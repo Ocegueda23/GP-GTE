@@ -92,9 +92,10 @@ Este diseño corrige explícitamente la deuda documentada del sistema actual:
 | ADR-03 | **Independencia total: todo vive en `bdsGTE`** — folios (`tblFolio` + `spGenerarFolio`) y motor de estatus (`tblProceso`/`tblTransicion`/`spCambiarEstatus`) propios, clonando el patrón transversal probado del ecosistema | Reutilizar `bdsCentral` (usp_GenerarFolio y CambiarST) | Decisión del equipo 2026-07-30: GTE no debe depender de ninguna otra base de datos; se replica el patrón §9, no se comparte la infraestructura |
 | ADR-04 | Motor de workflow por datos (generalización de `CambiarST`) | Workflow en código, librería externa (Elsa, Camunda) | Ya existe, ya está probado, es genérico y auditable; las librerías externas agregan complejidad que 2 devs no deben operar |
 | ADR-05 | CQRS ligero: Commands/Queries con MediatR, **sin** event sourcing ni bases separadas de lectura | Event sourcing completo | El historial de estatus ya da la dimensión temporal necesaria; ES completo es sobreingeniería |
-| ADR-06 | Integración Git por **webhooks + API** de Gitea (no hospedar Git propio) | Repos embebidos | Gitea self-hosted ya existe en Interflo; GTE lo referencia, no lo reemplaza |
+| ADR-06 | Integración Git por **webhooks + API del proveedor**, tras la abstracción `IProveedorGit` (no hospedar Git propio) | Acoplarse solo a Gitea; repos embebidos | GTE referencia repositorios, no los reemplaza. La abstracción es necesaria porque conviven dos proveedores: Gitea self-hosted para los proyectos internos y GitHub para el propio GTE (ADR-09) |
 | ADR-07 | Archivos adjuntos en filesystem/objeto con GUID + metadatos en BD | VARBINARY en BD (patrón Glosario actual) | Evita crecer la BD con binarios; el GUID de archivo es el patrón de la API central del ecosistema |
 | ADR-08 | Tiempo real con SignalR (tableros, notificaciones) | Polling | El GT actual hace polling de 100 ms por bug; SignalR elimina la clase completa de problema |
+| ADR-09 | **El código fuente de GTE vive en GitHub** (`github.com/Ocegueda23/GP-GTE`), de forma definitiva | Gitea self-hosted, que es el estándar del resto del ecosistema Interflo | Decisión del equipo (2026-07-30). Excepción explícita al estándar: aplica solo a este proyecto. Implicación registrada: para que GTE pueda trazar sus propios commits, la integración del módulo Desarrollo debe soportar GitHub además de Gitea (por eso ADR-06 abstrae el proveedor) |
 
 ### 0.4 Alcance funcional (mapa de capacidades)
 
@@ -346,7 +347,7 @@ token; RBAC por rol y alcance (global/proyecto/equipo); auditoría desde token v
 
 | Sistema | Dirección | Mecanismo | Uso |
 |---|---|---|---|
-| Gitea | Bidireccional | Webhooks entrantes + REST API saliente | Vincular commits/branches/PRs a work items; disparar transiciones; crear branch desde historia |
+| Gitea (proyectos internos) y GitHub (repositorio de GTE) | Bidireccional | Webhooks entrantes + REST API saliente, tras `IProveedorGit` | Vincular commits/branches/PRs a work items; disparar transiciones; crear branch desde historia. El proveedor se configura por repositorio (`tblRepositorio`) |
 | Microsoft Entra ID / AD | Entrante | OIDC / LDAP fallback | Autenticación SSO, alta automática de usuarios |
 | Microsoft Graph | Saliente | REST | Mensajes Teams, correo, calendario de reuniones |
 | SMTP | Saliente | SMTP | Correos de notificación (fallback de Graph) |
@@ -900,7 +901,7 @@ técnica base.
 | Calendarios y horarios | Horarios con tramos por día (soporta turnos partidos heredados: BANSI 08:30-14:30 + 17:00-19:30, etc.); días festivos por horario o globales; vista de calendario anual |
 | Vacaciones y ausencias | Solicitud de ausencia por tipo (vacaciones, incapacidad, permiso); flujo de aprobación por jefe (motor de workflow); las ausencias aprobadas descuentan capacidad de sprint y pausan SLA personales |
 | Ambientes | Catálogo de ambientes por proyecto (DEV, QA, PREPROD, PROD) con URL, servidor, base de datos y responsable |
-| Repositorios | Vínculo proyecto-repositorio Gitea (URL, token de webhook); prueba de conexión |
+| Repositorios | Vínculo proyecto-repositorio (proveedor Gitea o GitHub, URL, secreto de webhook); prueba de conexión |
 | Versiones del sistema | Historial de versiones de GTE mismo (sustituye `tblVersion`/`frmInfo`): notas visibles con "qué hay de nuevo" al iniciar sesión tras un release |
 
 **Reglas de negocio:**
@@ -1014,8 +1015,8 @@ duplicar a Gitea.
 
 | Funcionalidad | Detalle |
 |---|---|
-| Vínculo Git | Webhook de Gitea: push/PR/tag. Los mensajes de commit que mencionan un folio (`GTE-123`) se vinculan automáticamente al WorkItem |
-| Crear branch | Botón "Crear rama" en el WorkItem: crea `feature/GTE-123-slug` vía API de Gitea |
+| Vínculo Git | Webhook del proveedor (Gitea o GitHub): push/PR/tag. Los mensajes de commit que mencionan un folio (`GTE-123`) se vinculan automáticamente al WorkItem |
+| Crear branch | Botón "Crear rama" en el WorkItem: crea `feature/GTE-123-slug` vía API del proveedor |
 | Pull/Merge Requests | Estado del PR visible en el WorkItem; abrir PR puede transicionar el item a "En Revisión" (automatización configurable); merge puede transicionar a "En Pruebas" |
 | Commits | Lista de commits vinculados con autor, fecha y diff-link a Gitea |
 | Pipelines CI/CD | Registro de ejecuciones (build/deploy) reportadas por Gitea Actions vía webhook: estatus, duración, ambiente, artefactos producidos |
@@ -1908,7 +1909,7 @@ GTE.sln
 │   │   ├── «Modulo»/DTOs/Request|Responses/
 │   │   ├── Common/  (AuditContext, PagedResult, Behaviors MediatR)
 │   │   └── Interfaces/ (I«Feature»QueryService, ICanalNotificacion, IAlmacenArchivos,
-│   │                    IServicioIa, IGiteaClient, IMotorWorkflow, ICalendarioLaboral)
+│   │                    IServicioIa, IProveedorGit, IMotorWorkflow, ICalendarioLaboral)
 │   ├── GTE.Domain/
 │   │   ├── «Modulo»/Entities/
 │   │   ├── «Modulo»/Services/   (lógica pura: ReglasWorkItem, CalculadoraPresupuesto)
@@ -1919,7 +1920,7 @@ GTE.sln
 │   │   ├── Modelos/bdsGTE/                (scaffold de la unica base del sistema)
 │   │   ├── Repositories/  (escritura, RepositoryBase con AuditContext + bitácora)
 │   │   ├── Services/      (QueryServices - lectura/proyección)
-│   │   └── Integraciones/ (Gitea, Graph, Smtp, WhatsApp, ClaudeApi, Redis)
+│   │   └── Integraciones/ (Gitea, GitHub, Graph, Smtp, WhatsApp, ClaudeApi, Redis)
 │   └── GTE.Jobs/                    Hangfire server (host aparte o mismo proceso)
 ├── tests/
 │   ├── GTE.Domain.Tests/            reglas de negocio puras (xUnit)

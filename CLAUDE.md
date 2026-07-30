@@ -4,6 +4,12 @@ Este repo implementa la plataforma GTE. La fuente de decisiones es
 `Doctos/GTE-DocumentoMaestro.md`; las convenciones generales del ecosistema estan en el
 InterfloClaude.md global (secciones 7 a 13 aplican aqui con las adaptaciones de abajo).
 
+## Repositorio (ADR-09)
+
+Definitivo: https://github.com/Ocegueda23/GP-GTE (rama `main`, remoto `origin`).
+Excepcion deliberada al estandar del ecosistema, que usa Gitea self-hosted; aplica
+SOLO a este proyecto. No migrar sin decision del equipo.
+
 ## Stack (ADR-02 del Documento Maestro)
 
 - Backend: .NET 9, ASP.NET Core, EF Core 9, MediatR 12.x, FluentValidation,
