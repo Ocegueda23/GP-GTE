@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>GTE.WebApi</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.*" />
+    <PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0" />
+    <!-- AutoMapper 14.0.0: ultima linea MIT (la 15+ es comercial); incluye el registro AddAutoMapper -->
+    <PackageReference Include="AutoMapper" Version="14.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- CVE-2026-32933 (DoS por anidamiento ~25k niveles en el mapeo): solo parchado en
+         versiones comerciales 15.1.1+. No aplica a GTE: AutoMapper mapea unicamente
+         entidades a DTO construidas en servidor y System.Text.Json limita la
+         deserializacion de payloads a 64 niveles. Revisar si cambia el uso. -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-rvv3-g6hj-g44x" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\GTE.Application\GTE.Application.csproj" />
+    <ProjectReference Include="..\GTE.Infrastructure\GTE.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

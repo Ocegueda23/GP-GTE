@@ -1,0 +1,4 @@
+/* Los estilos base los gobierna MUI (CssBaseline + tema). */
+html, body, #root {
+  height: 100%;
+}
