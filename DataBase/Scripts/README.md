@@ -28,6 +28,12 @@ orden dentro de la tanda). Todo script es **idempotente**: se puede correr N vec
 | 09 INSERT Procesos | Alta de los 11 procesos GTE en dbo.tblProceso + ~55 transiciones en dbo.tblTransicion (todo en bdsGTE) |
 | 10 Verificacion | Solo lectura: comprueba los 100 objetos esperados + seeds de contrato (incluye tblProceso/tblTransicion pobladas); imprime FALTA/EXITOSA. Usar para comparar dev/preprod/prod |
 
+## Tanda 2 (2026-07-30)
+
+| Script | Contenido |
+|---|---|
+| 01_2026-07-30_INSERT_bdsGTE_TransicionesYEtiquetas.sql | Transicion WorkItem Terminado a Correccion (RECHAZAR_QA) que necesita el modulo de Revisiones + siembra de tblTransicionConfig con etiquetas de boton, permisos y motivos obligatorios de las 21 transiciones de WorkItem, Solicitud y Revision |
+
 ## Contratos importantes
 
 - **GTE es totalmente independiente**: una sola base (`bdsGTE`), sin referencias a ninguna

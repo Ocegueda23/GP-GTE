@@ -190,3 +190,34 @@ export interface MiDia {
 export async function obtenerMiDia() {
   return obtener<MiDia>("/api/v1/mi-dia");
 }
+
+export interface Revision {
+  idRevision: number;
+  idWorkItem: number;
+  folioWorkItem: string;
+  revisor: string;
+  comentarios: string | null;
+  idEstatus: number;
+  estatus: string;
+  corregido: boolean;
+  fechaCorreccion: string | null;
+  fechaRegistro: string;
+}
+
+export async function obtenerRevisiones(idWorkItem: number) {
+  return obtener<Revision[]>(`/api/v1/workitems/${idWorkItem}/revisiones`);
+}
+
+export async function crearRevision(idWorkItem: number, comentarios: string) {
+  return enviar<Revision>("post", `/api/v1/workitems/${idWorkItem}/revisiones`, { comentarios });
+}
+
+export async function corregirRevision(
+  idRevision: number,
+  datos: { corregido: boolean; motivo?: string },
+) {
+  return enviar<Revision>("put", `/api/v1/revisiones/${idRevision}/correccion`, {
+    corregido: datos.corregido,
+    motivo: datos.motivo || null,
+  });
+}

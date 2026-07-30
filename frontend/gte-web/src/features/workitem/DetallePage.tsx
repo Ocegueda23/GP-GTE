@@ -11,6 +11,7 @@ import {
 } from "../../shared/api/workitems";
 import { ModalTiempo } from "../trabajo/ModalTiempo";
 import { BotonesAcciones } from "./BotonesAcciones";
+import { PanelRevisiones } from "./PanelRevisiones";
 
 function formatearFecha(iso: string | null): string {
   if (!iso) return "-";
@@ -103,6 +104,9 @@ export function DetallePage() {
           <Tabs value={pestana} onChange={(_, valor) => setPestana(valor)} sx={{ mb: 2 }}>
             <Tab label="Descripcion" />
             <Tab label="Tiempo" />
+            <Tab label={item.revisionesPendientes > 0
+              ? `Revisiones (${item.revisionesPendientes})`
+              : "Revisiones"} />
           </Tabs>
 
           {pestana === 0 && (
@@ -157,6 +161,15 @@ export function DetallePage() {
               </Table>
             </Box>
           )}
+
+          {pestana === 2 && (
+            <PanelRevisiones
+              idWorkItem={item.idWorkItem}
+              folio={item.folio}
+              alExito={(mensaje) => setAviso({ tipo: "success", mensaje })}
+              alError={(mensaje) => setAviso({ tipo: "error", mensaje })}
+            />
+          )}
         </Paper>
 
         <Paper variant="outlined" sx={{ flex: 1, p: 2, alignSelf: "flex-start", minWidth: 280 }}>
@@ -185,7 +198,9 @@ export function DetallePage() {
           )}
           {item.revisionesPendientes > 0 && (
             <Alert severity="warning" sx={{ mt: 2 }}>
-              {item.revisionesPendientes} revision(es) pendiente(s) bloquean el cierre.
+              {item.revisionesPendientes === 1
+                ? "1 hallazgo sin corregir bloquea el cierre."
+                : `${item.revisionesPendientes} hallazgos sin corregir bloquean el cierre.`}
             </Alert>
           )}
         </Paper>

@@ -1043,7 +1043,7 @@ duplicar a Gitea.
 | Evidencias | Capturas/archivos adjuntos por ejecución |
 | Defectos | Falla -> botón "Crear bug" precargado (caso, paso, evidencia, release); el bug es un WorkItem tipo Bug con `IdEjecucionPruebaOrigen` |
 | Matriz de trazabilidad | Requisito x casos x resultado último ciclo: detecta requisitos sin cobertura |
-| Revisiones (code review interno) | Se conserva el flujo del GT: hallazgos por WorkItem con `Corregido`, reapertura solo por líder, cierre masivo con permiso `REV.Activar` |
+| Revisiones (code review interno) | Se conserva el flujo del GT: hallazgos por WorkItem con `Corregido`, reapertura solo por líder, cierre masivo con permiso `REV.Activar`. **Implementado**: reportar hallazgo reabre el item Terminado a Corrección (transición `RECHAZAR_QA` desde Terminado, sembrada por datos); marcar corregido mueve el hallazgo por su propio proceso; reabrir exige `REV.Reabrir` y motivo |
 | Automatización | Endpoint para que pipelines reporten resultados de pruebas automatizadas (JUnit XML) contra casos tipo Automatizada |
 | Cobertura | % requisitos con casos, % casos ejecutados, % pasa por ciclo |
 

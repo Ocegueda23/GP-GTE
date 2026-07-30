@@ -43,6 +43,10 @@ builder.Services.AddScoped<GTE.Domain.Interfaces.IWorkItemRepository, GTE.Infras
 builder.Services.AddScoped<GTE.Application.Interfaces.IWorkItemQueryService, GTE.Infrastructure.Services.WorkItemQueryService>();
 builder.Services.AddScoped<GTE.Application.Catalogos.Queries.ICatalogosQueryService, GTE.Infrastructure.Services.CatalogosQueryService>();
 
+// Modulo Revisiones
+builder.Services.AddScoped<GTE.Domain.Interfaces.IRevisionRepository, GTE.Infrastructure.Repositories.RevisionRepository>();
+builder.Services.AddScoped<GTE.Application.Interfaces.IRevisionQueryService, GTE.Infrastructure.Services.RevisionQueryService>();
+
 // Modulo Mi Dia
 builder.Services.AddScoped<GTE.Application.Interfaces.IMiDiaQueryService, GTE.Infrastructure.Services.MiDiaQueryService>();
 
