@@ -55,6 +55,36 @@ Revisar despues columnas computadas y tipos (leccion 7.8 del estandar). Para un 
 local rapido: crear bdsGTE en `(localdb)\MSSQLLocalDB` y correr los scripts 01-09.
 Las pruebas de integracion (GTE.Api.Tests) usan esa LocalDB si existe; si no, se omiten.
 
+## Autenticacion
+
+Toda la API exige identidad: sin token responde 401. Solo quedan abiertos `/health`,
+`/api/v1/version` y `/api/v1/auth/configuracion`. Los permisos finos se evaluan por caso
+de uso contra el RBAC de la base (403 si falta el permiso).
+
+### Produccion: Entra ID
+
+Llenar en `appsettings.json` (o variables de entorno):
+
+```
+Jwt:Authority = https://login.microsoftonline.com/<TENANT_ID>/v2.0
+Jwt:Audience  = <APPLICATION_ID_URI o client id de la app registrada>
+```
+
+**La API no arranca si en produccion no hay `Jwt:Authority` configurado**: es deliberado,
+para que nunca quede abierta por un despliegue incompleto. Al primer inicio de sesion de
+una identidad valida, su usuario se crea solo (aprovisionamiento JIT) y nace SIN roles:
+no puede operar hasta que administracion se los asigne.
+
+Pendiente de este frente: el flujo de redireccion del SPA hacia Entra (Authorization Code
+con PKCE) y la suplantacion auditada (permiso `ADM.Suplantar`).
+
+### Desarrollo sin tenant
+
+Con `Jwt:Desarrollo:Habilitado = true` (ya activo en `appsettings.Development.json`) la API
+emite tokens firmados localmente en `POST /api/v1/auth/desarrollo/token` con el cuerpo
+`{ "dominio": "aviramontes" }`. Ese endpoint responde 404 fuera del ambiente Development,
+y la clave de firma se genera aleatoria en cada arranque si no se configura una.
+
 ## Reglas del repositorio
 
 Ver `CLAUDE.md`. Resumen: flujo Controller -> AppService -> Repository/QueryService ->

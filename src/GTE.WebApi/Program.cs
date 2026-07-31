@@ -4,8 +4,8 @@ using GTE.Application.Common.Behaviors;
 using GTE.Infrastructure.Persistence;
 using GTE.WebApi;
 using GTE.WebApi.Middleware;
+using GTE.WebApi.Seguridad;
 using MediatR;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -37,6 +37,8 @@ builder.Services.AddScoped<GTE.Application.Interfaces.ICalendarioLaboral, GTE.In
 builder.Services.AddScoped<GTE.Application.Interfaces.IGeneradorFolios, GTE.Infrastructure.Services.GeneradorFolios>();
 builder.Services.AddScoped<GTE.Application.Interfaces.IVerificadorPermisos, GTE.Infrastructure.Services.VerificadorPermisos>();
 builder.Services.AddScoped<GTE.Application.Interfaces.IProveedorUsuarioActual, GTE.Infrastructure.Services.ProveedorUsuarioActual>();
+builder.Services.AddScoped<GTE.Application.Interfaces.IAprovisionadorUsuarios, GTE.Infrastructure.Services.AprovisionadorUsuarios>();
+builder.Services.AddScoped<GTE.Application.Interfaces.ISesionQueryService, GTE.Infrastructure.Services.SesionQueryService>();
 
 // Modulo WorkItems
 builder.Services.AddScoped<GTE.Domain.Interfaces.IWorkItemRepository, GTE.Infrastructure.Repositories.WorkItemRepository>();
@@ -66,16 +68,9 @@ builder.Services.AddScoped<GTE.Application.Interfaces.IMiDiaQueryService, GTE.In
 builder.Services.AddScoped<GTE.Domain.Interfaces.ISolicitudRepository, GTE.Infrastructure.Repositories.SolicitudRepository>();
 builder.Services.AddScoped<GTE.Application.Interfaces.ISolicitudQueryService, GTE.Infrastructure.Services.SolicitudQueryService>();
 
-// Autenticacion JWT (Entra ID via configuracion; los endpoints exigen [Authorize] por modulo)
-var seccionJwt = builder.Configuration.GetSection("Jwt");
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(opciones =>
-    {
-        opciones.Authority = seccionJwt["Authority"];
-        opciones.Audience = seccionJwt["Audience"];
-        opciones.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
-    });
-builder.Services.AddAuthorization();
+// Autenticacion: Entra ID en produccion; emisor local solo en desarrollo.
+// Arranca con FallbackPolicy que exige identidad en toda la API.
+builder.Services.AgregarAutenticacionGte(builder.Configuration, builder.Environment);
 
 // CORS para el SPA
 var origenesSpa = builder.Configuration.GetSection("Cors:Origenes").Get<string[]>()
@@ -102,7 +97,8 @@ app.UseMiddleware<AuditMiddleware>();
 app.UseAuthorization();
 
 app.MapControllers();
-app.MapGet("/health", () => Results.Ok(new { estado = "ok", fecha = DateTime.UtcNow }));
+app.MapGet("/health", () => Results.Ok(new { estado = "ok", fecha = DateTime.UtcNow }))
+    .AllowAnonymous();
 
 app.Run();
 

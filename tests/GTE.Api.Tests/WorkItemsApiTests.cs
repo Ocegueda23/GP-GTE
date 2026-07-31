@@ -4,7 +4,6 @@ using System.Text.Json;
 using GTE.Infrastructure.Modelos.bdsGTE;
 using GTE.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Xunit;
@@ -26,19 +25,7 @@ public class WorkItemsApiTests(WebApplicationFactory<Program> fabricaApp)
 
     private sealed record Envelope<T>(string Code, bool Success, string UserMessage, T? Response);
 
-    private static bool BaseDisponible()
-    {
-        try
-        {
-            using var conexion = new SqlConnection(CadenaLocal);
-            conexion.Open();
-            return true;
-        }
-        catch (Exception)
-        {
-            return false;
-        }
-    }
+    private static bool BaseDisponible() => FabricaApiAutenticada.BaseDisponible();
 
     private static FabricaContexto CrearFabricaDatos()
     {
@@ -59,14 +46,13 @@ public class WorkItemsApiTests(WebApplicationFactory<Program> fabricaApp)
             return;
         }
 
-        var cliente = fabricaApp.WithWebHostBuilder(builder =>
-            builder.UseSetting("ConnectionStrings:bdsGTE", CadenaLocal)).CreateClient();
+        var cliente = await FabricaApiAutenticada.CrearClienteAsync(fabricaApp, "aviramontes");
 
         var fabricaDatos = CrearFabricaDatos();
         var sufijo = Guid.NewGuid().ToString("N")[..6].ToUpperInvariant();
         var clave = $"E2E{sufijo}";
 
-        // Datos base: proyecto y el usuario que corresponde a la identidad "anonimo"
+        // Datos base: proyecto y el usuario que corresponde a la identidad del token
         int idProyecto;
         int idUsuario;
         var usuarioCreado = false;
@@ -83,12 +69,12 @@ public class WorkItemsApiTests(WebApplicationFactory<Program> fabricaApp)
             };
             contexto.TblProyecto.Add(proyecto);
 
-            var usuario = await contexto.TblUsuario.FirstOrDefaultAsync(u => u.Dominio == "anonimo");
+            var usuario = await contexto.TblUsuario.FirstOrDefaultAsync(u => u.Dominio == "aviramontes");
             if (usuario is null)
             {
                 usuario = new TblUsuario
                 {
-                    Dominio = "anonimo",
+                    Dominio = "aviramontes",
                     Nombre = "Usuario E2E",
                     UsuarioRegistro = "e2e",
                     Activo = true

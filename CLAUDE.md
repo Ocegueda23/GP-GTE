@@ -32,6 +32,10 @@ SOLO a este proyecto. No migrar sin decision del equipo.
   exponer entidades del scaffold.
 - Toda respuesta usa ApiResponse<T>; excepciones de dominio via GlobalExceptionMiddleware.
 - Auditoria SIEMPRE del token (AuditContext llenado por AuditMiddleware), nunca del payload.
+  Sin identidad, AuditContext.Usuario queda VACIO (usar TieneIdentidad): no usar centinelas
+  con texto porque pueden coincidir con una cuenta real y confundir la auditoria.
+- Toda la API exige autenticacion por FallbackPolicy. Un endpoint solo se abre con
+  [AllowAnonymous] y con una razon escrita (hoy: health, version y auth/configuracion).
   Bitacora con contexto de vida corta (RegistrarBitacoraAsync de RepositoryBase).
 - Cambios de estatus SOLO via IMotorWorkflow (dbo.spCambiarEstatus, motor propio); el
   front manda la accion, nunca el estatus destino. El estatus inicial lo fija el backend.

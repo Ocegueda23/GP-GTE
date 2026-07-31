@@ -44,7 +44,6 @@ export const http = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-// El token JWT se inyecta aqui cuando exista el flujo de login (SSO Entra ID).
 http.interceptors.request.use((config) => {
   const token = sessionStorage.getItem("gte.token");
   if (token) {
@@ -52,6 +51,25 @@ http.interceptors.request.use((config) => {
   }
   return config;
 });
+
+/** Handler que la aplicacion registra para reaccionar a una sesion invalida. */
+let alPerderSesion: (() => void) | null = null;
+
+export function registrarManejadorSesionInvalida(handler: () => void) {
+  alPerderSesion = handler;
+}
+
+// Token vencido o invalido: se descarta y la aplicacion vuelve al inicio de sesion
+http.interceptors.response.use(
+  (respuesta) => respuesta,
+  (error) => {
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
+      sessionStorage.removeItem("gte.token");
+      alPerderSesion?.();
+    }
+    return Promise.reject(error);
+  },
+);
 
 function lanzarErrorApi(error: unknown): never {
   if (axios.isAxiosError(error) && error.response?.data) {

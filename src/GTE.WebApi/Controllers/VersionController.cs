@@ -10,6 +10,7 @@ namespace GTE.WebApi.Controllers;
 [Route("api/v1/version")]
 public class VersionController(IWebHostEnvironment ambiente) : ControllerBase
 {
+    /// <summary>Anonimo a proposito: es el smoke test de despliegue y no expone datos.</summary>
     [HttpGet]
     [AllowAnonymous]
     public ActionResult<ApiResponse<object>> Obtener()
