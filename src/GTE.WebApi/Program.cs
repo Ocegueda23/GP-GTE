@@ -43,6 +43,14 @@ builder.Services.AddScoped<GTE.Domain.Interfaces.IWorkItemRepository, GTE.Infras
 builder.Services.AddScoped<GTE.Application.Interfaces.IWorkItemQueryService, GTE.Infrastructure.Services.WorkItemQueryService>();
 builder.Services.AddScoped<GTE.Application.Catalogos.Queries.ICatalogosQueryService, GTE.Infrastructure.Services.CatalogosQueryService>();
 
+// Modulo Calidad (QA)
+builder.Services.AddScoped<GTE.Domain.Interfaces.ICalidadRepository, GTE.Infrastructure.Repositories.CalidadRepository>();
+builder.Services.AddScoped<GTE.Application.Interfaces.ICalidadQueryService, GTE.Infrastructure.Services.CalidadQueryService>();
+
+// Modulo Entregas (releases)
+builder.Services.AddScoped<GTE.Domain.Interfaces.IEntregaRepository, GTE.Infrastructure.Repositories.EntregaRepository>();
+builder.Services.AddScoped<GTE.Application.Interfaces.IEntregaQueryService, GTE.Infrastructure.Services.EntregaQueryService>();
+
 // Modulo Planeacion
 builder.Services.AddScoped<GTE.Domain.Interfaces.IPlaneacionRepository, GTE.Infrastructure.Repositories.PlaneacionRepository>();
 builder.Services.AddScoped<GTE.Application.Interfaces.IPlaneacionQueryService, GTE.Infrastructure.Services.PlaneacionQueryService>();

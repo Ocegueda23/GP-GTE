@@ -7,6 +7,8 @@ import { PortalPage } from "./features/solicitudes/PortalPage";
 import { TriagePage } from "./features/triage/TriagePage";
 import { BacklogPage } from "./features/planeacion/BacklogPage";
 import { TableroPage } from "./features/planeacion/TableroPage";
+import { QaPage } from "./features/calidad/QaPage";
+import { ReleasesPage } from "./features/entregas/ReleasesPage";
 
 const tema = createTheme({
   palette: {
@@ -38,6 +40,8 @@ export default function App() {
               <Button color="inherit" component={RouterLink} to="/trabajo">Trabajo</Button>
               <Button color="inherit" component={RouterLink} to="/tablero">Tablero</Button>
               <Button color="inherit" component={RouterLink} to="/backlog">Backlog</Button>
+              <Button color="inherit" component={RouterLink} to="/qa">QA</Button>
+              <Button color="inherit" component={RouterLink} to="/releases">Releases</Button>
               <Button color="inherit" component={RouterLink} to="/solicitudes">Solicitudes</Button>
               <Button color="inherit" component={RouterLink} to="/triage">Triage</Button>
             </Box>
@@ -52,6 +56,8 @@ export default function App() {
               <Route path="/wi/:folio" element={<DetallePage />} />
               <Route path="/tablero" element={<TableroPage />} />
               <Route path="/backlog" element={<BacklogPage />} />
+              <Route path="/qa" element={<QaPage />} />
+              <Route path="/releases" element={<ReleasesPage />} />
               <Route path="/solicitudes" element={<PortalPage />} />
               <Route path="/triage" element={<TriagePage />} />
             </Routes>
