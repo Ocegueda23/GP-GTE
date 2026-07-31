@@ -3,7 +3,7 @@
 > Documento de continuidad. Sirve para retomar el proyecto en otra sesión sin
 > contexto previo. Actualizar al cerrar cada bloque de trabajo.
 >
-> **Última actualización:** 2026-07-31
+> **Última actualización:** 2026-07-31 (cierre del modulo de Administracion)
 > **Repositorio:** https://github.com/Ocegueda23/GP-GTE (rama `main`)
 > **Diseño completo:** `Doctos/GTE-DocumentoMaestro.md` (fuente de verdad de decisiones)
 > **Reglas para escribir código aquí:** `CLAUDE.md` en la raíz
@@ -54,9 +54,10 @@ dotnet test GTE.sln    # 34 pruebas; las de integración se omiten si no hay Loc
 | **Entregas** | Releases con contenido validado, artefactos con rollback pareado, cadena de firmas, despliegues, rollback, notas de versión | Releases |
 | **Motor de estatus** | 11 procesos por datos en `tblProceso`/`tblTransicion` + `spCambiarEstatus` con guard de concurrencia | — |
 | **Calendario laboral** | `fnMinutosLaborales` con turnos partidos y festivos; motor único de tiempo | — |
+| **Administracion** | Proyectos (alta/edicion + cambio de estatus por el motor, folio al autorizar, RN-PRY-01 bloquea el cierre con WorkItems abiertos), equipos con miembros y % dedicacion, usuarios (alta/edicion/baja logica, RN-ADM-01 valida ciclos de jerarquia con CTE recursivo), roles (asignar/retirar con alcance global o por proyecto, matriz rol-permiso guardada en lote), horarios (tramos con turnos partidos, dias festivos) y ambientes (por proyecto o globales) | Administracion (6 pestañas) |
 
-**Inventario:** 56 endpoints en 10 controladores · 10 pantallas · 12 scripts SQL ·
-~100 tablas · 34 pruebas.
+**Inventario:** 92 endpoints en 11 controladores · 11 pantallas · 12 scripts SQL ·
+~100 tablas · 38 pruebas.
 
 ---
 
@@ -68,7 +69,7 @@ Sin esto no se puede operar en producción, aunque el resto funcione.
 
 | # | Pendiente | Detalle |
 |---|---|---|
-| B1 | **Módulo de Administración (CRUD)** | Hoy **no existe forma de crear proyectos, equipos, usuarios, horarios ni ambientes desde la aplicación**: todo se hace por SQL. Tablas listas, sin API ni pantalla. Es el hueco más grande. Incluye asignar roles (sin esto, nadie puede habilitar a un usuario nuevo) |
+| ~~B1~~ | ~~**Módulo de Administración (CRUD)**~~ | **Resuelto 2026-07-31.** Proyectos, equipos+miembros, usuarios, roles (asignación+matriz en lote), horarios (tramos+festivos) y ambientes, con API completa (`AdministracionController`, 35 endpoints nuevos) y pantallas bajo `/admin` (6 pestañas). Ver detalle en la fila "Administracion" de la sección 2 y en la §3.4 lo que quedó deliberadamente fuera de alcance |
 | B2 | **Flujo de Entra ID en el SPA** | El backend ya valida tokens de Entra; falta la redirección Authorization Code + PKCE en el frontend. Necesita el tenant real (client id, tenant id, redirect URI). Hoy solo se entra con el emisor local de desarrollo |
 | B3 | **Migración de datos del GT** | Mapeo definido en el Documento Maestro §15.4: `tblTareas`→`tblWorkItem`, subtareas→hijos + registro de tiempo, historial de estatus, revisiones, usuarios/permisos, catálogos, glosario. Falta escribir y ensayar los scripts, con reportes de excepciones y checksums |
 | B4 | **Despliegue** | No hay pipeline CI/CD ni guía de publicación (IIS/Kestrel, certificados, usuario de BD con permisos mínimos, variables de entorno) |
@@ -114,6 +115,13 @@ transiciones automáticas configurables.
 
 ### 3.4 Detalles menores conocidos
 
+- **Administracion, fuera de alcance deliberado de esta entrega:** CRUD de roles nuevos (los 8
+  roles semilla ya cubren los perfiles del sistema; `EsSistema` sugiere que no se crean desde
+  UI), CRUD de Areas/Puestos (catalogos simples, sin pantalla propia), gestion de
+  Ausencias/vacaciones (mencionada en el Documento Maestro §3.1 pero no en el alcance de esta
+  sesion), Repositorios Git (tabla `tblRepositorio` lista, sin API), y "Version del sistema".
+  Los catalogos de Area/Puesto/Nivel/Horario ya se leen para los selects de Usuarios, solo
+  falta un alta propia si se necesita crear valores nuevos desde la UI en vez de por SQL.
 - `QaPage`: el alta de caso solo captura **un paso**; falta editar casos para agregar más.
 - `tblEtiqueta` sin uso (etiquetas libres para WorkItems).
 - Cadena de aprobación de releases fija (`QA`, `Líder`, `Negocio`); el diseño la quiere
@@ -165,6 +173,22 @@ transiciones automáticas configurables.
   Pendiente hay que ejecutar `INICIAR` antes, no forzar el salto.
 - **TypeScript del template Vite**: `erasableSyntaxOnly` prohíbe parameter properties en
   constructores.
+- **CTE recursivo para validar ciclos (RN-ADM-01)**: EF no expresa CTEs recursivos; se resuelve
+  con `DbCommand` crudo parametrizado (mismo patron que `MotorWorkflow`/`GeneradorFolios`), no
+  con `SqlQuery<T>` de EF 8/9 (mas simple pero no se probo aqui). Ver
+  `AdministracionRepository.FormariaCicloJerarquiaAsync`.
+- **`await x ?? throw ...;` como sentencia suelta no compila** (CS0201): hay que asignarlo,
+  aunque sea a un descarte (`_ = await consultas.ObtenerXAsync(...) ?? throw new
+  NotFoundException(...);`).
+- **Icono `DeleteOutline` de `@mui/icons-material`**: esta version del paquete no trae la
+  variante sin sufijo; usar `@mui/icons-material/DeleteOutlineOutlined`.
+- **`Typography` con `display="block"`** ya no es una prop valida en MUI 9 sin `component`;
+  usar `sx={{ display: "block" }}`.
+- **Automatizacion de navegador (Browser pane) y `Tabs` de MUI**: en un entorno sin
+  compositing real, el click por coordenadas de `computer` no siempre dispara el `onChange`
+  de un `Tab` (ripple/touch handling); si una pestaña no cambia visualmente pero tampoco hay
+  error, probar `elemento.click()` via `javascript_tool` antes de asumir que el componente
+  esta roto.
 
 ---
 

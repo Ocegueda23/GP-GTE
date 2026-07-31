@@ -68,6 +68,10 @@ builder.Services.AddScoped<GTE.Application.Interfaces.IMiDiaQueryService, GTE.In
 builder.Services.AddScoped<GTE.Domain.Interfaces.ISolicitudRepository, GTE.Infrastructure.Repositories.SolicitudRepository>();
 builder.Services.AddScoped<GTE.Application.Interfaces.ISolicitudQueryService, GTE.Infrastructure.Services.SolicitudQueryService>();
 
+// Modulo Administracion
+builder.Services.AddScoped<GTE.Domain.Interfaces.IAdministracionRepository, GTE.Infrastructure.Repositories.AdministracionRepository>();
+builder.Services.AddScoped<GTE.Application.Interfaces.IAdministracionQueryService, GTE.Infrastructure.Services.AdministracionQueryService>();
+
 // Autenticacion: Entra ID en produccion; emisor local solo en desarrollo.
 // Arranca con FallbackPolicy que exige identidad en toda la API.
 builder.Services.AgregarAutenticacionGte(builder.Configuration, builder.Environment);

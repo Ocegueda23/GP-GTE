@@ -14,6 +14,7 @@ import { TableroPage } from "./features/planeacion/TableroPage";
 import { QaPage } from "./features/calidad/QaPage";
 import { ReleasesPage } from "./features/entregas/ReleasesPage";
 import { GuardiaSesion } from "./features/sesion/GuardiaSesion";
+import { AdminPage } from "./features/admin/AdminPage";
 import { cerrarSesion, useSesion } from "./shared/api/sesion";
 
 const tema = createTheme({
@@ -31,8 +32,8 @@ const tema = createTheme({
   },
 });
 
-/** Opciones del menu con el permiso que las habilita (null = disponible para todos). */
-const NAVEGACION: { ruta: string; etiqueta: string; permiso: string | null }[] = [
+/** Opciones del menu con el/los permisos que las habilita (null = disponible para todos). */
+const NAVEGACION: { ruta: string; etiqueta: string; permiso: string | string[] | null }[] = [
   { ruta: "/mi-dia", etiqueta: "Mi dia", permiso: null },
   { ruta: "/trabajo", etiqueta: "Trabajo", permiso: null },
   { ruta: "/tablero", etiqueta: "Tablero", permiso: null },
@@ -41,6 +42,7 @@ const NAVEGACION: { ruta: string; etiqueta: string; permiso: string | null }[] =
   { ruta: "/releases", etiqueta: "Releases", permiso: "REL.Crear" },
   { ruta: "/solicitudes", etiqueta: "Solicitudes", permiso: null },
   { ruta: "/triage", etiqueta: "Triage", permiso: "SOL.Triage" },
+  { ruta: "/admin", etiqueta: "Administracion", permiso: ["ADM.Usuarios", "ADM.Roles"] },
 ];
 
 function BarraSuperior() {
@@ -59,7 +61,8 @@ function BarraSuperior() {
         <Typography variant="h6" sx={{ fontWeight: 700, letterSpacing: 1 }}>GTE</Typography>
         <Box sx={{ ml: 3, display: "flex", gap: 1, flexWrap: "wrap", flex: 1 }}>
           {NAVEGACION
-            .filter((opcion) => opcion.permiso === null || puede(opcion.permiso))
+            .filter((opcion) => opcion.permiso === null
+              || (Array.isArray(opcion.permiso) ? opcion.permiso.some(puede) : puede(opcion.permiso)))
             .map((opcion) => (
               <Button key={opcion.ruta} color="inherit" component={RouterLink} to={opcion.ruta}>
                 {opcion.etiqueta}
@@ -103,6 +106,7 @@ export default function App() {
                 <Route path="/releases" element={<ReleasesPage />} />
                 <Route path="/solicitudes" element={<PortalPage />} />
                 <Route path="/triage" element={<TriagePage />} />
+                <Route path="/admin" element={<AdminPage />} />
               </Routes>
             </Box>
           </Container>

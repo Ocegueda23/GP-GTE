@@ -18,4 +18,13 @@ public class CatalogosController(IMediator mediator) : ControllerBase
         var resultado = await mediator.Send(new ObtenerCatalogosBandejaQuery(), cancellationToken);
         return Ok(ApiResponse<CatalogosBandejaResponse>.Exito(resultado));
     }
+
+    /// <summary>Catalogos para las pantallas de /admin (dropdowns de alta/edicion).</summary>
+    [HttpGet("administracion")]
+    public async Task<ActionResult<ApiResponse<CatalogosAdministracionResponse>>> ObtenerAdministracion(
+        CancellationToken cancellationToken)
+    {
+        var resultado = await mediator.Send(new ObtenerCatalogosAdministracionQuery(), cancellationToken);
+        return Ok(ApiResponse<CatalogosAdministracionResponse>.Exito(resultado));
+    }
 }

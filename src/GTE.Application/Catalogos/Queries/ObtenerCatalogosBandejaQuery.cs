@@ -8,6 +8,7 @@ public record ObtenerCatalogosBandejaQuery : IRequest<CatalogosBandejaResponse>;
 public interface ICatalogosQueryService
 {
     Task<CatalogosBandejaResponse> ObtenerCatalogosBandejaAsync(CancellationToken cancellationToken = default);
+    Task<CatalogosAdministracionResponse> ObtenerCatalogosAdministracionAsync(CancellationToken cancellationToken = default);
 }
 
 public class ObtenerCatalogosBandejaHandler(ICatalogosQueryService consultas)
