@@ -2161,7 +2161,7 @@ gantt
 | 0 | Login SSO funcionando, un proceso de workflow de prueba operando vía `spCambiarEstatus`, pipeline CI con build+tests |
 | 1 | **El equipo abandona el GT WinForms**: paridad funcional de bandeja/detalle/tiempos/revisiones + datos migrados verificados |
 | 2 | Primer sprint planeado y cerrado dentro de GTE; solicitudes fluyen por triage |
-| 3 | Primer release real aprobado y desplegado con bitácora completa |
+| 3 | Primer release real aprobado y desplegado con bitácora completa. **Implementado 2026-07-31**: QA (planes, casos con pasos, ciclos, ejecuciones, bug desde falla, matriz de trazabilidad) y Entregas (contenido validado, artefactos con rollback pareado, cadena de firmas electrónicas, despliegues, rollback, notas de versión). **Pendiente de esta fase**: integración con el proveedor Git (webhooks, commits, PRs, pipelines) |
 | 4 | Mesa de ayuda operando con SLA medido un mes completo |
 | 5 | Dashboard ejecutivo presentado a dirección con datos reales |
 
