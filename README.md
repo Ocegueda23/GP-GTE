@@ -4,7 +4,8 @@ Plataforma integral de gestion del departamento de desarrollo de software de Int
 Sucesora del Gestor de Proyectos (GT, WinForms). El diseno completo vive en
 `Doctos/GTE-DocumentoMaestro.md` (fuente unica de decisiones de arquitectura).
 
-**Repositorio definitivo: https://github.com/Ocegueda23/GP-GTE** (ADR-09). Es una
+**Repositorio definitivo: https://github.com/Ocegueda23/GP-GTE** (ADR-09).
+Estado y pendientes al dia: `Doctos/PENDIENTES.md`. Es una
 excepcion deliberada al estandar del ecosistema Interflo, que usa Gitea self-hosted:
 aplica solo a este proyecto.
 
