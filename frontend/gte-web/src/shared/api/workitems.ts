@@ -44,6 +44,7 @@ export interface CatalogosBandeja {
   proyectos: { id: number; clave: string; nombre: string }[];
   usuarios: CatalogoItem[];
   tiposSolicitud: CatalogoItem[];
+  equipos: CatalogoItem[];
 }
 
 export interface FiltroBandeja {

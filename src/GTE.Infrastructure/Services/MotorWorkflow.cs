@@ -118,6 +118,23 @@ public class MotorWorkflow(FabricaContexto fabrica, AuditContext auditoria) : IM
         return acciones.OrderBy(a => a.Orden).ThenBy(a => a.Accion).ToList();
     }
 
+    public async Task<IReadOnlyList<TransicionDisponible>> ObtenerDestinosAsync(
+        string proceso,
+        int idEstatusOrigen,
+        CancellationToken cancellationToken = default)
+    {
+        await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
+
+        var configuracion = await ObtenerProcesoAsync(contexto, proceso, cancellationToken);
+
+        return await contexto.TblTransicion.AsNoTracking()
+            .Where(t => t.IdProceso == configuracion.IdProceso
+                        && t.IdEstatusOrigen == idEstatusOrigen
+                        && t.Activo)
+            .Select(t => new TransicionDisponible(t.Accion, t.IdEstatusDestino))
+            .ToListAsync(cancellationToken);
+    }
+
     private static async Task<Modelos.bdsGTE.TblProceso> ObtenerProcesoAsync(
         DbContextGTE contexto, string proceso, CancellationToken cancellationToken)
     {

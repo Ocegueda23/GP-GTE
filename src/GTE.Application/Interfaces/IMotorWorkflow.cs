@@ -15,6 +15,9 @@ public record ResultadoTransicion(
     int IdEstatusNuevo,
     string DescripcionEstatusNuevo);
 
+/// <summary>Flecha del grafo: que accion lleva a que estatus destino.</summary>
+public record TransicionDisponible(string Accion, int IdEstatusDestino);
+
 /// <summary>
 /// Motor de workflow propio de GTE. Unica puerta de cambio de estatus del sistema:
 /// invoca dbo.spCambiarEstatus, que lee el grafo de dbo.tblProceso/dbo.tblTransicion
@@ -36,5 +39,14 @@ public interface IMotorWorkflow
     Task<IReadOnlyList<AccionDisponible>> ObtenerAccionesAsync(
         string proceso,
         int idRegistro,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Transiciones activas desde un estatus. Sirve para traducir un destino deseado
+    /// (por ejemplo, soltar una tarjeta en otra columna del tablero) a la accion del grafo.
+    /// </summary>
+    Task<IReadOnlyList<TransicionDisponible>> ObtenerDestinosAsync(
+        string proceso,
+        int idEstatusOrigen,
         CancellationToken cancellationToken = default);
 }

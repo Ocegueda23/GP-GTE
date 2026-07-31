@@ -5,6 +5,8 @@ import { DetallePage } from "./features/workitem/DetallePage";
 import { MiDiaPage } from "./features/midia/MiDiaPage";
 import { PortalPage } from "./features/solicitudes/PortalPage";
 import { TriagePage } from "./features/triage/TriagePage";
+import { BacklogPage } from "./features/planeacion/BacklogPage";
+import { TableroPage } from "./features/planeacion/TableroPage";
 
 const tema = createTheme({
   palette: {
@@ -34,6 +36,8 @@ export default function App() {
             <Box sx={{ ml: 3, display: "flex", gap: 1 }}>
               <Button color="inherit" component={RouterLink} to="/mi-dia">Mi dia</Button>
               <Button color="inherit" component={RouterLink} to="/trabajo">Trabajo</Button>
+              <Button color="inherit" component={RouterLink} to="/tablero">Tablero</Button>
+              <Button color="inherit" component={RouterLink} to="/backlog">Backlog</Button>
               <Button color="inherit" component={RouterLink} to="/solicitudes">Solicitudes</Button>
               <Button color="inherit" component={RouterLink} to="/triage">Triage</Button>
             </Box>
@@ -46,6 +50,8 @@ export default function App() {
               <Route path="/mi-dia" element={<MiDiaPage />} />
               <Route path="/trabajo" element={<BandejaPage />} />
               <Route path="/wi/:folio" element={<DetallePage />} />
+              <Route path="/tablero" element={<TableroPage />} />
+              <Route path="/backlog" element={<BacklogPage />} />
               <Route path="/solicitudes" element={<PortalPage />} />
               <Route path="/triage" element={<TriagePage />} />
             </Routes>

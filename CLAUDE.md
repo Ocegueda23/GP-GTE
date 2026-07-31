@@ -45,6 +45,10 @@ SOLO a este proyecto. No migrar sin decision del equipo.
   las columnas bit (Activo DEFAULT 1) NO aplica de forma confiable en INSERTs de EF;
   toda alta fija Activo = true explicitamente en la entidad.
 - Sin SQL interpolado; sin SQL almacenado en datos.
+- TRAMPA EF (§7.8): no filtrar ni ordenar sobre proyecciones intermedias complejas
+  (records/DTOs anidados). Patron correcto: unir entidades sin proyectar, filtrar y
+  ordenar por columnas reales, y proyectar al final con Expression<Func<T,TResult>>
+  (ver ConsultaBase/ProyeccionTarjeta en PlaneacionQueryService).
 
 ## Frontend
 
