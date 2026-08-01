@@ -32,7 +32,8 @@ public class CambiarEstatusSolicitudHandler(
     ISolicitudQueryService consultas,
     IMotorWorkflow motor,
     IVerificadorPermisos permisos,
-    IProveedorUsuarioActual proveedorUsuario) : IRequestHandler<CambiarEstatusSolicitudCommand, SolicitudResponse>
+    IProveedorUsuarioActual proveedorUsuario,
+    IServicioNotificaciones notificaciones) : IRequestHandler<CambiarEstatusSolicitudCommand, SolicitudResponse>
 {
     public async Task<SolicitudResponse> Handle(
         CambiarEstatusSolicitudCommand command, CancellationToken cancellationToken)
@@ -78,7 +79,31 @@ public class CambiarEstatusSolicitudHandler(
             "Solicitud", command.IdSolicitud, command.Accion, command.Motivo, null, cancellationToken);
         await repositorio.AplicarEfectosTransicionAsync(command.IdSolicitud, command.Accion, cancellationToken);
 
+        await NotificarSolicitanteAsync(command, estado, cancellationToken);
+
         return await consultas.ObtenerPorIdAsync(command.IdSolicitud, cancellationToken)
             ?? throw new NotFoundException("Solicitud", command.IdSolicitud);
+    }
+
+    /// <summary>RECHAZAR y DEVOLVER exigen motivo (se lo lleva la notificacion); APROBAR no.</summary>
+    private async Task NotificarSolicitanteAsync(
+        CambiarEstatusSolicitudCommand command, GTE.Domain.Solicitudes.EstadoSolicitud estado,
+        CancellationToken cancellationToken)
+    {
+        var titulo = command.Accion switch
+        {
+            AccionesSolicitud.Aprobar => $"Tu solicitud {estado.Titulo} fue aprobada",
+            AccionesSolicitud.Rechazar => $"Tu solicitud {estado.Titulo} fue rechazada",
+            AccionesSolicitud.Devolver => $"Tu solicitud {estado.Titulo} fue devuelta para corregir",
+            _ => null
+        };
+        if (titulo is null)
+        {
+            return;
+        }
+
+        await notificaciones.NotificarAsync(
+            [estado.IdSolicitante], titulo, command.Motivo, "Solicitud", command.IdSolicitud,
+            "/solicitudes", cancellationToken);
     }
 }

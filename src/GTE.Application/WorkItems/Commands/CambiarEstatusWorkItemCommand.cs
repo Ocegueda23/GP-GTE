@@ -28,7 +28,8 @@ public class CambiarEstatusWorkItemValidator : AbstractValidator<CambiarEstatusW
 public class CambiarEstatusWorkItemHandler(
     IWorkItemRepository repositorio,
     IMotorWorkflow motor,
-    IVerificadorPermisos permisos) : IRequestHandler<CambiarEstatusWorkItemCommand, EstatusCambiadoResponse>
+    IVerificadorPermisos permisos,
+    INotificadorTiempoReal notificador) : IRequestHandler<CambiarEstatusWorkItemCommand, EstatusCambiadoResponse>
 {
     private const string Proceso = "WorkItem";
 
@@ -71,6 +72,11 @@ public class CambiarEstatusWorkItemHandler(
             Proceso, command.IdWorkItem, command.Accion, command.Motivo, horarioAsignado, cancellationToken);
 
         await repositorio.AplicarEfectosTransicionAsync(command.IdWorkItem, command.Accion, cancellationToken);
+
+        // Cubre tanto los botones de accion del detalle como el drag del kanban
+        // (MoverTarjetaCommand delega en este mismo comando).
+        await notificador.NotificarWorkItemActualizadoAsync(
+            command.IdWorkItem, resultado.IdEstatusNuevo, cancellationToken);
 
         return new EstatusCambiadoResponse
         {

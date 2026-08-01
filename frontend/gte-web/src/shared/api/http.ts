@@ -49,8 +49,10 @@ const RUTAS_SIN_REINTENTO = [
   "/api/v1/auth/logout",
 ];
 
+export const URL_BASE_API = import.meta.env.VITE_API_URL ?? "http://localhost:5088";
+
 export const http = axios.create({
-  baseURL: import.meta.env.VITE_API_URL ?? "http://localhost:5088",
+  baseURL: URL_BASE_API,
   headers: { "Content-Type": "application/json" },
   // El refresh token viaja en una cookie HttpOnly (no en el body ni en localStorage).
   withCredentials: true,

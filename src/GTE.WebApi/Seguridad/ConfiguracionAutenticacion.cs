@@ -42,6 +42,21 @@ public static class ConfiguracionAutenticacion
                     ValidateLifetime = true,
                     ClockSkew = TimeSpan.FromMinutes(2)
                 };
+                // El WebSocket de SignalR no puede mandar el header Authorization: el
+                // cliente manda el JWT por query string y aqui se recupera para el hub.
+                config.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = contexto =>
+                    {
+                        var accessToken = contexto.Request.Query["access_token"];
+                        if (!string.IsNullOrEmpty(accessToken)
+                            && contexto.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+                        {
+                            contexto.Token = accessToken;
+                        }
+                        return Task.CompletedTask;
+                    }
+                };
             });
 
         // Toda la API exige identidad; los permisos finos los evalua cada caso de uso

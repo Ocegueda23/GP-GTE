@@ -21,6 +21,7 @@ builder.Host.UseSerilog((contexto, configuracion) => configuracion
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddSignalR();
 
 // MediatR + FluentValidation + AutoMapper
 var ensambladoApplication = typeof(AuditContext).Assembly;
@@ -80,6 +81,12 @@ builder.Services.AddScoped<GTE.Application.Interfaces.IArchivoQueryService, GTE.
 builder.Services.AddSingleton<GTE.Application.Interfaces.IAlmacenArchivos, GTE.Infrastructure.Services.AlmacenArchivosDisco>();
 builder.Services.AddSingleton<GTE.Application.Interfaces.ISanitizadorHtml, GTE.Infrastructure.Services.SanitizadorHtmlGanss>();
 
+// Modulo Notificaciones (InApp + SignalR)
+builder.Services.AddScoped<GTE.Domain.Interfaces.INotificacionRepository, GTE.Infrastructure.Repositories.NotificacionRepository>();
+builder.Services.AddScoped<GTE.Application.Interfaces.INotificacionQueryService, GTE.Infrastructure.Services.NotificacionQueryService>();
+builder.Services.AddScoped<GTE.Application.Interfaces.IServicioNotificaciones, GTE.Infrastructure.Services.ServicioNotificaciones>();
+builder.Services.AddScoped<GTE.Application.Interfaces.INotificadorTiempoReal, GTE.WebApi.Hubs.NotificadorSignalR>();
+
 // Modulo Autenticacion (propia de GTE, sin proveedor externo)
 builder.Services.AddScoped<GTE.Domain.Interfaces.IAutenticacionRepository, GTE.Infrastructure.Repositories.AutenticacionRepository>();
 builder.Services.AddSingleton<GTE.Application.Interfaces.IHashPassword, GTE.Infrastructure.Services.HashPasswordBCrypt>();
@@ -115,6 +122,7 @@ app.UseMiddleware<AuditMiddleware>();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<GTE.WebApi.Hubs.NotificacionesHub>("/hubs/notificaciones");
 app.MapGet("/health", () => Results.Ok(new { estado = "ok", fecha = DateTime.UtcNow }))
     .AllowAnonymous();
 

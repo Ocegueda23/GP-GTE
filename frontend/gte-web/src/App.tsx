@@ -1,9 +1,15 @@
 import {
-  AppBar, Box, Button, Chip, Container, CssBaseline, Menu, MenuItem,
-  ThemeProvider, Toolbar, Tooltip, Typography, createTheme,
+  AppBar, Badge, Box, Button, Chip, Container, CssBaseline, Divider, IconButton, ListItemText,
+  Menu, MenuItem, ThemeProvider, Toolbar, Tooltip, Typography, createTheme,
 } from "@mui/material";
+import NotificationsIcon from "@mui/icons-material/Notifications";
 import { useState } from "react";
-import { BrowserRouter, Link as RouterLink, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Link as RouterLink, Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  marcarNotificacionLeida, marcarTodasNotificacionesLeidas, obtenerNotificaciones,
+} from "./shared/api/notificaciones";
+import { useConexionTiempoReal } from "./shared/tiempoReal/useConexionTiempoReal";
 import { BandejaPage } from "./features/trabajo/BandejaPage";
 import { DetallePage } from "./features/workitem/DetallePage";
 import { MiDiaPage } from "./features/midia/MiDiaPage";
@@ -45,9 +51,77 @@ const NAVEGACION: { ruta: string; etiqueta: string; permiso: string | string[] |
   { ruta: "/admin", etiqueta: "Administracion", permiso: ["ADM.Usuarios", "ADM.Roles"] },
 ];
 
+function CampanaNotificaciones() {
+  const navegar = useNavigate();
+  const clienteQuery = useQueryClient();
+  const [anclaNotificaciones, setAnclaNotificaciones] = useState<HTMLElement | null>(null);
+
+  const notificaciones = useQuery({
+    queryKey: ["notificaciones"],
+    queryFn: () => obtenerNotificaciones(true),
+    refetchOnWindowFocus: true,
+  });
+
+  const abrirNotificacion = async (idNotificacion: number, url: string | null) => {
+    setAnclaNotificaciones(null);
+    try {
+      await marcarNotificacionLeida(idNotificacion);
+    } finally {
+      await clienteQuery.invalidateQueries({ queryKey: ["notificaciones"] });
+      if (url) navegar(url);
+    }
+  };
+
+  const marcarTodas = async () => {
+    try {
+      await marcarTodasNotificacionesLeidas();
+    } finally {
+      await clienteQuery.invalidateQueries({ queryKey: ["notificaciones"] });
+    }
+  };
+
+  const pendientes = notificaciones.data ?? [];
+
+  return (
+    <>
+      <IconButton color="inherit" onClick={(e) => setAnclaNotificaciones(e.currentTarget)}>
+        <Badge badgeContent={pendientes.length} color="error">
+          <NotificationsIcon />
+        </Badge>
+      </IconButton>
+      <Menu
+        anchorEl={anclaNotificaciones}
+        open={anclaNotificaciones !== null}
+        onClose={() => setAnclaNotificaciones(null)}
+        slotProps={{ paper: { sx: { minWidth: 320, maxWidth: 400 } } }}
+      >
+        {pendientes.length === 0 && (
+          <MenuItem disabled>Sin notificaciones pendientes.</MenuItem>
+        )}
+        {pendientes.map((notificacion) => (
+          <MenuItem
+            key={notificacion.idNotificacion}
+            onClick={() => void abrirNotificacion(notificacion.idNotificacion, notificacion.url)}
+            sx={{ whiteSpace: "normal" }}
+          >
+            <ListItemText primary={notificacion.titulo} secondary={notificacion.mensaje} />
+          </MenuItem>
+        ))}
+        {pendientes.length > 0 && [
+          <Divider key="divisor" />,
+          <MenuItem key="marcar-todas" onClick={() => void marcarTodas()}>
+            Marcar todas como leidas
+          </MenuItem>,
+        ]}
+      </Menu>
+    </>
+  );
+}
+
 function BarraSuperior() {
   const { sesion, establecer, puede } = useSesion();
   const [ancla, setAncla] = useState<HTMLElement | null>(null);
+  useConexionTiempoReal();
 
   const salir = () => {
     void cerrarSesionServidor();
@@ -70,11 +144,12 @@ function BarraSuperior() {
               </Button>
             ))}
         </Box>
+        <CampanaNotificaciones />
         <Tooltip title={`${sesion?.dominio} - ${sesion?.roles.join(", ")}`}>
           <Chip
             label={sesion?.nombre ?? ""}
             onClick={(e) => setAncla(e.currentTarget)}
-            sx={{ color: "inherit", borderColor: "rgba(255,255,255,0.5)" }}
+            sx={{ color: "inherit", borderColor: "rgba(255,255,255,0.5)", ml: 1 }}
             variant="outlined"
           />
         </Tooltip>

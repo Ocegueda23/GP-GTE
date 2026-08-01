@@ -3,7 +3,7 @@
 > Documento de continuidad. Sirve para retomar el proyecto en otra sesión sin
 > contexto previo. Actualizar al cerrar cada bloque de trabajo.
 >
-> **Última actualización:** 2026-08-01 (edición de WorkItem en la UI, cierre de A2)
+> **Última actualización:** 2026-08-01 (notificaciones y SignalR en vivo, cierre de A3 y A6)
 > **Repositorio:** https://github.com/Ocegueda23/GP-GTE (rama `main`)
 > **Diseño completo:** `Doctos/GTE-DocumentoMaestro.md` (fuente de verdad de decisiones)
 > **Reglas para escribir código aquí:** `CLAUDE.md` en la raíz
@@ -64,9 +64,10 @@ dotnet test GTE.sln    # 45 pruebas; las de integración se omiten si no hay Loc
 | **Calendario laboral** | `fnMinutosLaborales` con turnos partidos y festivos; motor único de tiempo | — |
 | **Administracion** | Proyectos (alta/edicion + cambio de estatus por el motor, folio al autorizar, RN-PRY-01 bloquea el cierre con WorkItems abiertos), equipos con miembros y % dedicacion, usuarios (alta/edicion/baja logica, RN-ADM-01 valida ciclos de jerarquia con CTE recursivo), roles (asignar/retirar con alcance global o por proyecto, matriz rol-permiso guardada en lote), horarios (tramos con turnos partidos, dias festivos) y ambientes (por proyecto o globales) | Administracion (6 pestañas) |
 | **Comentarios y adjuntos** | Hilos de comentarios sobre WorkItem con formato basico (negritas, listas, etc.), @menciones con autocompletado (TipTap + catalogo de usuarios) y pegado de imagenes desde el portapapeles; adjuntos con subida/descarga por streaming autenticado (`IAlmacenArchivos` en disco, GUID + SHA-256), validacion de extension/tamano, baja logica solo por el propio autor. HTML sanitizado en el backend (`HtmlSanitizer`) antes de guardarse | franja de Comentarios bajo el detalle + pestaña Adjuntos, en Detalle de WorkItem |
+| **Notificaciones y tiempo real** | Campana con notificaciones In-App (`tblNotificacion`) que llegan en vivo por SignalR (`NotificacionesHub`, un solo hub para notificaciones + refresco de tablero); disparadores: Solicitud aprobada/rechazada/devuelta (notifica al solicitante) y @mencion en un comentario (notifica al mencionado). El tablero Kanban se refresca solo cuando cualquier WorkItem cambia de estatus, sin importar quien lo haya movido | campana en la barra superior (todas las pantallas) |
 
-**Inventario:** 104 endpoints en 13 controladores · 11 pantallas · 13 scripts SQL ·
-~100 tablas (+1, `tblRefreshToken`) · 47 pruebas.
+**Inventario:** 108 endpoints en 14 controladores + 1 hub de SignalR · 11 pantallas ·
+13 scripts SQL · ~100 tablas (+1, `tblRefreshToken`) · 49 pruebas.
 
 ---
 
@@ -89,10 +90,10 @@ Sin esto no se puede operar en producción, aunque el resto funcione.
 |---|---|---|
 | ~~A1~~ | ~~**Comentarios y adjuntos**~~ | **Resuelto 2026-08-01.** Hilos de comentarios (formato básico + @menciones + imágenes pegadas) y adjuntos (subida/descarga por streaming autenticado) sobre WorkItem, API completa (`ComentariosController`, `ArchivosController`) y UI integrada en el Detalle. Ver fila "Comentarios y adjuntos" de la sección 2 y lo que quedó deliberadamente fuera de alcance en la §3.4 |
 | ~~A2~~ | ~~**Edición de WorkItem en la UI**~~ | **Resuelto 2026-08-01.** Modal de edición (`ModalEditarWorkItem.tsx`) sobre el endpoint `PUT /workitems/{id}` ya existente: titulo, descripcion, criterios, prioridad, complejidad, asignado, compromiso y puntos. El boton "Editar" se oculta si el elemento esta Terminado o asignado a otra persona y el usuario no tiene el permiso correspondiente; las reglas campo-por-campo (compromiso al pasado, cambio de complejidad) las sigue validando el backend, su 403 se ve tal cual en el Snackbar. Se agrego el catalogo de Complejidades (`CatalogosBandejaResponse`) que no existia en ningun endpoint |
-| A3 | **Notificaciones** | `tblNotificacion`, `tblPlantillaNotificacion` y `ICanalNotificacion` listos, sin implementación. Sin esto el solicitante no sabe que su petición avanzó (rechazo, liberación) |
+| ~~A3~~ | ~~**Notificaciones**~~ | **Resuelto 2026-08-01.** Alta In-App (`tblNotificacion`) + listar/marcar leida(s), disparada desde Solicitud aprobar/rechazar/devolver y @mencion en comentarios. `ICanalNotificacion`/`tblPlantillaNotificacion` quedan sin implementar (ver §3.4): solo canal InApp, mensajes inline |
 | A4 | **Hangfire (trabajos en segundo plano)** | Vigilancia de SLA, snapshot de KPIs (`spSnapshotKpi` ya existe), recordatorios de compromiso, despacho del outbox `tblEventoDominio`, cierre automático de tickets |
 | A5 | **Portafolio** | `tblPortafolio`, `tblPrograma`, `tblRiesgo`, `tblHito`, `tblObjetivoOkr`, `tblTarifaNivel`, `tblPresupuestoProyecto` sin módulo. Incluye la matriz de riesgos y el costo real por proyecto (horas × tarifa por nivel) |
-| A6 | **SignalR** | Notificaciones en vivo y refresco de tableros; el diseño ya lo contempla (ADR-08) |
+| ~~A6~~ | ~~**SignalR**~~ | **Resuelto 2026-08-01.** `NotificacionesHub` unico (no dos como preveia el diseño original) para notificaciones en vivo (`Clients.User`) y refresco de tableros (`Clients.All` en `workItemActualizado`, sin grupo por equipo). Verificado con dos sesiones reales simultaneas en el navegador |
 
 ### 3.3 Fases del roadmap que faltan completas
 
@@ -149,10 +150,14 @@ transiciones automáticas configurables.
 - `spImportarJira` planeado, no escrito.
 - Suplantación auditada (permiso `ADM.Suplantar` ya sembrado) sin implementar.
 - Tema oscuro y revisión de accesibilidad (WCAG AA) pendientes.
-- El **arrastre de tarjetas del kanban no se pudo verificar con ratón real** en el entorno
-  de desarrollo usado (el navegador headless no genera los eventos de puntero que dnd-kit
-  necesita). La lógica del movimiento sí está verificada por su endpoint. **Conviene
-  probarlo a mano.**
+- ~~El arrastre de tarjetas del kanban no se pudo verificar con ratón real~~ **Verificado
+  2026-08-01.** Sí funciona: se simuló un arrastre real (`PointerEvent` sintético con
+  `pointerdown`/`pointermove`/`pointerup`, `isPrimary: true`, `button: 0`) moviendo
+  GTE-0006 de "En proceso" a "En pruebas" — `PUT /workitems/{id}/columna` respondió 200 y
+  el tablero reflejó el cambio. El intento anterior fallaba por dos motivos tecnicos, no
+  por un bug de la app (ver lección nueva en la sección 5): `requestAnimationFrame` no
+  corre si el Browser pane no esta compositando, y sin ceder el hilo entre cada
+  `pointermove` React nunca llega a recalcular la colisión antes del `pointerup`.
 - **Comentarios y adjuntos, fuera de alcance deliberado de esta entrega:** sin permiso de
   admin/líder para borrar comentarios o adjuntos ajenos (solo el propio autor puede,
   `ForbiddenException` en cualquier otro caso; agregar `COM.EliminarAjeno` si se necesita,
@@ -172,6 +177,14 @@ transiciones automáticas configurables.
   (`NuevoItemModal.tsx`) sigue sin captura de complejidad ni puntos de historia (no se pidió
   ampliarlo); no se introdujo deshabilitado de campos individuales por permiso (el backend
   revalida cada regla y su 403 se muestra tal cual, consistente con el resto de la app).
+- **Notificaciones y SignalR, fuera de alcance deliberado de esta entrega:** sin canales
+  Correo/Teams/WhatsApp (`ICanalNotificacion` sigue sin implementación, reservado para
+  cuando existan credenciales externas), sin `tblPlantillaNotificacion` (mensajes armados
+  inline en cada disparador), sin disparador de Solicitud convertida ni de Release
+  liberado (quedan para otra sesión), sin grupo por equipo en el broadcast de tablero
+  (`Clients.All`, la escala del ERP no lo justifica hoy), sin eliminar/editar
+  notificaciones (solo alta + marcar leída) y sin preferencias de canal/evento por usuario
+  (el Documento Maestro las menciona en el perfil pero no hay tabla para ellas).
 
 ---
 
@@ -268,11 +281,50 @@ transiciones automáticas configurables.
   necesita pisarlo explicitamente a `undefined` en esa llamada puntual para que el
   navegador calcule el boundary multipart solo (ver `subirArchivo` en
   `shared/api/archivos.ts`).
-- **Verificacion real de paste de imagen en el Browser pane**: a diferencia del drag del
-  kanban (necesita eventos de puntero reales que el entorno headless no genera), un
-  `ClipboardEvent` sintetico con `DataTransfer` SI se puede construir y despachar por script
-  contra el editor -- permitio probar de punta a punta la subida por pegado sin depender
-  del portapapeles real del sistema operativo.
+- **Verificacion real de paste de imagen en el Browser pane**: un `ClipboardEvent`
+  sintetico con `DataTransfer` SI se puede construir y despachar por script contra el
+  editor -- permitio probar de punta a punta la subida por pegado sin depender del
+  portapapeles real del sistema operativo.
+- **Simular un drag de dnd-kit (`PointerSensor`) por script, en el Browser pane**: SI se
+  puede, con tres detalles que no son obvios:
+  1. Hay que despachar `PointerEvent` reales (`new PointerEvent('pointerdown', {isPrimary:
+     true, button: 0, pointerId, clientX, clientY, bubbles: true})`), no `MouseEvent` --
+     `PointerSensor` solo escucha `pointerdown`/`pointermove`/`pointerup`.
+  2. Con `activationConstraint: {distance: N}`, el PRIMER `pointermove` que supera el
+     umbral solo activa el arrastre (no cuenta como movimiento); hacen falta moves
+     posteriores para que la deteccion de colision (`over`) se actualice.
+  3. **Nunca despachar todos los eventos en una sola rafaga sincrona**: dnd-kit actualiza
+     su estado interno (`over`, colisiones) via `dispatch`/render de React, que no ocurre
+     entre llamadas sincronas seguidas -- hay que ceder el hilo entre cada evento
+     (`await new Promise(r => setTimeout(r, 20-30))`). `requestAnimationFrame` NO sirve
+     para esto en el Browser pane: no corre si la pestaña no esta compositando/visible: use
+     `setTimeout`, que si corre.
+- **JWT propio + SignalR**: el claim `sub` del token (`EmisorTokenSesion.cs`) se mapea por
+  defecto a `ClaimTypes.NameIdentifier`, así que `Clients.User(idUsuario.ToString())`
+  funciona sin grupos manuales -- no hace falta que el Hub trackee membresías el mismo.
+  El WebSocket del navegador no puede mandar el header `Authorization`: hace falta
+  `Events.OnMessageReceived` en `AddJwtBearer` leyendo `access_token` del query string,
+  limitado por path (`/hubs`) para no aceptar tokens por query en el resto de la API.
+- **`IHubContext<T>` no puede vivir en Infrastructure** sin que esa capa dependa de
+  hosting de ASP.NET Core: el contrato (`INotificadorTiempoReal`) se define en
+  Application como siempre, pero la implementación concreta se registra desde `GTE.WebApi`
+  (única capa que conoce el Hub) -- única excepción al patrón "implementación en
+  Infrastructure" del resto del proyecto, y es correcta, no un atajo.
+- **`useEffect` + conexión SignalR bajo `StrictMode`**: el doble-invoke de efectos en
+  desarrollo crea y detiene una primera conexión antes de crear la definitiva -- aparece
+  `Error: The connection was stopped during negotiation.` en consola, es ruido esperado
+  (la segunda conexión sí queda viva), no un bug real.
+- **`ListItemButton`/`MenuItem` de MUI no son `<button>` nativos**: renderizan como `div`
+  con `role="button"` (`MuiButtonBase-root`) -- un `querySelectorAll('button')` para
+  clicar una opción de una lista/menu de MUI por script no la encuentra; hay que buscar
+  por clase (`.MuiListItemButton-root`, `.MuiMenuItem-root`) o por `[role="button"]`.
+- **Verificar tiempo real con dos sesiones en el Browser pane**: `sessionStorage` es por
+  pestaña, así que dos pestañas (`tabs_create`) pueden loguearse como usuarios distintos
+  al mismo tiempo -- suficiente para probar un push a un usuario específico o un
+  broadcast sin depender de un segundo navegador real. Ojo: las herramientas que no
+  reciben `tabId` explícito actúan sobre la pestaña *frontada* (`tabs_select`), no sobre
+  la última usada -- hay que pasar `tabId` explícito en cada llamada cuando se alterna
+  entre pestañas o se leen resultados de la pestaña equivocada.
 
 ---
 

@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using FluentValidation;
 using GTE.Application.DTOs.Request.Comentarios;
 using GTE.Application.DTOs.Responses.Comentarios;
@@ -26,8 +27,13 @@ public class CrearComentarioHandler(
     IComentarioRepository repositorio,
     IComentarioQueryService consultas,
     IWorkItemRepository workItems,
-    ISanitizadorHtml sanitizador) : IRequestHandler<CrearComentarioCommand, ComentarioResponse>
+    ISanitizadorHtml sanitizador,
+    IProveedorUsuarioActual proveedorUsuario,
+    IServicioNotificaciones notificaciones) : IRequestHandler<CrearComentarioCommand, ComentarioResponse>
 {
+    private static readonly Regex ExpresionMencion = new(
+        "class=\"mencion\"[^>]*data-id=\"(\\d+)\"", RegexOptions.Compiled);
+
     public async Task<ComentarioResponse> Handle(CrearComentarioCommand command, CancellationToken cancellationToken)
     {
         var estadoItem = await workItems.ObtenerEstadoAsync(command.IdWorkItem, cancellationToken)
@@ -58,7 +64,31 @@ public class CrearComentarioHandler(
             new ComentarioNuevo("WorkItem", command.IdWorkItem, html, command.Datos.IdComentarioPadre),
             cancellationToken);
 
+        await NotificarMencionesAsync(html, estadoItem, cancellationToken);
+
         return await consultas.ObtenerPorIdAsync(idComentario, cancellationToken)
             ?? throw new NotFoundException("Comentario", idComentario);
+    }
+
+    /// <summary>Notifica a los usuarios mencionados (span.mencion[data-id]), sin auto-notificarse.</summary>
+    private async Task NotificarMencionesAsync(
+        string html, GTE.Domain.WorkItems.EstadoWorkItem estadoItem, CancellationToken cancellationToken)
+    {
+        var usuarioActual = await proveedorUsuario.ObtenerAsync(cancellationToken);
+        var idsMencionados = ExpresionMencion.Matches(html)
+            .Select(m => int.Parse(m.Groups[1].Value))
+            .Distinct()
+            .Where(id => id != usuarioActual?.IdUsuario)
+            .ToList();
+
+        if (idsMencionados.Count == 0)
+        {
+            return;
+        }
+
+        var quien = usuarioActual?.Nombre ?? "Alguien";
+        await notificaciones.NotificarAsync(
+            idsMencionados, $"{quien} te menciono en un comentario", null,
+            "WorkItem", estadoItem.IdWorkItem, $"/wi/{estadoItem.Folio}", cancellationToken);
     }
 }
