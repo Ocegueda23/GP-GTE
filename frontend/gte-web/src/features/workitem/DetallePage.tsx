@@ -5,15 +5,20 @@ import {
   Stack, Tab, Table, TableBody, TableCell, TableHead, TableRow, Tabs, Typography,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import EditIcon from "@mui/icons-material/Edit";
 import { useQuery } from "@tanstack/react-query";
 import {
-  formatearMinutos, obtenerTiempos, obtenerWorkItem,
+  formatearMinutos, obtenerCatalogosBandeja, obtenerTiempos, obtenerWorkItem,
 } from "../../shared/api/workitems";
+import { useSesion } from "../../shared/api/sesion";
 import { ModalTiempo } from "../trabajo/ModalTiempo";
 import { BotonesAcciones } from "./BotonesAcciones";
+import { ModalEditarWorkItem } from "./ModalEditarWorkItem";
 import { PanelRevisiones } from "./PanelRevisiones";
 import { PanelAdjuntos } from "./PanelAdjuntos";
 import { PanelComentarios } from "./PanelComentarios";
+
+const ESTATUS_TERMINADO = 6;
 
 function formatearFecha(iso: string | null): string {
   if (!iso) return "-";
@@ -38,12 +43,19 @@ export function DetallePage() {
   const { folio = "" } = useParams();
   const [pestana, setPestana] = useState(0);
   const [modalTiempo, setModalTiempo] = useState(false);
+  const [modalEditar, setModalEditar] = useState(false);
   const [aviso, setAviso] = useState<{ tipo: "success" | "error"; mensaje: string } | null>(null);
+  const sesion = useSesion((estado) => estado.sesion);
+  const puede = useSesion((estado) => estado.puede);
 
   const detalle = useQuery({
     queryKey: ["workitem", folio],
     queryFn: () => obtenerWorkItem(folio),
     enabled: folio.length > 0,
+  });
+
+  const catalogos = useQuery({
+    queryKey: ["catalogos-bandeja"], queryFn: obtenerCatalogosBandeja, staleTime: 5 * 60_000,
   });
 
   const tiempos = useQuery({
@@ -68,6 +80,13 @@ export function DetallePage() {
     ? Math.min(100, Math.round(((item.minutosInvertidos ?? 0) / item.minutosPresupuesto) * 100))
     : null;
 
+  // El backend siempre revalida cada regla al guardar; aqui solo se oculta el boton
+  // cuando ni siquiera valdria la pena abrir el formulario (nada se podria guardar).
+  const esTerminado = item.idEstatus === ESTATUS_TERMINADO && !puede("WI.ModificarTerminado");
+  const esAjeno = item.idAsignado !== null && item.idAsignado !== sesion?.idUsuario
+    && !puede("WI.ModificarAjeno");
+  const puedeEditar = !esTerminado && !esAjeno;
+
   return (
     <Box sx={{ p: 2 }}>
       <Link component={RouterLink} to="/trabajo" underline="hover"
@@ -90,14 +109,20 @@ export function DetallePage() {
               {item.claveProyecto} - {item.proyecto}
             </Typography>
           </Box>
-          <Box sx={{ pt: 0.5 }}>
+          <Stack direction="row" spacing={1} sx={{ pt: 0.5, alignItems: "flex-start" }}>
+            {puedeEditar && (
+              <Button size="small" variant="outlined" startIcon={<EditIcon fontSize="small" />}
+                onClick={() => setModalEditar(true)}>
+                Editar
+              </Button>
+            )}
             <BotonesAcciones
               idWorkItem={item.idWorkItem}
               folio={item.folio}
               alExito={(mensaje) => setAviso({ tipo: "success", mensaje })}
               alError={(mensaje) => setAviso({ tipo: "error", mensaje })}
             />
-          </Box>
+          </Stack>
         </Stack>
       </Paper>
 
@@ -226,6 +251,15 @@ export function DetallePage() {
         abierto={modalTiempo}
         item={{ idWorkItem: item.idWorkItem, folio: item.folio }}
         alCerrar={() => setModalTiempo(false)}
+        alExito={(mensaje) => setAviso({ tipo: "success", mensaje })}
+        alError={(mensaje) => setAviso({ tipo: "error", mensaje })}
+      />
+
+      <ModalEditarWorkItem
+        abierto={modalEditar}
+        item={item}
+        catalogos={catalogos.data}
+        alCerrar={() => setModalEditar(false)}
         alExito={(mensaje) => setAviso({ tipo: "success", mensaje })}
         alError={(mensaje) => setAviso({ tipo: "error", mensaje })}
       />

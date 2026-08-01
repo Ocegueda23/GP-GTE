@@ -45,6 +45,7 @@ export interface CatalogosBandeja {
   usuarios: CatalogoItem[];
   tiposSolicitud: CatalogoItem[];
   equipos: CatalogoItem[];
+  complejidades: CatalogoItem[];
 }
 
 export interface FiltroBandeja {
@@ -125,7 +126,10 @@ export interface WorkItemDetalle {
   esMantenimiento: boolean;
   idEstatus: number;
   estatus: string;
+  idPrioridad: number;
   prioridad: string;
+  idComplejidad: number | null;
+  idAsignado: number | null;
   asignado: string | null;
   solicitante: string | null;
   sprint: string | null;
@@ -138,6 +142,17 @@ export interface WorkItemDetalle {
   fechaRegistro: string;
   esVencida: boolean;
   revisionesPendientes: number;
+}
+
+export interface WorkItemEditar {
+  titulo: string;
+  descripcion: string | null;
+  criteriosAceptacion: string | null;
+  idPrioridad: number;
+  idComplejidad: number | null;
+  idAsignado: number | null;
+  fechaCompromiso: string | null;
+  puntosHistoria: number | null;
 }
 
 export interface RegistroTiempo {
@@ -169,6 +184,10 @@ export async function obtenerTiempos(idWorkItem: number) {
 
 export async function crearWorkItem(datos: NuevoWorkItem) {
   return enviar<WorkItemDetalle>("post", "/api/v1/workitems", datos);
+}
+
+export async function actualizarWorkItem(idWorkItem: number, datos: WorkItemEditar) {
+  return enviar<WorkItemDetalle>("put", `/api/v1/workitems/${idWorkItem}`, datos);
 }
 
 /** Item de Mi Dia: el backend indica la accion que lo pone En Proceso. */

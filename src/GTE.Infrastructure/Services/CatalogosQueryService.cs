@@ -48,6 +48,11 @@ public class CatalogosQueryService(FabricaContexto fabrica) : ICatalogosQuerySer
                 .Where(e => e.Activo)
                 .OrderBy(e => e.Nombre)
                 .Select(e => new CatalogoItemResponse { Id = e.IdEquipo, Nombre = e.Nombre })
+                .ToListAsync(cancellationToken),
+            Complejidades = await contexto.TblComplejidad.AsNoTracking()
+                .Where(c => c.Activo)
+                .OrderBy(c => c.Orden)
+                .Select(c => new CatalogoItemResponse { Id = c.IdComplejidad, Nombre = c.Nombre })
                 .ToListAsync(cancellationToken)
         };
     }

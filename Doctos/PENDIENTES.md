@@ -3,7 +3,7 @@
 > Documento de continuidad. Sirve para retomar el proyecto en otra sesión sin
 > contexto previo. Actualizar al cerrar cada bloque de trabajo.
 >
-> **Última actualización:** 2026-08-01 (comentarios y adjuntos sobre WorkItem, cierre de A1)
+> **Última actualización:** 2026-08-01 (edición de WorkItem en la UI, cierre de A2)
 > **Repositorio:** https://github.com/Ocegueda23/GP-GTE (rama `main`)
 > **Diseño completo:** `Doctos/GTE-DocumentoMaestro.md` (fuente de verdad de decisiones)
 > **Reglas para escribir código aquí:** `CLAUDE.md` en la raíz
@@ -88,7 +88,7 @@ Sin esto no se puede operar en producción, aunque el resto funcione.
 | # | Pendiente | Detalle |
 |---|---|---|
 | ~~A1~~ | ~~**Comentarios y adjuntos**~~ | **Resuelto 2026-08-01.** Hilos de comentarios (formato básico + @menciones + imágenes pegadas) y adjuntos (subida/descarga por streaming autenticado) sobre WorkItem, API completa (`ComentariosController`, `ArchivosController`) y UI integrada en el Detalle. Ver fila "Comentarios y adjuntos" de la sección 2 y lo que quedó deliberadamente fuera de alcance en la §3.4 |
-| A2 | **Edición de WorkItem en la UI** | El endpoint `PUT /workitems/{id}` ya existe con todas sus reglas; falta la pantalla. Hoy no se puede cambiar asignado, compromiso ni complejidad desde la interfaz |
+| ~~A2~~ | ~~**Edición de WorkItem en la UI**~~ | **Resuelto 2026-08-01.** Modal de edición (`ModalEditarWorkItem.tsx`) sobre el endpoint `PUT /workitems/{id}` ya existente: titulo, descripcion, criterios, prioridad, complejidad, asignado, compromiso y puntos. El boton "Editar" se oculta si el elemento esta Terminado o asignado a otra persona y el usuario no tiene el permiso correspondiente; las reglas campo-por-campo (compromiso al pasado, cambio de complejidad) las sigue validando el backend, su 403 se ve tal cual en el Snackbar. Se agrego el catalogo de Complejidades (`CatalogosBandejaResponse`) que no existia en ningun endpoint |
 | A3 | **Notificaciones** | `tblNotificacion`, `tblPlantillaNotificacion` y `ICanalNotificacion` listos, sin implementación. Sin esto el solicitante no sabe que su petición avanzó (rechazo, liberación) |
 | A4 | **Hangfire (trabajos en segundo plano)** | Vigilancia de SLA, snapshot de KPIs (`spSnapshotKpi` ya existe), recordatorios de compromiso, despacho del outbox `tblEventoDominio`, cierre automático de tickets |
 | A5 | **Portafolio** | `tblPortafolio`, `tblPrograma`, `tblRiesgo`, `tblHito`, `tblObjetivoOkr`, `tblTarifaNivel`, `tblPresupuestoProyecto` sin módulo. Incluye la matriz de riesgos y el costo real por proyecto (horas × tarifa por nivel) |
@@ -163,6 +163,15 @@ transiciones automáticas configurables.
   Maestro §8.5). El almacén (`AlmacenArchivosDisco`) usa una carpeta local por defecto
   (`AlmacenArchivos:Ruta` vacío cae a una subcarpeta junto al ejecutable); para producción
   hay que apuntarlo al share de red real.
+- **Catálogo de Complejidades sin semilla de datos:** `tblComplejidad` existe y ya se
+  expone en `GET /catalogos/bandeja`, pero ningún script de despliegue le carga filas — en
+  un ambiente nuevo el select de Complejidad en el modal de edición de WorkItem apareceria
+  vacío (no bloquea nada, el campo es opcional). Si se necesita, es un script `INSERT` de
+  datos, no de esquema.
+- **Edición de WorkItem, fuera de alcance deliberado de esta entrega:** el modal de alta
+  (`NuevoItemModal.tsx`) sigue sin captura de complejidad ni puntos de historia (no se pidió
+  ampliarlo); no se introdujo deshabilitado de campos individuales por permiso (el backend
+  revalida cada regla y su 403 se muestra tal cual, consistente con el resto de la app).
 
 ---
 
