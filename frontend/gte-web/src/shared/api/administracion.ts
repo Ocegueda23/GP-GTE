@@ -190,6 +190,10 @@ export async function obtenerUsuario(idUsuario: number) {
   return obtener<Usuario>(`/api/v1/usuarios/${idUsuario}`);
 }
 
+export interface UsuarioCreado extends Usuario {
+  passwordTemporal: string;
+}
+
 export async function crearUsuario(datos: {
   dominio: string;
   nombre: string;
@@ -199,7 +203,11 @@ export async function crearUsuario(datos: {
   idHorario: number | null;
   idJefe: number | null;
 }) {
-  return enviar<Usuario>("post", "/api/v1/usuarios", datos);
+  return enviar<UsuarioCreado>("post", "/api/v1/usuarios", datos);
+}
+
+export async function restablecerPasswordUsuario(idUsuario: number) {
+  return enviar<{ passwordTemporal: string }>("put", `/api/v1/usuarios/${idUsuario}/password`, {});
 }
 
 export async function actualizarUsuario(idUsuario: number, datos: {

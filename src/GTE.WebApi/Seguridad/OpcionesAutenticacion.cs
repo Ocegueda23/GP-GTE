@@ -1,37 +1,32 @@
 namespace GTE.WebApi.Seguridad;
 
 /// <summary>
-/// Configuracion de autenticacion. En produccion se usa Entra ID (OIDC) llenando
-/// Authority y Audience. El emisor local existe SOLO para desarrollo, cuando no
-/// hay tenant disponible: nunca se habilita fuera del ambiente Development.
+/// Configuracion de autenticacion propia de GTE (sin proveedor externo): un solo JWT
+/// HMAC compartido por el atajo de desarrollo y por el login real. La clave de firma
+/// es obligatoria fuera de Development (falla al arrancar en vez de quedar abierta).
 /// </summary>
 public class OpcionesAutenticacion
 {
     public const string Seccion = "Jwt";
 
-    /// <summary>URL del tenant de Entra ID (o ADFS). Vacio = sin identidad externa.</summary>
-    public string? Authority { get; set; }
+    public string Issuer { get; set; } = "gte-api";
 
     public string Audience { get; set; } = "gte-api";
 
-    /// <summary>Emisor local de tokens para desarrollo. Ignorado fuera de Development.</summary>
-    public EmisorDesarrollo Desarrollo { get; set; } = new();
+    /// <summary>
+    /// Clave de firma HMAC. Obligatoria fuera de Development. En Development, si se deja
+    /// vacia se genera una efimera en memoria (los tokens se invalidan al reiniciar).
+    /// </summary>
+    public string? ClaveFirma { get; set; }
 
-    public bool TieneIdentidadExterna => !string.IsNullOrWhiteSpace(Authority);
+    public int MinutosVigenciaAcceso { get; set; } = 15;
+
+    /// <summary>Atajo de desarrollo (sin contraseña, por nombre de dominio). Solo Development.</summary>
+    public EmisorDesarrollo Desarrollo { get; set; } = new();
 }
 
 public class EmisorDesarrollo
 {
     /// <summary>Debe activarse explicitamente; solo surte efecto en Development.</summary>
     public bool Habilitado { get; set; }
-
-    public string Issuer { get; set; } = "gte-desarrollo";
-
-    /// <summary>
-    /// Clave de firma. Si se deja vacia en desarrollo se genera una aleatoria en memoria,
-    /// de modo que reiniciar la API invalida los tokens anteriores.
-    /// </summary>
-    public string? ClaveFirma { get; set; }
-
-    public int MinutosVigencia { get; set; } = 480;
 }

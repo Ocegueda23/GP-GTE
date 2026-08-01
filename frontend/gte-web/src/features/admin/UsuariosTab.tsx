@@ -10,7 +10,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
 import {
   actualizarUsuario, asignarRol, crearUsuario, darBajaUsuario, obtenerCatalogosAdministracion,
-  obtenerRolesUsuario, obtenerUsuarios, retirarRol, type Usuario,
+  obtenerRolesUsuario, obtenerUsuarios, restablecerPasswordUsuario, retirarRol, type Usuario,
 } from "../../shared/api/administracion";
 
 /** P20 - Usuarios: alta manual, baja logica, nivel, horario, jefe y asignacion de roles. */
@@ -18,6 +18,7 @@ export function UsuariosTab() {
   const [texto, setTexto] = useState("");
   const [modalNuevo, setModalNuevo] = useState(false);
   const [usuarioEditar, setUsuarioEditar] = useState<Usuario | null>(null);
+  const [passwordAMostrar, setPasswordAMostrar] = useState<{ nombre: string; password: string } | null>(null);
   const [aviso, setAviso] = useState<{ tipo: "success" | "error"; mensaje: string } | null>(null);
   const clienteQuery = useQueryClient();
 
@@ -62,7 +63,7 @@ export function UsuariosTab() {
 
   const crear = async () => {
     try {
-      const { mensaje } = await crearUsuario({
+      const { dato, mensaje } = await crearUsuario({
         dominio: dominio.trim(), nombre: nombre.trim(), correo: correo.trim() || null,
         idPuesto: idPuesto === "" ? null : (idPuesto as number),
         idNivel: idNivel === "" ? null : (idNivel as number),
@@ -72,9 +73,20 @@ export function UsuariosTab() {
       avisar(mensaje);
       setModalNuevo(false);
       limpiarAlta();
+      setPasswordAMostrar({ nombre: dato.nombre, password: dato.passwordTemporal });
       await refrescar();
     } catch (error) {
       avisar(error instanceof ErrorApi ? error.message : "No se pudo crear el usuario.", true);
+    }
+  };
+
+  const restablecerPassword = async () => {
+    if (!usuarioEditar) return;
+    try {
+      const { dato } = await restablecerPasswordUsuario(usuarioEditar.idUsuario);
+      setPasswordAMostrar({ nombre: usuarioEditar.nombre, password: dato.passwordTemporal });
+    } catch (error) {
+      avisar(error instanceof ErrorApi ? error.message : "No se pudo restablecer la contraseña.", true);
     }
   };
 
@@ -294,11 +306,29 @@ export function UsuariosTab() {
           </Stack>
         </DialogContent>
         <DialogActions sx={{ justifyContent: "space-between", px: 3 }}>
-          <Button color="error" onClick={() => void darBaja()}>Dar de baja</Button>
+          <Stack direction="row" spacing={1}>
+            <Button color="error" onClick={() => void darBaja()}>Dar de baja</Button>
+            <Button onClick={() => void restablecerPassword()}>Restablecer contraseña</Button>
+          </Stack>
           <Stack direction="row" spacing={1}>
             <Button onClick={() => setUsuarioEditar(null)}>Cancelar</Button>
             <Button variant="contained" onClick={() => void guardarEdicion()}>Guardar</Button>
           </Stack>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={passwordAMostrar !== null} onClose={() => setPasswordAMostrar(null)} fullWidth maxWidth="xs">
+        <DialogTitle>Contraseña temporal</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            Compartela con <strong>{passwordAMostrar?.nombre}</strong>. No se va a volver a mostrar.
+          </Typography>
+          <TextField size="small" fullWidth value={passwordAMostrar?.password ?? ""}
+            slotProps={{ input: { readOnly: true } }}
+            onFocus={(e) => e.target.select()} />
+        </DialogContent>
+        <DialogActions>
+          <Button variant="contained" onClick={() => setPasswordAMostrar(null)}>Listo</Button>
         </DialogActions>
       </Dialog>
 

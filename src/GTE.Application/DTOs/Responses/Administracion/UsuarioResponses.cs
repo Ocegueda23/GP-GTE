@@ -19,3 +19,15 @@ public class UsuarioResponse
     public DateTime? FechaBaja { get; set; }
     public bool Activo { get; set; }
 }
+
+/// <summary>Respuesta del alta de usuario: trae la password temporal una sola vez.</summary>
+public class UsuarioCreadoResponse : UsuarioResponse
+{
+    public string PasswordTemporal { get; set; } = string.Empty;
+}
+
+/// <summary>Respuesta del reset de password por un administrador.</summary>
+public class PasswordTemporalResponse
+{
+    public string PasswordTemporal { get; set; } = string.Empty;
+}

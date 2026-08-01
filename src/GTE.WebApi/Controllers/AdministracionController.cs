@@ -142,11 +142,21 @@ public class AdministracionController(IMediator mediator) : ControllerBase
     }
 
     [HttpPost("usuarios")]
-    public async Task<ActionResult<ApiResponse<UsuarioResponse>>> CrearUsuario(
+    public async Task<ActionResult<ApiResponse<UsuarioCreadoResponse>>> CrearUsuario(
         [FromBody] UsuarioCrearRequest request, CancellationToken cancellationToken)
     {
         var resultado = await mediator.Send(new CrearUsuarioCommand(request), cancellationToken);
-        return Ok(ApiResponse<UsuarioResponse>.Exito(resultado, $"Usuario {resultado.Nombre} creado."));
+        return Ok(ApiResponse<UsuarioCreadoResponse>.Exito(resultado, $"Usuario {resultado.Nombre} creado."));
+    }
+
+    /// <summary>Reset de password por un administrador: regresa la nueva password temporal una sola vez.</summary>
+    [HttpPut("usuarios/{id:int}/password")]
+    public async Task<ActionResult<ApiResponse<PasswordTemporalResponse>>> EstablecerPasswordAdmin(
+        int id, CancellationToken cancellationToken)
+    {
+        var passwordTemporal = await mediator.Send(new EstablecerPasswordAdminCommand(id), cancellationToken);
+        return Ok(ApiResponse<PasswordTemporalResponse>.Exito(
+            new PasswordTemporalResponse { PasswordTemporal = passwordTemporal }, "Password restablecida."));
     }
 
     [HttpPut("usuarios/{id:int}")]

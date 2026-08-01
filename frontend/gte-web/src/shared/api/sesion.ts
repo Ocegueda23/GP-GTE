@@ -15,10 +15,14 @@ export interface Sesion {
 }
 
 export interface ConfiguracionAuth {
-  identidadExterna: boolean;
-  authority: string | null;
-  audience: string;
   emisorDesarrollo: boolean;
+}
+
+export interface ResultadoLogin {
+  token: string;
+  expira: string;
+  sesion: Sesion;
+  requiereCambioPassword: boolean;
 }
 
 const CLAVE_TOKEN = "gte.token";
@@ -31,6 +35,16 @@ export async function obtenerSesion() {
   return obtener<Sesion>("/api/v1/auth/sesion");
 }
 
+/** Login propio de GTE: cuenta de dominio + contraseña. */
+export async function iniciarSesion(dominio: string, password: string) {
+  const { dato, mensaje } = await enviar<ResultadoLogin>(
+    "post", "/api/v1/auth/login", { dominio, password },
+  );
+  sessionStorage.setItem(CLAVE_TOKEN, dato.token);
+  return { sesion: dato.sesion, mensaje, requiereCambioPassword: dato.requiereCambioPassword };
+}
+
+/** Atajo de desarrollo: sin contraseña, solo disponible si la API lo habilita. */
 export async function iniciarSesionDesarrollo(dominio: string) {
   const { dato, mensaje } = await enviar<{ token: string; expira: string; sesion: Sesion }>(
     "post", "/api/v1/auth/desarrollo/token", { dominio },
@@ -39,6 +53,30 @@ export async function iniciarSesionDesarrollo(dominio: string) {
   return { sesion: dato.sesion, mensaje };
 }
 
+/** Rota el refresh token (cookie HttpOnly, viaja sola) y emite un access token nuevo. */
+export async function refrescarSesion() {
+  const { dato } = await enviar<ResultadoLogin>("post", "/api/v1/auth/refresh");
+  sessionStorage.setItem(CLAVE_TOKEN, dato.token);
+  return dato;
+}
+
+/** Revoca la sesion en el servidor (refresh token). Silencioso si ya no habia sesion valida. */
+export async function cerrarSesionServidor() {
+  try {
+    await enviar<object>("post", "/api/v1/auth/logout");
+  } catch {
+    // No importa si el servidor ya no tenia nada que revocar.
+  }
+}
+
+export async function cambiarPassword(passwordActual: string, passwordNueva: string) {
+  const { mensaje } = await enviar<object>("post", "/api/v1/auth/cambiar-password", {
+    passwordActual, passwordNueva,
+  });
+  return mensaje;
+}
+
+/** Limpia la sesion local (sessionStorage). Llamar despues de cerrarSesionServidor(). */
 export function cerrarSesion() {
   sessionStorage.removeItem(CLAVE_TOKEN);
 }

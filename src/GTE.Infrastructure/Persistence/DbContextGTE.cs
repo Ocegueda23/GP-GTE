@@ -144,6 +144,8 @@ public partial class DbContextGTE : DbContext
 
     public virtual DbSet<TblPullRequest> TblPullRequest { get; set; }
 
+    public virtual DbSet<TblRefreshToken> TblRefreshToken { get; set; }
+
     public virtual DbSet<TblRegistroTiempo> TblRegistroTiempo { get; set; }
 
     public virtual DbSet<TblReglaAutomatizacion> TblReglaAutomatizacion { get; set; }
@@ -2148,6 +2150,30 @@ public partial class DbContextGTE : DbContext
             entity.Property(e => e.UsuarioRegistro).HasMaxLength(200);
         });
 
+        modelBuilder.Entity<TblRefreshToken>(entity =>
+        {
+            entity.HasKey(e => e.IdRefreshToken);
+
+            entity.ToTable("tblRefreshToken");
+
+            entity.HasIndex(e => e.TokenHash, "UQ_tblRefreshToken_TokenHash").IsUnique();
+
+            entity.HasIndex(e => e.IdUsuario, "IX_tblRefreshToken_Usuario");
+
+            entity.Property(e => e.FechaRegistro).HasDefaultValueSql("(sysdatetime())");
+            entity.Property(e => e.IpOrigen).HasMaxLength(50);
+            entity.Property(e => e.TokenHash).HasMaxLength(100);
+            entity.Property(e => e.UsuarioRegistro).HasMaxLength(200);
+
+            entity.HasOne(d => d.IdUsuarioNavigation).WithMany(p => p.TblRefreshToken)
+                .HasForeignKey(d => d.IdUsuario)
+                .HasConstraintName("FK_tblRefreshToken_tblUsuario");
+
+            entity.HasOne(d => d.IdReemplazadoPorNavigation).WithMany(p => p.InverseIdReemplazadoPorNavigation)
+                .HasForeignKey(d => d.IdReemplazadoPor)
+                .HasConstraintName("FK_tblRefreshToken_tblRefreshToken");
+        });
+
         modelBuilder.Entity<TblUsuario>(entity =>
         {
             entity.HasKey(e => e.IdUsuario);
@@ -2159,11 +2185,16 @@ public partial class DbContextGTE : DbContext
             entity.HasIndex(e => e.Dominio, "UQ_tblUsuario_Dominio").IsUnique();
 
             entity.Property(e => e.Activo).HasDefaultValue(true);
+            entity.Property(e => e.BloqueadoHasta).HasColumnType("datetime2");
             entity.Property(e => e.Correo).HasMaxLength(200);
             entity.Property(e => e.Dominio).HasMaxLength(100);
             entity.Property(e => e.FechaMovto).HasColumnType("datetime");
             entity.Property(e => e.FechaRegistro).HasDefaultValueSql("(sysdatetime())");
+            entity.Property(e => e.FechaUltimoCambioPassword).HasColumnType("datetime2");
+            entity.Property(e => e.IntentosFallidos).HasDefaultValue(0);
             entity.Property(e => e.Nombre).HasMaxLength(200);
+            entity.Property(e => e.PasswordHash).HasMaxLength(200);
+            entity.Property(e => e.RequiereCambioPassword).HasDefaultValue(true);
             entity.Property(e => e.UsuarioMovto).HasMaxLength(50);
             entity.Property(e => e.UsuarioRegistro).HasMaxLength(200);
 

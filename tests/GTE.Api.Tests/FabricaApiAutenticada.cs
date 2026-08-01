@@ -40,11 +40,10 @@ public static class FabricaApiAutenticada
         {
             builder.UseSetting("environment", "Development");
             builder.UseSetting("ConnectionStrings:bdsGTE", CadenaLocal);
-            builder.UseSetting("Jwt:Authority", string.Empty);
+            builder.UseSetting("Jwt:Issuer", "gte-api");
             builder.UseSetting("Jwt:Audience", "gte-api");
+            builder.UseSetting("Jwt:ClaveFirma", ClaveFirmaPruebas);
             builder.UseSetting("Jwt:Desarrollo:Habilitado", "true");
-            builder.UseSetting("Jwt:Desarrollo:Issuer", "gte-desarrollo");
-            builder.UseSetting("Jwt:Desarrollo:ClaveFirma", ClaveFirmaPruebas);
         });
     }
 

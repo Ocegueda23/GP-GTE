@@ -37,6 +37,16 @@ public partial class TblUsuario
 
     public bool Activo { get; set; }
 
+    public string? PasswordHash { get; set; }
+
+    public bool? RequiereCambioPassword { get; set; }
+
+    public int? IntentosFallidos { get; set; }
+
+    public DateTime? BloqueadoHasta { get; set; }
+
+    public DateTime? FechaUltimoCambioPassword { get; set; }
+
     public virtual TblHorario? IdHorarioNavigation { get; set; }
 
     public virtual TblUsuario? IdJefeNavigation { get; set; }
@@ -66,6 +76,8 @@ public partial class TblUsuario
     public virtual ICollection<TblNotificacion> TblNotificacion { get; set; } = new List<TblNotificacion>();
 
     public virtual ICollection<TblProyecto> TblProyecto { get; set; } = new List<TblProyecto>();
+
+    public virtual ICollection<TblRefreshToken> TblRefreshToken { get; set; } = new List<TblRefreshToken>();
 
     public virtual ICollection<TblRegistroTiempo> TblRegistroTiempo { get; set; } = new List<TblRegistroTiempo>();
 

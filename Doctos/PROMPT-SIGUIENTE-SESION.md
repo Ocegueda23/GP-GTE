@@ -19,36 +19,34 @@ Gestor de Proyectos WinForms de Interflo. El repositorio es `C:\CODE\GTE`
 3. `Doctos/GTE-DocumentoMaestro.md` — solo las secciones del módulo que vayamos a tocar
    (es largo; no lo leas completo).
 
-**Objetivo de esta sesión: el módulo de Administración**, que es el bloqueante B1 del
-documento de pendientes. Hoy no existe forma de crear proyectos, equipos, usuarios,
-asignar roles, horarios ni ambientes desde la aplicación —todo se hace por SQL—, y por
-eso GTE todavía no se le puede entregar a nadie más.
+**Estado importante al abrir este chat: hay trabajo terminado y verificado pero SIN
+commitear.** En la sesión anterior se construyeron y verificaron de punta a punta dos
+bloques completos:
 
-Alcance concreto:
+- **Módulo de Administración (B1)**: proyectos, equipos+miembros, usuarios, roles
+  (asignación + matriz en lote), horarios (tramos+festivos), ambientes. API completa +
+  pantallas bajo `/admin` (6 pestañas).
+- **Autenticación propia de GTE (B2, reemplaza el plan de Entra ID)**: el equipo decidió
+  que GTE no depende de ningún proveedor externo. Login con usuario+contraseña (BCrypt),
+  bloqueo temporal tras intentos fallidos, JWT propio + refresh token rotativo en cookie
+  HttpOnly (con detección de reuso), cambio de contraseña propio y reset por
+  administrador.
 
-- **Proyectos**: alta y edición (clave, nombre, categoría, equipo, responsable, fechas
-  plan, bandera de mantenimiento) y cambio de estatus por el motor de workflow.
-- **Equipos y miembros**: alta de equipo con líder, agregar y quitar miembros con su
-  porcentaje de dedicación.
-- **Usuarios**: alta manual, baja lógica, nivel, horario, jefe y correo.
-- **Roles**: asignar y retirar roles a un usuario con su alcance (global o por proyecto);
-  matriz rol-permiso guardada en lote, no un round-trip por fila.
-- **Horarios**: tramos por día (soportar turnos partidos) y días festivos.
-- **Ambientes**: alta por proyecto o globales.
-- Pantallas bajo `/admin/*`, visibles solo con los permisos correspondientes.
+Ambos bloques están verificados (`dotnet test` en 45/45, prueba manual completa en
+navegador incluyendo el flujo de login real, refresh silencioso y logout) y ya están
+documentados en `Doctos/PENDIENTES.md`. `git status` en el repo va a mostrar todos los
+archivos nuevos/modificados de estos dos bloques, todavía sin `git add`/`commit`/`push`.
 
-Reglas que ya están definidas y hay que respetar:
+**Primer paso de esta sesión, antes de cualquier otra cosa: revisar el diff (`git status`
+y `git diff`) y, si todo se ve bien, hacer `git add` + commit + push a `main`.** No asumas
+autorización de push sin confirmar primero con el usuario — pregunta explícitamente antes
+de empujar a `main`. Excluir del commit `run-api-dev.cmd` (script local de conveniencia
+para levantar la API con la cadena de conexión de LocalDB, no es parte del repo).
 
-- Permisos `ADM.Usuarios` y `ADM.Roles` según la operación; se validan en el caso de uso,
-  nunca solo en el controlador.
-- RN-ADM-01: un usuario no puede ser su propio jefe ni formar ciclos en la jerarquía
-  (validar con CTE recursivo antes de guardar).
-- RN-ADM-02: el rol Administrador otorga todos los permisos, pero **no** cortocircuita las
-  reglas de negocio.
-- Los proyectos con `EsMantenimiento = 1` activan reglas especiales ya implementadas en
-  WorkItems; no las alteres.
+**Objetivo de esta sesión (una vez cerrado el commit): a decidir con el usuario** entre
+las alternativas de abajo, o lo que él prefiera.
 
-**Matices críticos (no negociables):**
+**Matices críticos (no negociables, aplican a cualquier frente que se elija):**
 
 - Toda la API exige token (401 sin él). Si agregas un endpoint público necesita
   `[AllowAnonymous]` y una razón escrita.
@@ -56,21 +54,27 @@ Reglas que ya están definidas y hay que respetar:
   y envía acciones, jamás un estatus destino.
 - El esquema lo gobiernan los scripts idempotentes de `DataBase/Scripts` con la
   nomenclatura y plantilla del estándar; **no uses migraciones de EF**. Si cambias el
-  esquema, corre el script y vuelve a hacer scaffold.
+  esquema, corre el script y aplica el delta a mano en el scaffold (correr el scaffolder
+  completo sin filtro reescribe `DbContextGTE.cs` entero y lo deja solo con las tablas que
+  filtres — ver la lección en `PENDIENTES.md` sección 5).
 - Toda alta debe fijar `Activo = true` explícitamente: el `DEFAULT` de la base no aplica
   en los INSERT de EF.
 - No filtres ni ordenes sobre proyecciones intermedias complejas en EF (da error 500);
   une entidades, filtra por columnas reales y proyecta al final.
 - Métodos en español; sin emojis ni caracteres decorativos en código, comentarios ni
   mensajes de commit.
+- GTE no usa Entra ID ni ningún proveedor de identidad externo (decisión firme,
+  2026-08-01): la autenticación, los accesos y los roles se manejan enteramente dentro de
+  `bdsGTE`.
 - **Verifica de verdad antes de afirmar que algo funciona**: compila, corre
-  `dotnet test` (hoy 34 pruebas en verde) y prueba el flujo por API o en el navegador.
+  `dotnet test` (hoy 45 pruebas en verde) y prueba el flujo por API o en el navegador.
   Si algo no se puede verificar en este entorno, dilo explícitamente.
 
-Cómo levantar la base, la API y el SPA está en la sección 1 de `Doctos/PENDIENTES.md`.
+Cómo levantar la base, la API y el SPA está en la sección 1 de `Doctos/PENDIENTES.md`
+(incluye la nota nueva sobre `Jwt:ClaveFirma` y cómo probar el login real).
 
 **Al terminar**: actualiza `Doctos/PENDIENTES.md` con lo que quedó hecho y lo que falta,
-y haz commit y push a `main`.
+y haz commit y push a `main` (confirmando antes con el usuario).
 
 ---
 
@@ -84,6 +88,6 @@ Si se prefiere otro frente, sustituir la sección **Objetivo** por uno de estos
 | **Comentarios y adjuntos** (A1) | Es lo que más se usa a diario en un gestor de tareas; las tablas y el contrato `IAlmacenArchivos` ya existen |
 | **Edición de WorkItem en la UI** (A2) | Rápido: el endpoint con todas sus reglas ya existe, solo falta la pantalla |
 | **Notificaciones + Hangfire** (A3, A4) | Cierra el ciclo con el solicitante y activa la vigilancia de SLA y los KPIs |
-| **Flujo de Entra ID en el SPA** (B2) | Requiere tener a mano el tenant, client id y redirect URI reales |
 | **Migración de datos del GT** (B3) | Necesario para el corte real; el mapeo está en el Documento Maestro §15.4 |
+| **Despliegue** (B4) | Ya no bloquea en la parte de identidad (B2 resuelto); falta pipeline CI/CD, `appsettings.Production.json`, usuario de BD de mínimo privilegio, hosting (IIS/Kestrel/Docker) — ver el desglose completo que se armó para este frente en el historial de esta sesión |
 | **Integración Git** (resto de Fase 3) | Traza commits y PRs contra los WorkItems, tras la abstracción `IProveedorGit` |

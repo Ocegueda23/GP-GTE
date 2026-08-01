@@ -3,7 +3,7 @@
 > Documento de continuidad. Sirve para retomar el proyecto en otra sesión sin
 > contexto previo. Actualizar al cerrar cada bloque de trabajo.
 >
-> **Última actualización:** 2026-07-31 (cierre del modulo de Administracion)
+> **Última actualización:** 2026-08-01 (autenticación propia de GTE, cierre de B2)
 > **Repositorio:** https://github.com/Ocegueda23/GP-GTE (rama `main`)
 > **Diseño completo:** `Doctos/GTE-DocumentoMaestro.md` (fuente de verdad de decisiones)
 > **Reglas para escribir código aquí:** `CLAUDE.md` en la raíz
@@ -27,15 +27,23 @@ cd frontend/gte-web && npm install && npm run dev
 Cadena de conexión local por variable de entorno:
 `ConnectionStrings__bdsGTE=Server=(localdb)\MSSQLLocalDB;Database=bdsGTE;Trusted_Connection=True;TrustServerCertificate=True`
 
-**Iniciar sesión en desarrollo:** la pantalla de login pide una cuenta de dominio, sin
-contraseña (el emisor local de tokens solo existe en Development). Datos sembrados a mano
-durante el desarrollo: `aviramontes` (rol Administrador) y `lgarcia` (rol Desarrollador).
-Si la base está recién creada no hay usuarios: cualquier cuenta que se escriba se
-aprovisiona sola pero **nace sin roles**, así que hay que asignarle uno por SQL
-(`tblUsuarioRol`) para poder operar.
+**GTE ya no usa Entra ID ni ningún proveedor externo: la autenticación es propia** (usuario
++ contraseña con BCrypt, JWT propio, refresh token rotativo en cookie HttpOnly). Fuera de
+`Development`, `Jwt:ClaveFirma` es **obligatoria** (32+ caracteres) o la API no arranca; en
+`Development` sin configurarla se genera una efímera (los tokens se invalidan al reiniciar).
+
+**Iniciar sesión en desarrollo:** la pantalla de login tiene el formulario real (cuenta de
+dominio + contraseña) y, si `Jwt:Desarrollo:Habilitado=true`, una sección aparte con el
+atajo sin contraseña de siempre. Los usuarios existentes (`aviramontes` rol Administrador,
+`lgarcia` rol Desarrollador) **no tienen contraseña puesta todavía** (la columna
+`PasswordHash` nace en `NULL`): para probar el login real hay que entrar primero con el
+atajo de desarrollo y usar "Restablecer contraseña" en Administración > Usuarios para
+generarles una. Si la base está recién creada, cualquier cuenta que se escriba en el atajo
+de desarrollo se aprovisiona sola pero **nace sin roles**, así que hay que asignarle uno
+por SQL (`tblUsuarioRol`) para poder operar.
 
 ```bash
-dotnet test GTE.sln    # 34 pruebas; las de integración se omiten si no hay LocalDB
+dotnet test GTE.sln    # 45 pruebas; las de integración se omiten si no hay LocalDB
 ```
 
 ---
@@ -44,7 +52,7 @@ dotnet test GTE.sln    # 34 pruebas; las de integración se omiten si no hay Loc
 
 | Módulo | Alcance | Pantalla |
 |---|---|---|
-| **Autenticación** | Toda la API exige token (401 sin él). Entra ID por configuración; emisor local solo en Development. Aprovisionamiento JIT sin roles. Menú filtrado por permisos | Login |
+| **Autenticación** | Propia de GTE, sin proveedor externo: usuario+contraseña (BCrypt), bloqueo temporal tras 5 intentos fallidos, JWT de acceso (15 min) + refresh token rotativo en cookie HttpOnly (8h, con detección de reuso que revoca toda la cadena), cambio de contraseña propio y reset por administrador. Toda la API exige token (401 sin él); atajo local sin contraseña solo en Development. Menú filtrado por permisos | Login |
 | **WorkItems** | Bandeja con filtros heredados del GT, detalle, alta, cambio de estatus por acción, registro de tiempo | Trabajo, Detalle |
 | **Mi Día** | Item en proceso, vencidas, para hoy, próximos 7 días, tiempo del día | Mi Día |
 | **Revisiones** | Hallazgos de QA/code review que bloquean el cierre; reapertura con permiso | pestaña en Detalle |
@@ -56,8 +64,8 @@ dotnet test GTE.sln    # 34 pruebas; las de integración se omiten si no hay Loc
 | **Calendario laboral** | `fnMinutosLaborales` con turnos partidos y festivos; motor único de tiempo | — |
 | **Administracion** | Proyectos (alta/edicion + cambio de estatus por el motor, folio al autorizar, RN-PRY-01 bloquea el cierre con WorkItems abiertos), equipos con miembros y % dedicacion, usuarios (alta/edicion/baja logica, RN-ADM-01 valida ciclos de jerarquia con CTE recursivo), roles (asignar/retirar con alcance global o por proyecto, matriz rol-permiso guardada en lote), horarios (tramos con turnos partidos, dias festivos) y ambientes (por proyecto o globales) | Administracion (6 pestañas) |
 
-**Inventario:** 92 endpoints en 11 controladores · 11 pantallas · 12 scripts SQL ·
-~100 tablas · 38 pruebas.
+**Inventario:** 97 endpoints en 11 controladores · 11 pantallas · 13 scripts SQL ·
+~100 tablas (+1, `tblRefreshToken`) · 45 pruebas.
 
 ---
 
@@ -70,7 +78,7 @@ Sin esto no se puede operar en producción, aunque el resto funcione.
 | # | Pendiente | Detalle |
 |---|---|---|
 | ~~B1~~ | ~~**Módulo de Administración (CRUD)**~~ | **Resuelto 2026-07-31.** Proyectos, equipos+miembros, usuarios, roles (asignación+matriz en lote), horarios (tramos+festivos) y ambientes, con API completa (`AdministracionController`, 35 endpoints nuevos) y pantallas bajo `/admin` (6 pestañas). Ver detalle en la fila "Administracion" de la sección 2 y en la §3.4 lo que quedó deliberadamente fuera de alcance |
-| B2 | **Flujo de Entra ID en el SPA** | El backend ya valida tokens de Entra; falta la redirección Authorization Code + PKCE en el frontend. Necesita el tenant real (client id, tenant id, redirect URI). Hoy solo se entra con el emisor local de desarrollo |
+| ~~B2~~ | ~~**Autenticación en el SPA**~~ | **Resuelto 2026-08-01, cambio de alcance.** No habrá tenant de Entra ID (decisión del equipo: GTE maneja autenticación, accesos y roles totalmente dentro de sí mismo). Se construyó login propio: usuario+contraseña (BCrypt), bloqueo temporal, JWT + refresh rotativo en cookie HttpOnly, cambio de contraseña propio y reset por administrador. Ver fila "Autenticación" de la sección 2, ADR nuevo en la sección 4, y lo que queda fuera de alcance en la §3.4 (recuperar contraseña por correo, MFA, bootstrap del primer admin en un ambiente sin atajo de desarrollo) |
 | B3 | **Migración de datos del GT** | Mapeo definido en el Documento Maestro §15.4: `tblTareas`→`tblWorkItem`, subtareas→hijos + registro de tiempo, historial de estatus, revisiones, usuarios/permisos, catálogos, glosario. Falta escribir y ensayar los scripts, con reportes de excepciones y checksums |
 | B4 | **Despliegue** | No hay pipeline CI/CD ni guía de publicación (IIS/Kestrel, certificados, usuario de BD con permisos mínimos, variables de entorno) |
 
@@ -115,6 +123,15 @@ transiciones automáticas configurables.
 
 ### 3.4 Detalles menores conocidos
 
+- **Autenticación propia, fuera de alcance deliberado de esta entrega:** "olvidé mi
+  contraseña" por correo (no hay SMTP configurado todavía), MFA (el diseño original lo
+  delegaba a Entra ID; sin Entra queda pendiente, ej. TOTP si se quiere más adelante), y el
+  bootstrap del primerísimo password de un Administrador en un ambiente de producción real
+  sin el atajo de desarrollo disponible (por ahora: UPDATE directo a la BD, o arrancar ese
+  primer login en Development). Los usuarios existentes antes de este cambio nacen con
+  `PasswordHash = NULL` y `RequiereCambioPassword = 1`: no pueden usar `/auth/login` hasta
+  que un administrador les restablezca la contraseña (o ellos mismos, vía el atajo de
+  desarrollo + cambio propio, si el ambiente lo permite).
 - **Administracion, fuera de alcance deliberado de esta entrega:** CRUD de roles nuevos (los 8
   roles semilla ya cubren los perfiles del sistema; `EsSistema` sugiere que no se crean desde
   UI), CRUD de Areas/Puestos (catalogos simples, sin pantalla propia), gestion de
@@ -150,6 +167,7 @@ transiciones automáticas configurables.
 | — | El frontend **nunca decide transiciones**: pide las acciones válidas al motor y envía acciones, jamás estatus destino |
 | — | El esquema lo gobiernan los scripts de `DataBase/Scripts` (idempotentes). **No usar migraciones de EF**; tras cambiar el esquema, re-scaffold |
 | — | MediatR 12.5.0 y AutoMapper 14.0.0 fijados por licencia libre; no subir de major sin decisión |
+| — | **GTE no usa Entra ID ni ningún proveedor de identidad externo** (decisión del equipo, 2026-08-01): reemplaza la intención original de B2. Autenticación 100% propia dentro de `bdsGTE` (usuario+contraseña BCrypt, JWT propio, refresh rotativo). Un solo JWT HMAC para todo el sistema: el atajo de desarrollo y el login real emiten el mismo tipo de token (`IEmisorTokenSesion`), nunca dos mecanismos distintos |
 
 ---
 
@@ -189,6 +207,24 @@ transiciones automáticas configurables.
   de un `Tab` (ripple/touch handling); si una pestaña no cambia visualmente pero tampoco hay
   error, probar `elemento.click()` via `javascript_tool` antes de asumir que el componente
   esta roto.
+- **Cookie de refresh `SameSite=None; Secure` entre `localhost:5173` y `localhost:5088`
+  (puertos distintos = origenes distintos) SI viaja en Chrome/Edge**, sin HTTPS: el
+  navegador trata `http://localhost` como contexto seguro. Se verifico en vivo (no se
+  asumio): `document.cookie` la mantiene invisible (confirma `HttpOnly`) y aun asi
+  `/auth/logout`/`/auth/refresh` la reciben. Requiere `axios.create({ withCredentials:
+  true })` en el cliente y `.AllowCredentials()` en la politica de CORS (incompatible con
+  origenes wildcard, pero ya se usa una lista explicita).
+- **Interceptor de refresh silencioso en axios**: en el 401, revisar la URL de la peticion
+  que fallo antes de reintentar -- si la peticion original YA era `/auth/refresh`,
+  `/auth/login`, etc., no reintentar (bucle sin sentido). Un solo refresh en vuelo
+  compartido (`Promise` memoizada) si varias peticiones truenan con 401 al mismo tiempo.
+- **BCrypt.Net-Next** (no `BCrypt.Net`) es el paquete correcto; y la construccion de JWT
+  (`System.IdentityModel.Tokens.Jwt`/`Microsoft.IdentityModel.Tokens`) no llega gratis a
+  `GTE.Infrastructure` solo por ser dependencia transitiva de `GTE.WebApi` -- cada proyecto
+  necesita su propia referencia si construye/valida tokens.
+- **Mensajes de error genericos en login**: "usuario o contraseña incorrectos" debe ser
+  identico tanto si el usuario no existe como si la contraseña esta mal (evita enumeracion
+  de cuentas validas por diferencia de mensaje/tiempo de respuesta).
 
 ---
 

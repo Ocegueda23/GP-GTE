@@ -72,17 +72,23 @@ builder.Services.AddScoped<GTE.Application.Interfaces.ISolicitudQueryService, GT
 builder.Services.AddScoped<GTE.Domain.Interfaces.IAdministracionRepository, GTE.Infrastructure.Repositories.AdministracionRepository>();
 builder.Services.AddScoped<GTE.Application.Interfaces.IAdministracionQueryService, GTE.Infrastructure.Services.AdministracionQueryService>();
 
-// Autenticacion: Entra ID en produccion; emisor local solo en desarrollo.
+// Modulo Autenticacion (propia de GTE, sin proveedor externo)
+builder.Services.AddScoped<GTE.Domain.Interfaces.IAutenticacionRepository, GTE.Infrastructure.Repositories.AutenticacionRepository>();
+builder.Services.AddSingleton<GTE.Application.Interfaces.IHashPassword, GTE.Infrastructure.Services.HashPasswordBCrypt>();
+builder.Services.AddSingleton<GTE.Application.Interfaces.IEmisorTokenSesion, GTE.Infrastructure.Services.EmisorTokenSesion>();
+
+// Autenticacion: JWT propio de GTE (sin proveedor externo).
 // Arranca con FallbackPolicy que exige identidad en toda la API.
 builder.Services.AgregarAutenticacionGte(builder.Configuration, builder.Environment);
 
-// CORS para el SPA
+// CORS para el SPA (AllowCredentials: el refresh token viaja en una cookie HttpOnly)
 var origenesSpa = builder.Configuration.GetSection("Cors:Origenes").Get<string[]>()
     ?? ["http://localhost:5173"];
 builder.Services.AddCors(opciones => opciones.AddPolicy("Spa", politica => politica
     .WithOrigins(origenesSpa)
     .AllowAnyHeader()
-    .AllowAnyMethod()));
+    .AllowAnyMethod()
+    .AllowCredentials()));
 
 var app = builder.Build();
 

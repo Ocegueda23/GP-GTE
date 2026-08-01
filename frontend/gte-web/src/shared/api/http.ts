@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { type InternalAxiosRequestConfig } from "axios";
 
 /**
  * Envelope estandar de toda respuesta de la API GTE.
@@ -39,13 +39,25 @@ export class ErrorApi extends Error {
   }
 }
 
+const CLAVE_TOKEN = "gte.token";
+
+/** Rutas de auth que nunca se reintentan tras un refresh (evitan bucles sin sentido). */
+const RUTAS_SIN_REINTENTO = [
+  "/api/v1/auth/refresh",
+  "/api/v1/auth/login",
+  "/api/v1/auth/desarrollo/token",
+  "/api/v1/auth/logout",
+];
+
 export const http = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? "http://localhost:5088",
   headers: { "Content-Type": "application/json" },
+  // El refresh token viaja en una cookie HttpOnly (no en el body ni en localStorage).
+  withCredentials: true,
 });
 
 http.interceptors.request.use((config) => {
-  const token = sessionStorage.getItem("gte.token");
+  const token = sessionStorage.getItem(CLAVE_TOKEN);
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -59,15 +71,57 @@ export function registrarManejadorSesionInvalida(handler: () => void) {
   alPerderSesion = handler;
 }
 
-// Token vencido o invalido: se descarta y la aplicacion vuelve al inicio de sesion
+/** Un solo refresh en vuelo aunque varias peticiones truenen con 401 al mismo tiempo. */
+let refrescoEnCurso: Promise<string | null> | null = null;
+
+async function intentarRefrescar(): Promise<string | null> {
+  refrescoEnCurso ??= (async () => {
+    try {
+      const { data } = await http.post<ApiResponse<{ token: string }>>("/api/v1/auth/refresh");
+      if (!data.success || !data.response) return null;
+      sessionStorage.setItem(CLAVE_TOKEN, data.response.token);
+      return data.response.token;
+    } catch {
+      return null;
+    } finally {
+      refrescoEnCurso = null;
+    }
+  })();
+  return refrescoEnCurso;
+}
+
+interface SolicitudConReintento extends InternalAxiosRequestConfig {
+  _reintentada?: boolean;
+}
+
+// Access token vencido: se intenta un refresh silencioso (la cookie viaja sola) y se
+// reintenta la peticion original una sola vez; si tambien falla, se cierra la sesion.
 http.interceptors.response.use(
   (respuesta) => respuesta,
-  (error) => {
-    if (axios.isAxiosError(error) && error.response?.status === 401) {
-      sessionStorage.removeItem("gte.token");
-      alPerderSesion?.();
+  async (error) => {
+    if (!axios.isAxiosError(error) || error.response?.status !== 401) {
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
+
+    const solicitudOriginal = error.config as SolicitudConReintento | undefined;
+    const esRutaSinReintento = RUTAS_SIN_REINTENTO.some((ruta) => solicitudOriginal?.url?.startsWith(ruta));
+
+    if (!solicitudOriginal || solicitudOriginal._reintentada || esRutaSinReintento) {
+      sessionStorage.removeItem(CLAVE_TOKEN);
+      alPerderSesion?.();
+      return Promise.reject(error);
+    }
+
+    const nuevoToken = await intentarRefrescar();
+    if (!nuevoToken) {
+      sessionStorage.removeItem(CLAVE_TOKEN);
+      alPerderSesion?.();
+      return Promise.reject(error);
+    }
+
+    solicitudOriginal._reintentada = true;
+    solicitudOriginal.headers.Authorization = `Bearer ${nuevoToken}`;
+    return http(solicitudOriginal);
   },
 );
 

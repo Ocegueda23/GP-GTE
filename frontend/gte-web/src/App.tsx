@@ -15,7 +15,7 @@ import { QaPage } from "./features/calidad/QaPage";
 import { ReleasesPage } from "./features/entregas/ReleasesPage";
 import { GuardiaSesion } from "./features/sesion/GuardiaSesion";
 import { AdminPage } from "./features/admin/AdminPage";
-import { cerrarSesion, useSesion } from "./shared/api/sesion";
+import { cerrarSesion, cerrarSesionServidor, useSesion } from "./shared/api/sesion";
 
 const tema = createTheme({
   palette: {
@@ -50,6 +50,7 @@ function BarraSuperior() {
   const [ancla, setAncla] = useState<HTMLElement | null>(null);
 
   const salir = () => {
+    void cerrarSesionServidor();
     cerrarSesion();
     establecer(null);
     setAncla(null);
