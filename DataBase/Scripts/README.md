@@ -34,6 +34,12 @@ orden dentro de la tanda). Todo script es **idempotente**: se puede correr N vec
 |---|---|
 | 01_2026-07-30_INSERT_bdsGTE_TransicionesYEtiquetas.sql | Transicion WorkItem Terminado a Correccion (RECHAZAR_QA) que necesita el modulo de Revisiones + siembra de tblTransicionConfig con etiquetas de boton, permisos y motivos obligatorios de las 21 transiciones de WorkItem, Solicitud y Revision |
 
+## Tanda de despliegue (2026-08-01)
+
+| Script | Contenido |
+|---|---|
+| 01_2026-08-01_SCRIPT_bdsGTE_UsuarioServicio.sql | Login de Windows (cuenta de servicio) + usuario en bdsGTE con permisos minimos (db_datareader/db_datawriter + EXECUTE sobre spCambiarEstatus/spGenerarFolio/spRegistrarBitacora/spSnapshotKpi). **Excepcion deliberada**: el Bloque 1 corre contra `[master]` (el login es un principal de servidor), no contra bdsGTE -- unico script de esta carpeta que lo hace. Ajustar la variable `@NombreLogin` en los dos bloques antes de correrlo. Ver `Doctos/MANUAL_INSTALACION_GTE.md` |
+
 ## Contratos importantes
 
 - **GTE es totalmente independiente**: una sola base (`bdsGTE`), sin referencias a ninguna

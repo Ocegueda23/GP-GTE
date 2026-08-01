@@ -7,6 +7,8 @@ obj/
 logs/
 appsettings.Local.json
 appsettings.*.Local.json
+src/GTE.WebApi/wwwroot/*
+!src/GTE.WebApi/wwwroot/.gitkeep
 
 # Node / frontend
 node_modules/

@@ -116,6 +116,19 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+// SPA: en produccion, Kestrel sirve el build de React (frontend/gte-web/dist copiado a
+// wwwroot al publicar) en el mismo proceso que la API -- sin IIS ni reverse proxy separado
+// (topologia minima fase 1, ver Documento Maestro seccion 1.1). Si wwwroot no existe (por
+// ejemplo, en Development, donde el SPA corre aparte con "npm run dev") esto no falla: solo
+// no hay archivos estaticos que servir y la peticion sigue de largo por el resto del pipeline.
+// Va ANTES de CORS/auth a proposito: un archivo real (JS/CSS/index.html) tiene que servirse
+// sin pasar por el FallbackPolicy. MapFallbackToFile usa la restriccion implicita ":nonfile",
+// asi que una ruta como "/assets/app.js" NUNCA la matchea (queda sin endpoint) y el
+// FallbackPolicy (RequireAuthenticatedUser) la bloquearia con 401 si UseStaticFiles no la
+// hubiera servido ya aqui arriba -- confirmado en pruebas manuales.
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 app.UseCors("Spa");
 app.UseAuthentication();
 app.UseMiddleware<AuditMiddleware>();
@@ -125,6 +138,12 @@ app.MapControllers();
 app.MapHub<GTE.WebApi.Hubs.NotificacionesHub>("/hubs/notificaciones");
 app.MapGet("/health", () => Results.Ok(new { estado = "ok", fecha = DateTime.UtcNow }))
     .AllowAnonymous();
+
+// Rutas de cliente de la SPA sin archivo fisico (ej. "/proyectos/123"): no coinciden con
+// ningun controlador ni con un archivo real, asi que si matchean el fallback (":nonfile").
+// AllowAnonymous porque el shell tiene que poder cargar sin sesion -- es lo que muestra la
+// pantalla de login. Los datos reales siguen exigiendo token en /api/v1/...
+app.MapFallbackToFile("index.html").AllowAnonymous();
 
 app.Run();
 

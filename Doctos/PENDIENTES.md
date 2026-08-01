@@ -3,7 +3,7 @@
 > Documento de continuidad. Sirve para retomar el proyecto en otra sesión sin
 > contexto previo. Actualizar al cerrar cada bloque de trabajo.
 >
-> **Última actualización:** 2026-08-01 (notificaciones y SignalR en vivo, cierre de A3 y A6)
+> **Última actualización:** 2026-08-01 (despliegue: Kestrel directo como Windows Service, cierre de B4)
 > **Repositorio:** https://github.com/Ocegueda23/GP-GTE (rama `main`)
 > **Diseño completo:** `Doctos/GTE-DocumentoMaestro.md` (fuente de verdad de decisiones)
 > **Reglas para escribir código aquí:** `CLAUDE.md` en la raíz
@@ -82,7 +82,7 @@ Sin esto no se puede operar en producción, aunque el resto funcione.
 | ~~B1~~ | ~~**Módulo de Administración (CRUD)**~~ | **Resuelto 2026-07-31.** Proyectos, equipos+miembros, usuarios, roles (asignación+matriz en lote), horarios (tramos+festivos) y ambientes, con API completa (`AdministracionController`, 35 endpoints nuevos) y pantallas bajo `/admin` (6 pestañas). Ver detalle en la fila "Administracion" de la sección 2 y en la §3.4 lo que quedó deliberadamente fuera de alcance |
 | ~~B2~~ | ~~**Autenticación en el SPA**~~ | **Resuelto 2026-08-01, cambio de alcance.** No habrá tenant de Entra ID (decisión del equipo: GTE maneja autenticación, accesos y roles totalmente dentro de sí mismo). Se construyó login propio: usuario+contraseña (BCrypt), bloqueo temporal, JWT + refresh rotativo en cookie HttpOnly, cambio de contraseña propio y reset por administrador. Ver fila "Autenticación" de la sección 2, ADR nuevo en la sección 4, y lo que queda fuera de alcance en la §3.4 (recuperar contraseña por correo, MFA, bootstrap del primer admin en un ambiente sin atajo de desarrollo) |
 | B3 | **Migración de datos del GT** | Mapeo definido en el Documento Maestro §15.4: `tblTareas`→`tblWorkItem`, subtareas→hijos + registro de tiempo, historial de estatus, revisiones, usuarios/permisos, catálogos, glosario. Falta escribir y ensayar los scripts, con reportes de excepciones y checksums |
-| B4 | **Despliegue** | No hay pipeline CI/CD ni guía de publicación (IIS/Kestrel, certificados, usuario de BD con permisos mínimos, variables de entorno) |
+| ~~B4~~ | ~~**Despliegue**~~ | **Resuelto 2026-08-01.** Kestrel directo como Windows Service (sin IIS, sin Docker, sin CI/CD -- mismo patrón real que ya usa `Interflo.ServiceHealth`, ver decisión en la sección 4). La API sirve la SPA compilada en el mismo proceso (`wwwroot` + fallback). `publicar.bat` hace `npm run build` + `dotnet publish` + copia el build a `wwwroot` en un solo paso. Script de BD de mínimo privilegio (`DataBase/Scripts/01_2026-08-01_SCRIPT_bdsGTE_UsuarioServicio.sql`) y manual completo (`Doctos/MANUAL_INSTALACION_GTE.md`, calcado del formato real de ServiceHealth). Verificado con el `.exe` publicado real corriendo solo (no `dotnet run`) y `dotnet test` en 49/49. Fuera de alcance deliberado: sin pipeline de CI (se decidió mantener todo manual, igual que el resto del ecosistema) y sin bootstrap de la primera contraseña en un ambiente nuevo (ver §3.4, ya documentado desde B2) |
 
 ### 3.2 Alto valor, sin bloquear
 
@@ -201,6 +201,7 @@ transiciones automáticas configurables.
 | — | El esquema lo gobiernan los scripts de `DataBase/Scripts` (idempotentes). **No usar migraciones de EF**; tras cambiar el esquema, re-scaffold |
 | — | MediatR 12.5.0 y AutoMapper 14.0.0 fijados por licencia libre; no subir de major sin decisión |
 | — | **GTE no usa Entra ID ni ningún proveedor de identidad externo** (decisión del equipo, 2026-08-01): reemplaza la intención original de B2. Autenticación 100% propia dentro de `bdsGTE` (usuario+contraseña BCrypt, JWT propio, refresh rotativo). Un solo JWT HMAC para todo el sistema: el atajo de desarrollo y el login real emiten el mismo tipo de token (`IEmisorTokenSesion`), nunca dos mecanismos distintos |
+| — | **Despliegue de GTE: Kestrel directo como Windows Service** (decisión del equipo, 2026-08-01), sin IIS, sin reverse proxy, sin Docker y sin pipeline de CI/CD -- mismo patrón real que ya usa `Interflo.ServiceHealth` en producción (publicación manual con `.bat` + `sc create` + variables de entorno para secretos). La API sirve también la SPA compilada en el mismo proceso (`wwwroot` + `MapFallbackToFile`). **Diverge deliberadamente** del diagrama de la sección 1.1 del Documento Maestro (que preveía IIS ARR/YARP + Redis): esa arquitectura queda como visión de escalamiento a futuro (fase N, multi-instancia); la topología mínima fase 1 (1 servidor de aplicaciones) no la necesita. Revisar/actualizar ese diagrama si el equipo decide escalar |
 
 ---
 
@@ -325,6 +326,46 @@ transiciones automáticas configurables.
   reciben `tabId` explícito actúan sobre la pestaña *frontada* (`tabs_select`), no sobre
   la última usada -- hay que pasar `tabId` explícito en cada llamada cuando se alterna
   entre pestañas o se leen resultados de la pestaña equivocada.
+- **`MapFallbackToFile` usa la restricción implícita `:nonfile`**: una ruta como
+  `/assets/app.js` (tiene extensión) NUNCA la matchea como endpoint -- por diseño, para
+  que un archivo estático faltante dé 404 en vez de servir `index.html` por error. Con un
+  `FallbackPolicy` global que exige autenticación (`RequireAuthenticatedUser`), esto
+  significa que una petición a un archivo real **sin endpoint** cae directo en el
+  `FallbackPolicy` y se bloquea con 401 -- pasó en vivo con los `.js`/`.css` del build de
+  React. La solución real no es marcar el fallback con `AllowAnonymous` (eso solo cubre
+  rutas de cliente sin extensión, ej. `/proyectos/123`): hay que colocar
+  `UseDefaultFiles()`/`UseStaticFiles()` **antes** de `UseCors`/`UseAuthentication`/
+  `UseAuthorization` en el pipeline, para que un archivo físico se sirva y corte el
+  pipeline ahí mismo, sin llegar nunca al `FallbackPolicy`. El `MapFallbackToFile(...)`
+  en sí *sí* necesita `.AllowAnonymous()` explícito (para las rutas de cliente sin
+  archivo), porque el shell de la SPA tiene que cargar sin sesión -- es lo que muestra la
+  pantalla de login (ver `Program.cs`).
+- **`UseStaticFiles()` tolera un `wwwroot` faltante en tiempo de ejecución** (solo un WARN
+  en el log), **pero `WebApplicationBuilder` NO**: el paso interno
+  `StaticWebAssetsLoader.UseStaticWebAssets` (parte del arranque, corre en cualquier
+  ambiente, no solo Development) construye un `PhysicalFileProvider` sobre `wwwroot` y
+  **truena con `DirectoryNotFoundException` si la carpeta no existe físicamente** -- rompió
+  las 24 pruebas de `GTE.Api.Tests` (`WebApplicationFactory` construye la app real) hasta
+  que se agregó un `wwwroot/.gitkeep` versionado (con `.gitignore` ajustado a
+  `wwwroot/*` + `!wwwroot/.gitkeep`, no a la carpeta completa). Cualquier proyecto que
+  sirva una SPA desde `wwwroot` necesita la carpeta trackeada de antemano, no solo
+  generada al publicar.
+- **`THROW;` (sin argumentos, para relanzar en un `CATCH`) exige que la sentencia
+  inmediatamente anterior termine en punto y coma** -- si no, error de sintaxis
+  ("Incorrect syntax near 'THROW'") que además señala una línea equivocada (la del
+  `PRINT` anterior, no la del propio `THROW`), lo que hace más difícil detectar la causa
+  real a simple vista. Verificado en vivo contra LocalDB con un repro mínimo. Revisar
+  cualquier bloque `CATCH` nuevo que combine `PRINT` sin `;` seguido de `THROW`.
+- **Crear un login de SQL Server (`CREATE LOGIN ... FROM WINDOWS`) y su usuario en una
+  base (`CREATE USER ... FOR LOGIN`) son operaciones en ámbitos distintos** (`master` vs.
+  la base de datos): un script de aprovisionamiento de cuenta de servicio legítimamente
+  necesita `USE [master]` para el login y `USE [bdsGTE]` para el usuario/permisos --
+  excepción documentada al invariante "todos los scripts de esta carpeta corren solo
+  contra bdsGTE" (ver `DataBase/Scripts/README.md`). Si se prueba esto localmente, ojo:
+  usar la propia cuenta de Windows que ya es `dbo` de la base de prueba falla con
+  "The login already has an account with the user name 'dbo'" al día de crear el `USER`
+  -- no es un bug del script, es que esa cuenta ya tiene una asignación en esa base; para
+  probar de verdad hace falta un login distinto al dueño de la base.
 
 ---
 
