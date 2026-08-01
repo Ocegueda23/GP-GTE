@@ -72,6 +72,14 @@ builder.Services.AddScoped<GTE.Application.Interfaces.ISolicitudQueryService, GT
 builder.Services.AddScoped<GTE.Domain.Interfaces.IAdministracionRepository, GTE.Infrastructure.Repositories.AdministracionRepository>();
 builder.Services.AddScoped<GTE.Application.Interfaces.IAdministracionQueryService, GTE.Infrastructure.Services.AdministracionQueryService>();
 
+// Modulo Comentarios y Archivos (adjuntos)
+builder.Services.AddScoped<GTE.Domain.Interfaces.IComentarioRepository, GTE.Infrastructure.Repositories.ComentarioRepository>();
+builder.Services.AddScoped<GTE.Application.Interfaces.IComentarioQueryService, GTE.Infrastructure.Services.ComentarioQueryService>();
+builder.Services.AddScoped<GTE.Domain.Interfaces.IArchivoRepository, GTE.Infrastructure.Repositories.ArchivoRepository>();
+builder.Services.AddScoped<GTE.Application.Interfaces.IArchivoQueryService, GTE.Infrastructure.Services.ArchivoQueryService>();
+builder.Services.AddSingleton<GTE.Application.Interfaces.IAlmacenArchivos, GTE.Infrastructure.Services.AlmacenArchivosDisco>();
+builder.Services.AddSingleton<GTE.Application.Interfaces.ISanitizadorHtml, GTE.Infrastructure.Services.SanitizadorHtmlGanss>();
+
 // Modulo Autenticacion (propia de GTE, sin proveedor externo)
 builder.Services.AddScoped<GTE.Domain.Interfaces.IAutenticacionRepository, GTE.Infrastructure.Repositories.AutenticacionRepository>();
 builder.Services.AddSingleton<GTE.Application.Interfaces.IHashPassword, GTE.Infrastructure.Services.HashPasswordBCrypt>();

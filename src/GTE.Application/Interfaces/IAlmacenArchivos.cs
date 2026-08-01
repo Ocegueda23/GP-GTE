@@ -6,7 +6,8 @@ public record ArchivoAlmacenado(
     string NombreArchivo,
     string Extension,
     long TamanoBytes,
-    string HashSha256);
+    string HashSha256,
+    string RutaRelativa);
 
 /// <summary>
 /// Almacen de archivos por GUID (share de red en fase 1, migrable a blob storage).

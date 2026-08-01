@@ -125,7 +125,7 @@ http.interceptors.response.use(
   },
 );
 
-function lanzarErrorApi(error: unknown): never {
+export function lanzarErrorApi(error: unknown): never {
   if (axios.isAxiosError(error) && error.response?.data) {
     const data = error.response.data as ApiResponse<unknown>;
     if (data.userMessage) {
@@ -150,14 +150,16 @@ export async function obtener<T>(url: string, params?: URLSearchParams): Promise
   }
 }
 
-/** POST/PUT tipado: devuelve el dato y el userMessage para el toast. */
+/** POST/PUT/DELETE tipado: devuelve el dato y el userMessage para el toast. */
 export async function enviar<T>(
-  metodo: "post" | "put",
+  metodo: "post" | "put" | "delete",
   url: string,
   body?: unknown,
 ): Promise<{ dato: T; mensaje: string }> {
   try {
-    const { data } = await http[metodo]<ApiResponse<T>>(url, body);
+    const { data } = metodo === "delete"
+      ? await http.delete<ApiResponse<T>>(url)
+      : await http[metodo]<ApiResponse<T>>(url, body);
     if (!data.success) {
       throw new ErrorApi(data.userMessage, data.code);
     }

@@ -3,7 +3,7 @@
 > Documento de continuidad. Sirve para retomar el proyecto en otra sesión sin
 > contexto previo. Actualizar al cerrar cada bloque de trabajo.
 >
-> **Última actualización:** 2026-08-01 (autenticación propia de GTE, cierre de B2)
+> **Última actualización:** 2026-08-01 (comentarios y adjuntos sobre WorkItem, cierre de A1)
 > **Repositorio:** https://github.com/Ocegueda23/GP-GTE (rama `main`)
 > **Diseño completo:** `Doctos/GTE-DocumentoMaestro.md` (fuente de verdad de decisiones)
 > **Reglas para escribir código aquí:** `CLAUDE.md` en la raíz
@@ -63,9 +63,10 @@ dotnet test GTE.sln    # 45 pruebas; las de integración se omiten si no hay Loc
 | **Motor de estatus** | 11 procesos por datos en `tblProceso`/`tblTransicion` + `spCambiarEstatus` con guard de concurrencia | — |
 | **Calendario laboral** | `fnMinutosLaborales` con turnos partidos y festivos; motor único de tiempo | — |
 | **Administracion** | Proyectos (alta/edicion + cambio de estatus por el motor, folio al autorizar, RN-PRY-01 bloquea el cierre con WorkItems abiertos), equipos con miembros y % dedicacion, usuarios (alta/edicion/baja logica, RN-ADM-01 valida ciclos de jerarquia con CTE recursivo), roles (asignar/retirar con alcance global o por proyecto, matriz rol-permiso guardada en lote), horarios (tramos con turnos partidos, dias festivos) y ambientes (por proyecto o globales) | Administracion (6 pestañas) |
+| **Comentarios y adjuntos** | Hilos de comentarios sobre WorkItem con formato basico (negritas, listas, etc.), @menciones con autocompletado (TipTap + catalogo de usuarios) y pegado de imagenes desde el portapapeles; adjuntos con subida/descarga por streaming autenticado (`IAlmacenArchivos` en disco, GUID + SHA-256), validacion de extension/tamano, baja logica solo por el propio autor. HTML sanitizado en el backend (`HtmlSanitizer`) antes de guardarse | franja de Comentarios bajo el detalle + pestaña Adjuntos, en Detalle de WorkItem |
 
-**Inventario:** 97 endpoints en 11 controladores · 11 pantallas · 13 scripts SQL ·
-~100 tablas (+1, `tblRefreshToken`) · 45 pruebas.
+**Inventario:** 104 endpoints en 13 controladores · 11 pantallas · 13 scripts SQL ·
+~100 tablas (+1, `tblRefreshToken`) · 47 pruebas.
 
 ---
 
@@ -86,7 +87,7 @@ Sin esto no se puede operar en producción, aunque el resto funcione.
 
 | # | Pendiente | Detalle |
 |---|---|---|
-| A1 | **Comentarios y adjuntos** | `tblComentario`, `tblArchivo`, `tblArchivoVinculo` y el contrato `IAlmacenArchivos` existen sin implementación. Es lo que más se usa a diario en un gestor de tareas (incluye menciones `@usuario`) |
+| ~~A1~~ | ~~**Comentarios y adjuntos**~~ | **Resuelto 2026-08-01.** Hilos de comentarios (formato básico + @menciones + imágenes pegadas) y adjuntos (subida/descarga por streaming autenticado) sobre WorkItem, API completa (`ComentariosController`, `ArchivosController`) y UI integrada en el Detalle. Ver fila "Comentarios y adjuntos" de la sección 2 y lo que quedó deliberadamente fuera de alcance en la §3.4 |
 | A2 | **Edición de WorkItem en la UI** | El endpoint `PUT /workitems/{id}` ya existe con todas sus reglas; falta la pantalla. Hoy no se puede cambiar asignado, compromiso ni complejidad desde la interfaz |
 | A3 | **Notificaciones** | `tblNotificacion`, `tblPlantillaNotificacion` y `ICanalNotificacion` listos, sin implementación. Sin esto el solicitante no sabe que su petición avanzó (rechazo, liberación) |
 | A4 | **Hangfire (trabajos en segundo plano)** | Vigilancia de SLA, snapshot de KPIs (`spSnapshotKpi` ya existe), recordatorios de compromiso, despacho del outbox `tblEventoDominio`, cierre automático de tickets |
@@ -152,6 +153,16 @@ transiciones automáticas configurables.
   de desarrollo usado (el navegador headless no genera los eventos de puntero que dnd-kit
   necesita). La lógica del movimiento sí está verificada por su endpoint. **Conviene
   probarlo a mano.**
+- **Comentarios y adjuntos, fuera de alcance deliberado de esta entrega:** sin permiso de
+  admin/líder para borrar comentarios o adjuntos ajenos (solo el propio autor puede,
+  `ForbiddenException` en cualquier otro caso; agregar `COM.EliminarAjeno` si se necesita,
+  siguiendo el patrón de `WI.ModificarAjeno`), sin edición de un comentario ya publicado
+  (solo alta + baja lógica), sin notificación real al mencionar `@usuario` (los `data-id`
+  quedan marcados inline en el HTML guardado, listos para que A3 los lea el día que exista),
+  y sin antivirus sobre el almacén de archivos (mencionado como opcional en el Documento
+  Maestro §8.5). El almacén (`AlmacenArchivosDisco`) usa una carpeta local por defecto
+  (`AlmacenArchivos:Ruta` vacío cae a una subcarpeta junto al ejecutable); para producción
+  hay que apuntarlo al share de red real.
 
 ---
 
@@ -225,6 +236,34 @@ transiciones automáticas configurables.
 - **Mensajes de error genericos en login**: "usuario o contraseña incorrectos" debe ser
   identico tanto si el usuario no existe como si la contraseña esta mal (evita enumeracion
   de cuentas validas por diferencia de mensaje/tiempo de respuesta).
+- **HTML enriquecido de usuario, sanitizar siempre en el backend**: el front nunca es la
+  ultima linea de defensa. `HtmlSanitizer` (Ganss.Xss) con `AllowedTags`/`AllowedAttributes`
+  explicitos (sin `src` en `img`) y `AllowDataAttributes = true` para permitir `data-guid`/
+  `data-id` (menciones e imagenes) sin abrir la puerta a atributos arbitrarios.
+- **Imagenes pegadas en contenido enriquecido, nunca por URL directa**: el HTML persistido
+  solo guarda `data-guid`; ni el editor (NodeView de TipTap) ni la vista de solo lectura
+  usan `<img src="...">` contra el endpoint -- ambos piden el blob autenticado por
+  `axios` (header `Authorization`, `responseType: "blob"`) y arman un `ObjectURL` en
+  cliente. **`dangerouslySetInnerHTML` no ejecuta NodeViews de React**: la vista de solo
+  lectura de un comentario ya guardado necesita su propio `useEffect` que busque
+  `img[data-guid]` en el DOM renderizado y resuelva el blob a mano (ver
+  `ContenidoComentario` en `PanelComentarios.tsx`); no basta con que el editor sepa
+  mostrarlas.
+- **TipTap v3 (no v2)**: `@tiptap/suggestion` cambio el patron de posicionamiento del popup
+  de menciones -- ya no hace falta `tippy.js` a mano, `SuggestionProps.mount(elemento)`
+  monta y reposiciona solo (Floating UI por debajo), devuelve un `unmount()` para llamar en
+  `onExit`. `@tiptap/react` reexporta todo `@tiptap/core` (`Node`, `mergeAttributes`,
+  `NodeViewProps`, etc.), no hace falta importarlos de `@tiptap/core` por separado.
+- **Adjuntos multipart con el cliente axios compartido**: `http.ts` fija
+  `Content-Type: application/json` por defecto en la instancia; una subida con `FormData`
+  necesita pisarlo explicitamente a `undefined` en esa llamada puntual para que el
+  navegador calcule el boundary multipart solo (ver `subirArchivo` en
+  `shared/api/archivos.ts`).
+- **Verificacion real de paste de imagen en el Browser pane**: a diferencia del drag del
+  kanban (necesita eventos de puntero reales que el entorno headless no genera), un
+  `ClipboardEvent` sintetico con `DataTransfer` SI se puede construir y despachar por script
+  contra el editor -- permitio probar de punta a punta la subida por pegado sin depender
+  del portapapeles real del sistema operativo.
 
 ---
 

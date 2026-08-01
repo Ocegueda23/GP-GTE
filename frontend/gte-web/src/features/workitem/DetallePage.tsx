@@ -12,6 +12,8 @@ import {
 import { ModalTiempo } from "../trabajo/ModalTiempo";
 import { BotonesAcciones } from "./BotonesAcciones";
 import { PanelRevisiones } from "./PanelRevisiones";
+import { PanelAdjuntos } from "./PanelAdjuntos";
+import { PanelComentarios } from "./PanelComentarios";
 
 function formatearFecha(iso: string | null): string {
   if (!iso) return "-";
@@ -107,6 +109,7 @@ export function DetallePage() {
             <Tab label={item.revisionesPendientes > 0
               ? `Revisiones (${item.revisionesPendientes})`
               : "Revisiones"} />
+            <Tab label="Adjuntos" />
           </Tabs>
 
           {pestana === 0 && (
@@ -170,6 +173,19 @@ export function DetallePage() {
               alError={(mensaje) => setAviso({ tipo: "error", mensaje })}
             />
           )}
+
+          {pestana === 3 && (
+            <PanelAdjuntos
+              idWorkItem={item.idWorkItem}
+              alExito={(mensaje) => setAviso({ tipo: "success", mensaje })}
+              alError={(mensaje) => setAviso({ tipo: "error", mensaje })}
+            />
+          )}
+
+          <PanelComentarios
+            idWorkItem={item.idWorkItem}
+            alError={(mensaje) => setAviso({ tipo: "error", mensaje })}
+          />
         </Paper>
 
         <Paper variant="outlined" sx={{ flex: 1, p: 2, alignSelf: "flex-start", minWidth: 280 }}>
