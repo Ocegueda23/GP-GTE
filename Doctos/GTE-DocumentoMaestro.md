@@ -88,7 +88,7 @@ Este diseño corrige explícitamente la deuda documentada del sistema actual:
 | # | Decisión | Alternativas evaluadas | Justificación |
 |---|---|---|---|
 | ADR-01 | **Monolito modular** desplegado como una sola Web API, con módulos DDD aislados | Microservicios | Equipo de 2 desarrolladores; microservicios multiplican costo operativo sin beneficio a esta escala. Las fronteras de módulo permiten extraer servicios después |
-| ADR-02 | **.NET 9 + React** | .NET 8 + Angular (estándar Frente B vigente) | Decisión explícita del producto. CONTRADICCIÓN REGISTRADA con InterfloClaude.md §6-8: si GTE se aprueba con este stack, actualizar el estándar o documentar GTE como Frente C |
+| ADR-02 | **.NET 8 + React** (retargeteado desde .NET 9 el 2026-08-01, ver PENDIENTES.md §4-5: el servidor real de despliegue no tenía el runtime 9.0, y .NET 8 es LTS mientras 9 es STS) | .NET 8 + Angular (estándar Frente B vigente) | Decisión explícita del producto. El backend (.NET 8) ya **no** contradice InterfloClaude.md §6-8; el frontend (React vs Angular) **sigue divergiendo** -- pendiente ratificar o documentar GTE como Frente C solo por esa parte |
 | ADR-03 | **Independencia total: todo vive en `bdsGTE`** — folios (`tblFolio` + `spGenerarFolio`) y motor de estatus (`tblProceso`/`tblTransicion`/`spCambiarEstatus`) propios, clonando el patrón transversal probado del ecosistema | Reutilizar `bdsCentral` (usp_GenerarFolio y CambiarST) | Decisión del equipo 2026-07-30: GTE no debe depender de ninguna otra base de datos; se replica el patrón §9, no se comparte la infraestructura |
 | ADR-04 | Motor de workflow por datos (generalización de `CambiarST`) | Workflow en código, librería externa (Elsa, Camunda) | Ya existe, ya está probado, es genérico y auditable; las librerías externas agregan complejidad que 2 devs no deben operar |
 | ADR-05 | CQRS ligero: Commands/Queries con MediatR, **sin** event sourcing ni bases separadas de lectura | Event sourcing completo | El historial de estatus ya da la dimensión temporal necesaria; ES completo es sobreingeniería |
@@ -168,7 +168,7 @@ flowchart TB
 
     subgraph SrvApp["Servidor de aplicaciones (Windows Server / IIS o Kestrel)"]
         RP[Reverse proxy - IIS ARR o YARP<br/>TLS, compresion, rate limiting]
-        API[GTE.WebApi - .NET 9<br/>Monolito modular]
+        API[GTE.WebApi - .NET 8<br/>Monolito modular]
         HF[Hangfire Server<br/>jobs y automatizaciones]
         SR[SignalR Hub<br/>tiempo real]
         FS[(Almacen de archivos<br/>share de red GTE/Archivos<br/>GUID por archivo)]
@@ -220,7 +220,7 @@ flowchart LR
         HTTPC[Cliente HTTP tipado<br/>ApiResponse-T]
     end
 
-    subgraph Backend["GTE.WebApi (.NET 9)"]
+    subgraph Backend["GTE.WebApi (.NET 8)"]
         direction TB
         MW[Middleware: Auth JWT, Auditoria,<br/>Excepciones globales, Serilog]
         subgraph Modulos["Modulos de dominio (bounded contexts)"]
@@ -1933,8 +1933,8 @@ GTE.sln
 
 | Pieza | Uso en GTE |
 |---|---|
-| .NET 9 / ASP.NET Core | Minimal hosting, controllers clásicos por claridad de equipo |
-| EF Core 9 | Acceso a datos; DbContext por base; sin lazy loading; `AsNoTracking` en queries; migraciones NO — el esquema lo gobiernan los scripts SQL versionados (patrón del ecosistema), scaffold tras cada cambio |
+| .NET 8 (LTS) / ASP.NET Core | Minimal hosting, controllers clásicos por claridad de equipo. Retargeteado desde .NET 9 el 2026-08-01 (ver PENDIENTES.md §4-5) |
+| EF Core 8 | Acceso a datos; DbContext por base; sin lazy loading; `AsNoTracking` en queries; migraciones NO — el esquema lo gobiernan los scripts SQL versionados (patrón del ecosistema), scaffold tras cada cambio |
 | MediatR | Commands/Queries + `INotification` para eventos de dominio; pipeline behaviors: Validación -> Autorización de alcance -> Logging -> Transacción |
 | FluentValidation | Un validator por Request; los mensajes viajan en `userMessage` |
 | AutoMapper | Entidad <-> DTO en perfiles por módulo |
@@ -2172,8 +2172,11 @@ la sección 14 es incremental y desactivable.
 
 ### 15.6 Pendientes de decisión del equipo (pelotear antes de codear)
 
-1. Ratificar ADR-02 (stack .NET 9 + React vs estándar Frente B .NET 8 + Angular) y
-   actualizar InterfloClaude.md en consecuencia.
+1. PARCIALMENTE RESUELTO (2026-08-01): backend retargeteado de .NET 9 a **.NET 8**, ya sin
+   contradicción con el estándar Frente B en ese punto (ver ADR-02 actualizado y
+   PENDIENTES.md §4-5). Sigue pendiente ratificar/documentar la divergencia de frontend
+   (React vs el Angular del estándar Frente B) y actualizar InterfloClaude.md en
+   consecuencia.
 2. RESUELTO (2026-07-30): el motor de estatus y los folios se clonan DENTRO de `bdsGTE` —
    GTE es totalmente independiente de cualquier otra base de datos.
 3. Definir tarifas por nivel y política de visibilidad de costos (quién ve dinero).

@@ -1,14 +1,28 @@
 /* =====================================================================
    Script:      01_2026-08-01_SCRIPT_bdsGTE_UsuarioServicio.sql
    Autor:       Equipo GTE
-   Descripcion: Crea (si no existe) el login de Windows de la cuenta de
-                servicio bajo la que corre el Windows Service de
-                GTE.WebApi en el servidor de destino, y le concede en
-                bdsGTE solo los permisos minimos que el proceso necesita:
+   Descripcion: Crea (si no existe) el LOGIN de SQL Server (usuario +
+                contrasena propios de SQL Server, sin depender de ningun
+                dominio/Active Directory/cuenta de Windows) bajo el cual
+                se conecta el Windows Service de GTE.WebApi en el
+                servidor de destino, y le concede en bdsGTE solo los
+                permisos minimos que el proceso necesita:
                 lectura/escritura de datos (db_datareader/db_datawriter)
                 y EXECUTE sobre los stored procedures del motor propio
                 (spCambiarEstatus, spGenerarFolio, spRegistrarBitacora,
                 spSnapshotKpi). Nunca db_owner ni sysadmin.
+
+                Decision deliberada (2026-08-01): autenticacion de SQL
+                Server, NO de Windows. GTE no depende de que el SQL
+                Server destino este en la misma maquina/dominio que el
+                servidor de aplicaciones, ni de coordinar una cuenta de
+                Windows con un administrador de AD -- coherente con que
+                GTE tampoco depende de Entra ID para su propia
+                autenticacion de aplicacion (ver Doctos/PENDIENTES.md
+                seccion 4). Requisito: el SQL Server destino debe tener
+                habilitado el modo mixto ("SQL Server and Windows
+                Authentication mode"), no solo Windows Authentication
+                (ver Doctos/MANUAL_INSTALACION_GTE.md paso 1).
 
                 EXCEPCION deliberada a "todos los scripts de esta carpeta
                 corren solo contra bdsGTE" (ver DataBase/Scripts/README.md):
@@ -16,20 +30,21 @@
                 el resto del script (USER + permisos) si corre contra
                 bdsGTE, como el resto de la tanda.
 
-                AJUSTAR la variable @NombreLogin (mas abajo, en los DOS
-                bloques) con la cuenta de servicio real del ambiente de
-                destino antes de correr este script -- formato
-                DOMINIO\cuenta si es cuenta de dominio, o
-                NOMBREEQUIPO\cuenta si es una cuenta local de ese
-                servidor. Ver Doctos/MANUAL_INSTALACION_GTE.md paso 1.
+                AJUSTAR @Password (mas abajo, en el Bloque 1) con una
+                contrasena real antes de correr este script -- el script
+                se detiene con error si se deja el valor de ejemplo.
+                @NombreLogin ya trae un valor por default (svc_gte);
+                cambiarlo solo si se necesita otro nombre, en AMBOS
+                bloques. Ver Doctos/MANUAL_INSTALACION_GTE.md paso 1.
    =====================================================================
-   Modificacion:                                                 Rev_00
+   Modificacion:                                                 Rev_01
    Fecha: 01 ago 2026
-   Descripcion: Version inicial.
+   Descripcion: Cambio de autenticacion de Windows a SQL Server (login
+                propio con password, sin depender de dominio/AD).
    ===================================================================== */
 
 -- =========================================================================
--- Bloque 1: login a nivel de servidor (master), autenticacion de Windows
+-- Bloque 1: login a nivel de servidor (master), autenticacion de SQL Server
 -- =========================================================================
 USE [master]
 GO
@@ -38,13 +53,21 @@ GO
 BEGIN TRANSACTION
 BEGIN TRY
 
-    DECLARE @NombreLogin SYSNAME = N'AJUSTAR\svc.gte';  -- <-- AJUSTAR antes de correr
+    DECLARE @NombreLogin SYSNAME = N'svc_gte';
+    DECLARE @Password NVARCHAR(128) = N'CAMBIAR-ESTA-CONTRASENA';  -- <-- AJUSTAR antes de correr
     DECLARE @Sql NVARCHAR(MAX);
+
+    IF @Password = N'CAMBIAR-ESTA-CONTRASENA'
+    BEGIN
+        RAISERROR(N'Editar la variable @Password del Bloque 1 antes de correr este script (no dejar el valor de ejemplo).', 16, 1);
+    END
 
     IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = @NombreLogin)
     BEGIN
-        SET @Sql = N'CREATE LOGIN ' + QUOTENAME(@NombreLogin) + N' FROM WINDOWS
-                     WITH DEFAULT_DATABASE = [bdsGTE]';
+        SET @Sql = N'CREATE LOGIN ' + QUOTENAME(@NombreLogin) + N'
+                     WITH PASSWORD = ' + QUOTENAME(@Password, N'''') + N',
+                     CHECK_POLICY = ON, CHECK_EXPIRATION = OFF,
+                     DEFAULT_DATABASE = [bdsGTE]';
         EXEC sp_executesql @Sql;
         PRINT 'OK: login ' + @NombreLogin + ' creado';
     END
@@ -76,7 +99,7 @@ GO
 BEGIN TRANSACTION
 BEGIN TRY
 
-    DECLARE @NombreLogin SYSNAME = N'AJUSTAR\svc.gte';  -- <-- mismo valor que el Bloque 1
+    DECLARE @NombreLogin SYSNAME = N'svc_gte';  -- <-- mismo valor que el Bloque 1
     DECLARE @Sql NVARCHAR(MAX);
 
     IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = @NombreLogin)

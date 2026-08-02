@@ -51,7 +51,7 @@ export function TriagePage() {
 
   return (
     <Box sx={{ p: 2 }}>
-      <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>Triage de solicitudes</Typography>
+      <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>Revision de solicitudes</Typography>
 
       <TextField size="small" label="Buscar folio, titulo o solicitante" value={texto}
         onChange={(e) => setTexto(e.target.value)} sx={{ mb: 2, minWidth: 300 }} />
@@ -81,7 +81,7 @@ export function TriagePage() {
                 <TableRow>
                   <TableCell colSpan={9}>
                     <Typography color="text.secondary" sx={{ py: 4, textAlign: "center" }}>
-                      No hay solicitudes pendientes de triage.
+                      No hay solicitudes pendientes de revision.
                     </Typography>
                   </TableCell>
                 </TableRow>

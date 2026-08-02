@@ -1,18 +1,22 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>GTE.WebApi</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.*" />
-    <PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.*" />
+    <PackageReference Include="Serilog.AspNetCore" Version="8.0.3" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0" />
     <!-- AutoMapper 14.0.0: ultima linea MIT (la 15+ es comercial); incluye el registro AddAutoMapper -->
     <PackageReference Include="AutoMapper" Version="14.0.0" />
+    <!-- Integracion con el Service Control Manager de Windows (UseWindowsService en
+         Program.cs). Sin esto, el .exe publicado corre como consola normal y sc start
+         truena con error 1053 (nunca le avisa a Windows que ya esta RUNNING). -->
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="8.0.*" />
   </ItemGroup>
 
   <ItemGroup>

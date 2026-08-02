@@ -1,10 +1,13 @@
 import {
-  AppBar, Badge, Box, Button, Chip, Container, CssBaseline, Divider, IconButton, ListItemText,
-  Menu, MenuItem, ThemeProvider, Toolbar, Tooltip, Typography, createTheme,
+  AppBar, Badge, Box, Chip, CssBaseline, Divider, Drawer, IconButton, List, ListItemButton,
+  ListItemText, Menu, MenuItem, ThemeProvider, Toolbar, Tooltip, Typography, createTheme,
 } from "@mui/material";
+import MenuIcon from "@mui/icons-material/Menu";
 import NotificationsIcon from "@mui/icons-material/Notifications";
 import { useState } from "react";
-import { BrowserRouter, Link as RouterLink, Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import {
+  BrowserRouter, Link as RouterLink, Navigate, Route, Routes, useLocation, useNavigate,
+} from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   marcarNotificacionLeida, marcarTodasNotificacionesLeidas, obtenerNotificaciones,
@@ -21,6 +24,7 @@ import { QaPage } from "./features/calidad/QaPage";
 import { ReleasesPage } from "./features/entregas/ReleasesPage";
 import { GuardiaSesion } from "./features/sesion/GuardiaSesion";
 import { AdminPage } from "./features/admin/AdminPage";
+import { ManualUsuarioPage } from "./features/ayuda/ManualUsuarioPage";
 import { cerrarSesion, cerrarSesionServidor, useSesion } from "./shared/api/sesion";
 
 const tema = createTheme({
@@ -38,6 +42,8 @@ const tema = createTheme({
   },
 });
 
+const ANCHO_MENU = 220;
+
 /** Opciones del menu con el/los permisos que las habilita (null = disponible para todos). */
 const NAVEGACION: { ruta: string; etiqueta: string; permiso: string | string[] | null }[] = [
   { ruta: "/mi-dia", etiqueta: "Mi dia", permiso: null },
@@ -47,8 +53,9 @@ const NAVEGACION: { ruta: string; etiqueta: string; permiso: string | string[] |
   { ruta: "/qa", etiqueta: "QA", permiso: "QA.Ejecutar" },
   { ruta: "/releases", etiqueta: "Releases", permiso: "REL.Crear" },
   { ruta: "/solicitudes", etiqueta: "Solicitudes", permiso: null },
-  { ruta: "/triage", etiqueta: "Triage", permiso: "SOL.Triage" },
+  { ruta: "/triage", etiqueta: "Revision de solicitudes", permiso: "SOL.Triage" },
   { ruta: "/admin", etiqueta: "Administracion", permiso: ["ADM.Usuarios", "ADM.Roles"] },
+  { ruta: "/ayuda", etiqueta: "Ayuda", permiso: null },
 ];
 
 function CampanaNotificaciones() {
@@ -118,8 +125,32 @@ function CampanaNotificaciones() {
   );
 }
 
-function BarraSuperior() {
-  const { sesion, establecer, puede } = useSesion();
+function ListaNavegacion({ alNavegar }: { alNavegar?: () => void }) {
+  const { puede } = useSesion();
+  const ubicacion = useLocation();
+
+  return (
+    <List sx={{ pt: 1 }}>
+      {NAVEGACION
+        .filter((opcion) => opcion.permiso === null
+          || (Array.isArray(opcion.permiso) ? opcion.permiso.some(puede) : puede(opcion.permiso)))
+        .map((opcion) => (
+          <ListItemButton
+            key={opcion.ruta}
+            component={RouterLink}
+            to={opcion.ruta}
+            selected={ubicacion.pathname === opcion.ruta}
+            onClick={alNavegar}
+          >
+            <ListItemText primary={opcion.etiqueta} />
+          </ListItemButton>
+        ))}
+    </List>
+  );
+}
+
+function BarraSuperior({ alAbrirMenu }: { alAbrirMenu: () => void }) {
+  const { sesion, establecer } = useSesion();
   const [ancla, setAncla] = useState<HTMLElement | null>(null);
   useConexionTiempoReal();
 
@@ -131,25 +162,19 @@ function BarraSuperior() {
   };
 
   return (
-    <AppBar position="static">
+    <AppBar position="fixed" sx={{ zIndex: (t) => t.zIndex.drawer + 1 }}>
       <Toolbar variant="dense">
-        <Typography variant="h6" sx={{ fontWeight: 700, letterSpacing: 1 }}>GTE</Typography>
-        <Box sx={{ ml: 3, display: "flex", gap: 1, flexWrap: "wrap", flex: 1 }}>
-          {NAVEGACION
-            .filter((opcion) => opcion.permiso === null
-              || (Array.isArray(opcion.permiso) ? opcion.permiso.some(puede) : puede(opcion.permiso)))
-            .map((opcion) => (
-              <Button key={opcion.ruta} color="inherit" component={RouterLink} to={opcion.ruta}>
-                {opcion.etiqueta}
-              </Button>
-            ))}
-        </Box>
+        <Typography variant="h6" sx={{ fontWeight: 700, letterSpacing: 1, flex: 1 }}>GTE</Typography>
         <CampanaNotificaciones />
         <Tooltip title={`${sesion?.dominio} - ${sesion?.roles.join(", ")}`}>
           <Chip
             label={sesion?.nombre ?? ""}
             onClick={(e) => setAncla(e.currentTarget)}
-            sx={{ color: "inherit", borderColor: "rgba(255,255,255,0.5)", ml: 1 }}
+            sx={{
+              color: "inherit", borderColor: "rgba(255,255,255,0.5)", ml: 1,
+              maxWidth: { xs: 90, sm: "none" },
+              "& .MuiChip-label": { overflow: "hidden", textOverflow: "ellipsis" },
+            }}
             variant="outlined"
           />
         </Tooltip>
@@ -157,20 +182,58 @@ function BarraSuperior() {
           <MenuItem disabled>{sesion?.correo ?? sesion?.dominio}</MenuItem>
           <MenuItem onClick={salir}>Cerrar sesion</MenuItem>
         </Menu>
+        <IconButton color="inherit" onClick={alAbrirMenu} sx={{ display: { sm: "none" }, ml: 1 }}>
+          <MenuIcon />
+        </IconButton>
       </Toolbar>
     </AppBar>
   );
 }
 
 export default function App() {
+  const [menuMovilAbierto, setMenuMovilAbierto] = useState(false);
+
   return (
     <ThemeProvider theme={tema}>
       <CssBaseline />
       <BrowserRouter>
         <GuardiaSesion>
-          <BarraSuperior />
-          <Container maxWidth={false} sx={{ px: 0 }}>
-            <Box>
+          <Box sx={{ display: "flex" }}>
+            <BarraSuperior alAbrirMenu={() => setMenuMovilAbierto(true)} />
+
+            {/* Menu lateral fijo (pantallas medianas o mas grandes) */}
+            <Drawer
+              anchor="right"
+              variant="permanent"
+              sx={{
+                display: { xs: "none", sm: "block" },
+                width: ANCHO_MENU,
+                flexShrink: 0,
+                "& .MuiDrawer-paper": { width: ANCHO_MENU, boxSizing: "border-box" },
+              }}
+            >
+              <Toolbar variant="dense" />
+              <ListaNavegacion />
+            </Drawer>
+
+            {/* Menu lateral deslizable (celular) */}
+            <Drawer
+              anchor="right"
+              variant="temporary"
+              open={menuMovilAbierto}
+              onClose={() => setMenuMovilAbierto(false)}
+              ModalProps={{ keepMounted: true }}
+              sx={{
+                display: { xs: "block", sm: "none" },
+                "& .MuiDrawer-paper": { width: ANCHO_MENU, boxSizing: "border-box" },
+              }}
+            >
+              <Toolbar variant="dense" />
+              <ListaNavegacion alNavegar={() => setMenuMovilAbierto(false)} />
+            </Drawer>
+
+            <Box component="main" sx={{ flexGrow: 1, width: { sm: `calc(100% - ${ANCHO_MENU}px)` } }}>
+              <Toolbar variant="dense" />
               <Routes>
                 <Route path="/" element={<Navigate to="/mi-dia" replace />} />
                 <Route path="/mi-dia" element={<MiDiaPage />} />
@@ -183,9 +246,10 @@ export default function App() {
                 <Route path="/solicitudes" element={<PortalPage />} />
                 <Route path="/triage" element={<TriagePage />} />
                 <Route path="/admin" element={<AdminPage />} />
+                <Route path="/ayuda" element={<ManualUsuarioPage />} />
               </Routes>
             </Box>
-          </Container>
+          </Box>
         </GuardiaSesion>
       </BrowserRouter>
     </ThemeProvider>

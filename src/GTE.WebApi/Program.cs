@@ -10,6 +10,13 @@ using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Integracion con el Service Control Manager de Windows: sin esto, el .exe publicado
+// corre como una consola normal y "sc start" truena con error 1053 (nunca le avisa a
+// Windows que ya quedo en estado RUNNING). No-op si no se esta corriendo como servicio
+// (dotnet run local, WebApplicationFactory de las pruebas), asi que es seguro dejarlo
+// siempre activo.
+builder.Host.UseWindowsService();
+
 // Logging estructurado
 builder.Host.UseSerilog((contexto, configuracion) => configuracion
     .ReadFrom.Configuration(contexto.Configuration)

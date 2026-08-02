@@ -17,7 +17,13 @@ echo ===================================================
 cd /d "%~dp0"
 
 echo.
-echo === Paso 1/3: build del frontend (npm run build) ===
+echo === Paso 1/4: limpiar la carpeta de destino (evita mezclar publishes viejos) ===
+if exist "%CARPETA_DESTINO%" (
+    rmdir /s /q "%CARPETA_DESTINO%"
+)
+
+echo.
+echo === Paso 2/4: build del frontend (npm run build) ===
 pushd frontend\gte-web
 call npm run build
 if %ERRORLEVEL% NEQ 0 (
@@ -30,7 +36,7 @@ if %ERRORLEVEL% NEQ 0 (
 popd
 
 echo.
-echo === Paso 2/3: dotnet publish de GTE.WebApi ===
+echo === Paso 3/4: dotnet publish de GTE.WebApi ===
 dotnet publish "src\GTE.WebApi\GTE.WebApi.csproj" -c %CONFIGURACION% -o "%CARPETA_DESTINO%"
 if %ERRORLEVEL% NEQ 0 (
     echo.
@@ -40,7 +46,7 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo.
-echo === Paso 3/3: copiar el build del frontend a wwwroot del publish ===
+echo === Paso 4/4: copiar el build del frontend a wwwroot del publish ===
 if exist "%CARPETA_DESTINO%\wwwroot" (
     rmdir /s /q "%CARPETA_DESTINO%\wwwroot"
 )

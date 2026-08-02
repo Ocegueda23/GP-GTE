@@ -56,7 +56,7 @@ dotnet test GTE.sln    # 45 pruebas; las de integración se omiten si no hay Loc
 | **WorkItems** | Bandeja con filtros heredados del GT, detalle, alta, cambio de estatus por acción, registro de tiempo | Trabajo, Detalle |
 | **Mi Día** | Item en proceso, vencidas, para hoy, próximos 7 días, tiempo del día | Mi Día |
 | **Revisiones** | Hallazgos de QA/code review que bloquean el cierre; reapertura con permiso | pestaña en Detalle |
-| **Solicitudes y triage** | Portal del solicitante, bandeja de triage, aprobar/rechazar/devolver, conversión a WorkItems trazados | Solicitudes, Triage |
+| **Solicitudes y revisión** | Portal del solicitante, bandeja de revisión (antes llamada "triage" en el código -- la etiqueta visible se cambió a "Revisión de solicitudes" 2026-08-02 porque nadie fuera del equipo entendía el término; el nombre interno del componente/ruta/permiso sigue siendo `triage`/`SOL.Triage`, sin tocar), aprobar/rechazar/devolver, conversión a WorkItems trazados | Solicitudes, Revisión de solicitudes |
 | **Planeación** | Backlog priorizable, sprints (activar/cerrar con reubicación), capacidad con calendario real, burndown, kanban con WIP | Backlog, Tablero |
 | **Calidad (QA)** | Planes, casos con pasos, ciclos, ejecuciones, bug desde falla, matriz de trazabilidad | QA |
 | **Entregas** | Releases con contenido validado, artefactos con rollback pareado, cadena de firmas, despliegues, rollback, notas de versión | Releases |
@@ -65,8 +65,10 @@ dotnet test GTE.sln    # 45 pruebas; las de integración se omiten si no hay Loc
 | **Administracion** | Proyectos (alta/edicion + cambio de estatus por el motor, folio al autorizar, RN-PRY-01 bloquea el cierre con WorkItems abiertos), equipos con miembros y % dedicacion, usuarios (alta/edicion/baja logica, RN-ADM-01 valida ciclos de jerarquia con CTE recursivo), roles (asignar/retirar con alcance global o por proyecto, matriz rol-permiso guardada en lote), horarios (tramos con turnos partidos, dias festivos) y ambientes (por proyecto o globales) | Administracion (6 pestañas) |
 | **Comentarios y adjuntos** | Hilos de comentarios sobre WorkItem con formato basico (negritas, listas, etc.), @menciones con autocompletado (TipTap + catalogo de usuarios) y pegado de imagenes desde el portapapeles; adjuntos con subida/descarga por streaming autenticado (`IAlmacenArchivos` en disco, GUID + SHA-256), validacion de extension/tamano, baja logica solo por el propio autor. HTML sanitizado en el backend (`HtmlSanitizer`) antes de guardarse | franja de Comentarios bajo el detalle + pestaña Adjuntos, en Detalle de WorkItem |
 | **Notificaciones y tiempo real** | Campana con notificaciones In-App (`tblNotificacion`) que llegan en vivo por SignalR (`NotificacionesHub`, un solo hub para notificaciones + refresco de tablero); disparadores: Solicitud aprobada/rechazada/devuelta (notifica al solicitante) y @mencion en un comentario (notifica al mencionado). El tablero Kanban se refresca solo cuando cualquier WorkItem cambia de estatus, sin importar quien lo haya movido | campana en la barra superior (todas las pantallas) |
+| **Manual de usuario (Ayuda)** | Pagina de ayuda estatica dentro de la SPA, en espanol simple para usuarios sin conocimiento tecnico: secciones en acordeon (login, menu, Mi Dia, bandeja, detalle de WorkItem, Solicitudes, el flujo completo de una solicitud hasta su cierre con diagrama SVG -- incluye las ramas de Rechazada/Devuelta y Hallazgos de QA --, otras secciones segun rol, contacto de soporte). Sin permiso (disponible para cualquier usuario autenticado); contenido fijo en el codigo, no hay editor -- actualizarlo requiere tocar `ManualUsuarioPage.tsx` | Ayuda (visible para todos en el menu) |
+| **Menu lateral (2026-08-02)** | La navegacion se movio de una barra horizontal arriba a un panel lateral fijo del lado derecho (`Drawer` de MUI, `variant="permanent"`), con la opcion activa resaltada segun la ruta actual. En pantallas chicas se colapsa a un boton de menu en la barra superior que abre un cajon deslizable (`variant="temporary"`) que se cierra solo al navegar. La barra superior conservo el logo, la campana de notificaciones y el chip de usuario (con el nombre truncado en pantallas chicas para no empujar el boton de menu fuera de la vista) | Panel lateral derecho (todas las pantallas) |
 
-**Inventario:** 108 endpoints en 14 controladores + 1 hub de SignalR · 11 pantallas ·
+**Inventario:** 108 endpoints en 14 controladores + 1 hub de SignalR · 12 pantallas ·
 13 scripts SQL · ~100 tablas (+1, `tblRefreshToken`) · 49 pruebas.
 
 ---
@@ -82,7 +84,7 @@ Sin esto no se puede operar en producción, aunque el resto funcione.
 | ~~B1~~ | ~~**Módulo de Administración (CRUD)**~~ | **Resuelto 2026-07-31.** Proyectos, equipos+miembros, usuarios, roles (asignación+matriz en lote), horarios (tramos+festivos) y ambientes, con API completa (`AdministracionController`, 35 endpoints nuevos) y pantallas bajo `/admin` (6 pestañas). Ver detalle en la fila "Administracion" de la sección 2 y en la §3.4 lo que quedó deliberadamente fuera de alcance |
 | ~~B2~~ | ~~**Autenticación en el SPA**~~ | **Resuelto 2026-08-01, cambio de alcance.** No habrá tenant de Entra ID (decisión del equipo: GTE maneja autenticación, accesos y roles totalmente dentro de sí mismo). Se construyó login propio: usuario+contraseña (BCrypt), bloqueo temporal, JWT + refresh rotativo en cookie HttpOnly, cambio de contraseña propio y reset por administrador. Ver fila "Autenticación" de la sección 2, ADR nuevo en la sección 4, y lo que queda fuera de alcance en la §3.4 (recuperar contraseña por correo, MFA, bootstrap del primer admin en un ambiente sin atajo de desarrollo) |
 | B3 | **Migración de datos del GT** | Mapeo definido en el Documento Maestro §15.4: `tblTareas`→`tblWorkItem`, subtareas→hijos + registro de tiempo, historial de estatus, revisiones, usuarios/permisos, catálogos, glosario. Falta escribir y ensayar los scripts, con reportes de excepciones y checksums |
-| ~~B4~~ | ~~**Despliegue**~~ | **Resuelto 2026-08-01.** Kestrel directo como Windows Service (sin IIS, sin Docker, sin CI/CD -- mismo patrón real que ya usa `Interflo.ServiceHealth`, ver decisión en la sección 4). La API sirve la SPA compilada en el mismo proceso (`wwwroot` + fallback). `publicar.bat` hace `npm run build` + `dotnet publish` + copia el build a `wwwroot` en un solo paso. Script de BD de mínimo privilegio (`DataBase/Scripts/01_2026-08-01_SCRIPT_bdsGTE_UsuarioServicio.sql`) y manual completo (`Doctos/MANUAL_INSTALACION_GTE.md`, calcado del formato real de ServiceHealth). Verificado con el `.exe` publicado real corriendo solo (no `dotnet run`) y `dotnet test` en 49/49. Fuera de alcance deliberado: sin pipeline de CI (se decidió mantener todo manual, igual que el resto del ecosistema) y sin bootstrap de la primera contraseña en un ambiente nuevo (ver §3.4, ya documentado desde B2) |
+| ~~B4~~ | ~~**Despliegue**~~ | **Resuelto y CONFIRMADO 2026-08-01 contra un servidor real (`SRVPROD\NASA`): el Windows Service quedo corriendo, el primer login funciono y la contrasena de arranque ya se cambio.** Kestrel directo como Windows Service (sin IIS, sin Docker, sin CI/CD -- mismo patrón real que ya usa `Interflo.ServiceHealth`, ver decisión en la sección 4). La API sirve la SPA compilada en el mismo proceso (`wwwroot` + fallback). `publicar.bat` hace `npm run build` + `dotnet publish` + limpia la carpeta de destino + copia el build a `wwwroot`, todo en un solo paso. Tres herramientas para las variables de entorno del servicio, todas con merge seguro (nunca borran las demás): `generar-clave-jwt.bat` (genera `Jwt__ClaveFirma` sola), `configurar-variable-servicio.bat` (una variable cualquiera) y `configurar-servicio-completo.bat` (las tres de un jalón + reinicia el servicio). Login de BD de mínimo privilegio con **autenticación de SQL Server** (no de Windows) via `DataBase/Scripts/01_2026-08-01_SCRIPT_bdsGTE_UsuarioServicio.sql`, y manual completo (`Doctos/MANUAL_INSTALACION_GTE.md`, calcado del formato real de ServiceHealth). `dotnet test` en 49/49 durante todo el proceso.<br><br>**Problemas reales encontrados y resueltos en la primera instalación real** (todos con lección correspondiente en la sección 5): (1) `sc start` daba error 1053 -- faltaba `UseWindowsService()`; (2) el `.exe` no arrancaba, el servidor no tenía el runtime 9.0 ("You must install or update .NET") -- se decidió retargetear todo el backend a **.NET 8** (ver ADR-02 actualizado en la sección 4) en vez de instalar el 9.0; (3) tras el retargeteo, un segundo intento de instalación trueno con `FileNotFoundException` de `System.Runtime` version 9.0.0.0 -- archivos del publish viejo mezclados con el nuevo en la carpeta instalada (`dotnet publish` no borra lo que ya no necesita); (4) `Falta Jwt:ClaveFirma` -- variable de entorno todavía no configurada; (5) al `bdsGTE` real le faltaba correr `01_2026-08-01_SCRIPT_bdsGTE_Autenticacion.sql` (las columnas `PasswordHash`/`RequiereCambioPassword` no existían, `INSERT` fallaba con "Invalid column name"); (6) `tblUsuario` estaba vacía (base nueva, sin datos migrados del GT todavía) -- se creó el primer Administrador a mano con un `INSERT` + hash BCrypt generado con la misma librería de la API (ver receta en el manual, sección "Primer login"); (7) `Login failed for user 'NT AUTHORITY\SYSTEM'` -- el servicio no se había reiniciado después de configurar `ConnectionStrings__bdsGTE`, así que seguía usando el `Trusted_Connection=True` por default de `appsettings.json` contra `localhost` en vez de la cadena real. Fuera de alcance deliberado: sin pipeline de CI (se decidió mantener todo manual, igual que el resto del ecosistema) |
 
 ### 3.2 Alto valor, sin bloquear
 
@@ -192,7 +194,7 @@ transiciones automáticas configurables.
 
 | ADR | Decisión |
 |---|---|
-| 02 | .NET 9 + React. **Contradice** el estándar del Frente B (.NET 8 + Angular): pendiente ratificar y actualizar `InterfloClaude.md` |
+| 02 | .NET 8 (retargeteado desde .NET 9 el 2026-08-01, ver detalle abajo) + React. React **sigue divergiendo** del estándar del Frente B (Angular): pendiente ratificar y actualizar `InterfloClaude.md`. El backend en .NET 8 ya **no** diverge -- se alinea con el estándar |
 | 03 | **`bdsGTE` es la única base.** Motor de estatus y folios propios; cero dependencia de `bdsCentral` u otra base |
 | 04 | El workflow vive en datos (`tblProceso`/`tblTransicion`). Alta de procesos = filas, nunca tocar `spCambiarEstatus` |
 | 06 | Integración Git tras `IProveedorGit` (conviven Gitea y GitHub) |
@@ -202,6 +204,7 @@ transiciones automáticas configurables.
 | — | MediatR 12.5.0 y AutoMapper 14.0.0 fijados por licencia libre; no subir de major sin decisión |
 | — | **GTE no usa Entra ID ni ningún proveedor de identidad externo** (decisión del equipo, 2026-08-01): reemplaza la intención original de B2. Autenticación 100% propia dentro de `bdsGTE` (usuario+contraseña BCrypt, JWT propio, refresh rotativo). Un solo JWT HMAC para todo el sistema: el atajo de desarrollo y el login real emiten el mismo tipo de token (`IEmisorTokenSesion`), nunca dos mecanismos distintos |
 | — | **Despliegue de GTE: Kestrel directo como Windows Service** (decisión del equipo, 2026-08-01), sin IIS, sin reverse proxy, sin Docker y sin pipeline de CI/CD -- mismo patrón real que ya usa `Interflo.ServiceHealth` en producción (publicación manual con `.bat` + `sc create` + variables de entorno para secretos). La API sirve también la SPA compilada en el mismo proceso (`wwwroot` + `MapFallbackToFile`). **Diverge deliberadamente** del diagrama de la sección 1.1 del Documento Maestro (que preveía IIS ARR/YARP + Redis): esa arquitectura queda como visión de escalamiento a futuro (fase N, multi-instancia); la topología mínima fase 1 (1 servidor de aplicaciones) no la necesita. Revisar/actualizar ese diagrama si el equipo decide escalar |
+| — | **La API se conecta a `bdsGTE` con autenticación de SQL Server (login propio `svc_gte`), NO con autenticación de Windows** (decisión del equipo, 2026-08-01). Se intentó primero un login de Windows (`FROM WINDOWS`) para la cuenta de servicio, pero una cuenta local de una máquina no es resoluble desde un SQL Server que viva en otra máquina/VM (error 15401) -- forzaría a coordinar una cuenta de dominio con un administrador de AD, justo la clase de dependencia externa que el equipo quiere evitar (coherente con "GTE no usa Entra ID ni ningún proveedor de identidad externo", misma fila de arriba, ahora extendido también a la capa de infraestructura de datos). Requiere que el SQL Server destino tenga habilitado el modo mixto ("SQL Server and Windows Authentication mode"). El login se aprovisiona con `DataBase/Scripts/01_2026-08-01_SCRIPT_bdsGTE_UsuarioServicio.sql` |
 
 ---
 
@@ -356,16 +359,100 @@ transiciones automáticas configurables.
   `PRINT` anterior, no la del propio `THROW`), lo que hace más difícil detectar la causa
   real a simple vista. Verificado en vivo contra LocalDB con un repro mínimo. Revisar
   cualquier bloque `CATCH` nuevo que combine `PRINT` sin `;` seguido de `THROW`.
-- **Crear un login de SQL Server (`CREATE LOGIN ... FROM WINDOWS`) y su usuario en una
-  base (`CREATE USER ... FOR LOGIN`) son operaciones en ámbitos distintos** (`master` vs.
-  la base de datos): un script de aprovisionamiento de cuenta de servicio legítimamente
-  necesita `USE [master]` para el login y `USE [bdsGTE]` para el usuario/permisos --
-  excepción documentada al invariante "todos los scripts de esta carpeta corren solo
-  contra bdsGTE" (ver `DataBase/Scripts/README.md`). Si se prueba esto localmente, ojo:
-  usar la propia cuenta de Windows que ya es `dbo` de la base de prueba falla con
-  "The login already has an account with the user name 'dbo'" al día de crear el `USER`
-  -- no es un bug del script, es que esa cuenta ya tiene una asignación en esa base; para
-  probar de verdad hace falta un login distinto al dueño de la base.
+- **Crear un login de SQL Server y su usuario en una base (`CREATE USER ... FOR LOGIN`)
+  son operaciones en ámbitos distintos** (`master` vs. la base de datos): un script de
+  aprovisionamiento de cuenta de servicio legítimamente necesita `USE [master]` para el
+  login y `USE [bdsGTE]` para el usuario/permisos -- excepción documentada al invariante
+  "todos los scripts de esta carpeta corren solo contra bdsGTE" (ver
+  `DataBase/Scripts/README.md`). Si se prueba esto localmente, ojo: usar la propia cuenta
+  de Windows que ya es `dbo` de la base de prueba falla con "The login already has an
+  account with the user name 'dbo'" al día de crear el `USER` -- no es un bug del script,
+  es que esa cuenta ya tiene una asignación en esa base; para probar de verdad hace falta
+  un login distinto al dueño de la base.
+- **`CREATE LOGIN ... FROM WINDOWS` exige que la cuenta sea resoluble por el SQL Server
+  destino** (error 15401 "Windows NT user or group ... not found" si no) -- una cuenta
+  LOCAL de una máquina (`EQUIPO\usuario`) solo existe para Windows en ESA máquina; si el
+  SQL Server real vive en otro servidor/VM, nunca la va a poder validar, sin importar que
+  la cuenta exista y esté bien escrita. Se descubrió probando el script de aprovisionamiento
+  contra un SQL Server real distinto de la máquina de desarrollo. **Se decidió pivotear a
+  autenticación de SQL Server** (login propio `svc_gte` con password, ver decisión en la
+  sección 4) precisamente para no depender de que servidor de aplicaciones y SQL Server
+  compartan dominio/AD -- requiere que el SQL Server destino tenga habilitado el modo
+  mixto ("SQL Server and Windows Authentication mode"), verificado y documentado en
+  `Doctos/MANUAL_INSTALACION_GTE.md`.
+- **Guard de "no dejar el valor de ejemplo" con `RAISERROR` al inicio de un script de
+  aprovisionamiento**: comparar la variable sensible (`@Password`) contra el placeholder
+  literal y abortar con un mensaje claro si coinciden -- barato de escribir y evita correr
+  el script contra un ambiente real con una contraseña de ejemplo por descuido. Patrón
+  reutilizable para cualquier script futuro con un valor que el operador DEBE cambiar.
+- **`sc start` truena con ERROR 1053 ("El servicio no respondio a tiempo...") si el `.exe`
+  publicado no tiene integración con el Service Control Manager**: un Kestrel/consola
+  normal (lo que produce `dotnet publish` por default) arranca bien pero nunca le avisa a
+  Windows que ya quedó `RUNNING` -- Windows espera la respuesta, se cansa, y mata el
+  intento, sin importar que la API en sí funcione perfecto si se corriera a mano. Se
+  descubrió en vivo al instalar el servicio real por primera vez. Arreglo: paquete
+  `Microsoft.Extensions.Hosting.WindowsServices` + `builder.Host.UseWindowsService();` al
+  inicio de `Program.cs` (antes de cualquier otro `builder.Host...`) -- es un no-op cuando
+  NO se corre como servicio (`dotnet run`, `WebApplicationFactory` de las pruebas), así que
+  no rompe nada en desarrollo ni en pruebas (49/49 siguen en verde). **Lección para
+  cualquier API .NET nueva del ecosistema que se vaya a instalar como Windows Service**:
+  agregar esto desde el principio, no hasta el primer despliegue real.
+- **.NET no hace fallback entre versiones mayores del runtime**: el servidor real
+  (`SRVPROD\NASA`) tenía instalados .NET 8.0.29 y 10.0.10, pero el `.exe` (compilado para
+  `net9.0`) se negó a arrancar ("You must install or update .NET to run this
+  application") porque el 9.0 exacto no estaba. Se descubrió en vivo al instalar el
+  servicio real. **Se decidió retargetear todo el backend de `net9.0` a `net8.0`** (los 7
+  `.csproj` del repo + los paquetes `Microsoft.*` pineados a `9.0.*`/`9.0.0` que van
+  atados a la versión mayor del runtime: `Microsoft.AspNetCore.Authentication.JwtBearer`,
+  `Microsoft.EntityFrameworkCore.Design`/`SqlServer`,
+  `Microsoft.Extensions.Configuration.Abstractions`,
+  `Microsoft.Extensions.Hosting.WindowsServices`, `Microsoft.AspNetCore.Mvc.Testing`) en
+  vez de instalar el runtime 9.0 en el servidor -- decisión del equipo, no solo por
+  conveniencia: **.NET 9 es STS (soporte corto, ~18 meses) mientras que .NET 8 y .NET 10
+  son LTS (3 años)**, y .NET 8 además ya es el estándar documentado del resto del
+  ecosistema (Frente B), así que esto resuelve de paso la divergencia que ADR-02 ya tenía
+  marcada como "pendiente ratificar". El retargeteo compiló limpio a la primera (0
+  errores) y las 49 pruebas siguieron en verde -- no se usaba ninguna sintaxis de C# 13
+  específica de `net9.0`. Ver ADR-02 actualizado en la sección 4 y en
+  `InterfloClaude.md`.
+- **`dotnet publish -o carpeta` no borra archivos que la version nueva ya no necesita** --
+  solo agrega/sobreescribe. Tras el retargeteo de `net9.0` a `net8.0`, un segundo intento
+  de instalación real truenó con `FileNotFoundException: Could not load file or assembly
+  'System.Runtime, Version=9.0.0.0...'` aunque el runtime instalado ya era el 8.0.29
+  correcto -- quedaron ensamblados del publish viejo (compilados contra `net9.0`)
+  mezclados con los nuevos en la misma carpeta, tanto en el publish local como en la
+  carpeta ya instalada en el servidor. Arreglo en dos frentes: `publicar.bat` ahora
+  borra su carpeta de destino ANTES de publicar (paso 1/4), y el manual instruye borrar
+  el CONTENIDO COMPLETO de la carpeta instalada en el servidor antes de copiar cualquier
+  publish nuevo, no solo sobreescribir. Aplica a cualquier cambio de `TargetFramework` o
+  de dependencias mayores, no solo a este caso puntual.
+- **Las variables de entorno de un Windows Service solo se cargan cuando el PROCESO
+  arranca**, no en caliente: configurar `ConnectionStrings__bdsGTE` (o cualquier otra) sin
+  reiniciar el servicio despues deja corriendo la version vieja del ambiente. Se
+  manifestó como `Login failed for user 'NT AUTHORITY\SYSTEM'. Reason: Failed to open the
+  explicitly specified database 'bdsGTE'` -- el servicio (corriendo como `LocalSystem`
+  porque no se especificó `obj=` en `sc create`) seguía usando el `Trusted_Connection=True`
+  contra `localhost` que trae `appsettings.json` por default, en vez de la cadena real con
+  el login SQL `svc_gte`. **Pista de diagnostico util**: si el error de conexión muestra
+  una cuenta de Windows (`NT AUTHORITY\SYSTEM`, `NT AUTHORITY\NETWORK SERVICE`, etc.) en
+  vez del login de SQL Server esperado, la variable de entorno no se está aplicando --
+  casi siempre falta un reinicio del servicio. `configurar-servicio-completo.bat` ya
+  reinicia solo al final para evitar este error exacto; la ruta variable-por-variable
+  (`configurar-variable-servicio.bat`) requiere `sc stop`/`sc start` a mano después.
+- **Bootstrap del primer usuario en una `bdsGTE` real recién creada**: la tabla
+  `tblUsuario` nace vacía (no hay migración de datos del GT todavía, B3 sigue pendiente),
+  así que ni siquiera existe un Administrador para entrar y usar "Restablecer
+  contraseña". Se resolvió con un `INSERT` manual directo (`tblUsuario` +
+  `tblUsuarioRol` contra el rol `Administrador` por nombre, no por Id hardcodeado) y un
+  hash BCrypt generado con la MISMA versión de `BCrypt.Net-Next` que usa la API (un
+  proyecto de consola desechable en el temp, nunca commiteado), con
+  `RequiereCambioPassword = 1` para forzar que la contraseña temporal se cambie en el
+  primer login -- confirmado que el flujo de cambio obligatorio funciona de verdad. Antes
+  de este `INSERT`, hacía falta haber corrido ya
+  `01_2026-08-01_SCRIPT_bdsGTE_Autenticacion.sql` (agrega `PasswordHash`/
+  `RequiereCambioPassword` a `tblUsuario`) -- si no, el `INSERT` falla con "Invalid column
+  name". Receta completa (genérica, sin el hash real de nadie) en
+  `Doctos/MANUAL_INSTALACION_GTE.md`, sección "Primer login en un ambiente nuevo".
 
 ---
 

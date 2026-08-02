@@ -114,7 +114,7 @@ export function LoginPage() {
         </Typography>
 
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <TextField autoFocus size="small" label="Cuenta de dominio" placeholder="aviramontes"
+          <TextField autoFocus size="small" label="Usuario" placeholder="usuario"
             value={dominio} onChange={(e) => setDominio(e.target.value)} />
           <TextField size="small" type="password" label="Contraseña" value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -130,10 +130,10 @@ export function LoginPage() {
           <>
             <Divider sx={{ my: 3 }} />
             <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
-              Ambiente de desarrollo: atajo sin contraseña, por cuenta de dominio.
+              Ambiente de desarrollo: atajo sin contraseña, por usuario.
             </Typography>
             <Box sx={{ display: "flex", gap: 1 }}>
-              <TextField size="small" placeholder="aviramontes" value={dominioDesarrollo}
+              <TextField size="small" placeholder="usuario" value={dominioDesarrollo}
                 onChange={(e) => setDominioDesarrollo(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && dominioDesarrollo.trim()) void entrarDesarrollo(); }} />
               <Button variant="outlined" disabled={enviandoDesarrollo || !dominioDesarrollo.trim()}

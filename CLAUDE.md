@@ -12,9 +12,12 @@ SOLO a este proyecto. No migrar sin decision del equipo.
 
 ## Stack (ADR-02 del Documento Maestro)
 
-- Backend: .NET 9, ASP.NET Core, EF Core 9, MediatR 12.x, FluentValidation,
-  AutoMapper 13.0.1, Serilog. (MediatR y AutoMapper quedan fijados en estas versiones
-  por licencia libre; no subir de major sin decision del equipo.)
+- Backend: .NET 8 (LTS; retargeteado desde .NET 9 el 2026-08-01 -- ver PENDIENTES.md
+  seccion 4 y 5, el servidor real de destino no tenia el runtime 9.0 instalado y ya de
+  paso alinea a GTE con el estandar del resto del ecosistema, Frente B), ASP.NET Core,
+  EF Core 8, MediatR 12.x, FluentValidation, AutoMapper 13.0.1, Serilog. (MediatR y
+  AutoMapper quedan fijados en estas versiones por licencia libre; no subir de major sin
+  decision del equipo.)
 - Frontend: React 18 + TypeScript + Vite (frontend/gte-web).
 - BD: SQL Server - bdsGTE, LA UNICA BASE DEL SISTEMA (ADR-03: independencia total; el
   motor de estatus tblProceso/tblTransicion/spCambiarEstatus y los folios spGenerarFolio
