@@ -46,6 +46,8 @@ export interface CatalogosBandeja {
   tiposSolicitud: CatalogoItem[];
   equipos: CatalogoItem[];
   complejidades: CatalogoItem[];
+  categoriasTicket: CatalogoItem[];
+  severidades: CatalogoItem[];
 }
 
 export interface FiltroBandeja {
@@ -121,6 +123,7 @@ export interface WorkItemDetalle {
   titulo: string;
   descripcion: string | null;
   criteriosAceptacion: string | null;
+  idProyecto: number;
   claveProyecto: string;
   proyecto: string;
   esMantenimiento: boolean;
@@ -172,6 +175,7 @@ export interface NuevoWorkItem {
   idPrioridad: number;
   idAsignado: number | null;
   fechaCompromiso: string | null;
+  idPadre?: number;
 }
 
 export async function obtenerWorkItem(folio: string) {
@@ -180,6 +184,23 @@ export async function obtenerWorkItem(folio: string) {
 
 export async function obtenerTiempos(idWorkItem: number) {
   return obtener<RegistroTiempo[]>(`/api/v1/workitems/${idWorkItem}/tiempo`);
+}
+
+/** MinutosRegistrados es la suma directa de tblRegistroTiempo (no el
+ * "Invertido" del padre, que sale de tblHistorialEstatus y la migracion del
+ * GT nunca llena para los hijos). */
+export interface WorkItemHijo {
+  idWorkItem: number;
+  folio: string;
+  titulo: string;
+  idEstatus: number;
+  estatus: string;
+  asignado: string | null;
+  minutosRegistrados: number;
+}
+
+export async function obtenerHijos(idWorkItem: number) {
+  return obtener<WorkItemHijo[]>(`/api/v1/workitems/${idWorkItem}/hijos`);
 }
 
 export async function crearWorkItem(datos: NuevoWorkItem) {

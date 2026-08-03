@@ -5,6 +5,7 @@ import {
 } from "@mui/material";
 import { useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
+import { EditorEnriquecido } from "../../shared/editor/EditorEnriquecido";
 import {
   actualizarWorkItem, type CatalogosBandeja, type WorkItemDetalle,
 } from "../../shared/api/workitems";
@@ -83,9 +84,12 @@ export function ModalEditarWorkItem({ abierto, item, catalogos, alCerrar, alExit
           onChange={(e) => setTitulo(e.target.value)}
           slotProps={{ htmlInput: { maxLength: 200 } }}
         />
-        <TextField
-          size="small" label="Descripcion" multiline minRows={3}
-          value={descripcion} onChange={(e) => setDescripcion(e.target.value)}
+        <EditorEnriquecido
+          label="Descripcion"
+          value={descripcion}
+          onChange={setDescripcion}
+          idWorkItemParaAdjuntos={item.idWorkItem}
+          onError={alError}
         />
         <TextField
           size="small" label="Criterios de aceptacion" multiline minRows={2}

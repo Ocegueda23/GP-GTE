@@ -5,6 +5,7 @@ using GTE.Application.Interfaces;
 using GTE.Domain.Exceptions;
 using GTE.Domain.Interfaces;
 using GTE.Domain.Revisiones;
+using GTE.Domain.WorkItems;
 using MediatR;
 
 namespace GTE.Application.Revisiones.Commands;
@@ -24,13 +25,19 @@ public class CorregirRevisionValidator : AbstractValidator<CorregirRevisionComma
 /// Marca un hallazgo como corregido o lo reabre.
 /// RN-QA-02: reabrir un hallazgo ya corregido exige el permiso REV.Reabrir
 /// (regla heredada del GT: solo un lider puede reabrir) y motivo capturado.
+/// RN-REQ-05 (2026-08-02): marcar CORREGIDO un hallazgo de un WorkItem ajeno exige
+/// WI.ModificarAjeno -- quien corrige deberia ser quien hizo el arreglo (el asignado
+/// del WorkItem), no un tercero cualquiera. Se detecto la misma clase de hueco que
+/// RegistrarTiempoCommand: este comando no tenia NINGUN gate en el camino de
+/// "corregido", reproducido en vivo antes de codear.
 /// </summary>
 public class CorregirRevisionHandler(
     IRevisionRepository repositorio,
     IRevisionQueryService consultas,
     IWorkItemRepository workItems,
     IMotorWorkflow motor,
-    IVerificadorPermisos permisos) : IRequestHandler<CorregirRevisionCommand, RevisionResponse>
+    IVerificadorPermisos permisos,
+    IProveedorUsuarioActual proveedorUsuario) : IRequestHandler<CorregirRevisionCommand, RevisionResponse>
 {
     public async Task<RevisionResponse> Handle(CorregirRevisionCommand command, CancellationToken cancellationToken)
     {
@@ -47,7 +54,17 @@ public class CorregirRevisionHandler(
         var estadoItem = await workItems.ObtenerEstadoAsync(estado.IdWorkItem, cancellationToken)
             ?? throw new NotFoundException("WorkItem", estado.IdWorkItem);
 
-        if (!command.Datos.Corregido)
+        if (command.Datos.Corregido)
+        {
+            var usuarioActual = await proveedorUsuario.ObtenerAsync(cancellationToken);
+            var esAjeno = estadoItem.IdAsignado != usuarioActual?.IdUsuario;
+            if (esAjeno)
+            {
+                await permisos.ExigirPermisoAsync(
+                    PermisosWorkItem.ModificarAjeno, estadoItem.IdProyecto, cancellationToken);
+            }
+        }
+        else
         {
             // RN-QA-02: reabrir es facultad del lider y siempre con motivo
             await permisos.ExigirPermisoAsync(PermisosRevision.Reabrir, estadoItem.IdProyecto, cancellationToken);

@@ -136,6 +136,26 @@ public class WorkItemQueryService(FabricaContexto fabrica) : IWorkItemQueryServi
             }).ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<WorkItemHijoResponse>> ObtenerHijosAsync(
+        int idWorkItemPadre, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
+        return await contexto.TblWorkItem.AsNoTracking()
+            .Where(w => w.IdPadre == idWorkItemPadre)
+            .OrderBy(w => w.IdWorkItem)
+            .Select(w => new WorkItemHijoResponse
+            {
+                IdWorkItem = w.IdWorkItem,
+                Folio = w.Folio,
+                Titulo = w.Titulo,
+                IdEstatus = w.IdEstatusWorkItem,
+                Estatus = w.IdEstatusWorkItemNavigation.Descripcion,
+                Asignado = w.IdAsignadoNavigation != null ? w.IdAsignadoNavigation.Nombre : null,
+                MinutosRegistrados = w.TblRegistroTiempo.Where(t => t.Activo).Sum(t => (int?)t.Minutos) ?? 0
+            })
+            .ToListAsync(cancellationToken);
+    }
+
     private static IQueryable<WorkItemResponse> ProyectarDetalle(DbContextGTE contexto)
     {
         return from v in contexto.VwBandejaTrabajo.AsNoTracking()
@@ -148,6 +168,7 @@ public class WorkItemQueryService(FabricaContexto fabrica) : IWorkItemQueryServi
                    Titulo = v.Titulo,
                    Descripcion = w.Descripcion,
                    CriteriosAceptacion = w.CriteriosAceptacion,
+                   IdProyecto = w.IdProyecto,
                    ClaveProyecto = v.ClaveProyecto,
                    Proyecto = v.Proyecto,
                    EsMantenimiento = v.EsMantenimiento,

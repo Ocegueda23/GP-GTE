@@ -19,32 +19,30 @@ Gestor de Proyectos WinForms de Interflo. El repositorio es `C:\CODE\GTE`
 3. `Doctos/GTE-DocumentoMaestro.md` — solo las secciones del módulo que vayamos a tocar
    (es largo; no lo leas completo).
 
-**Estado importante al abrir este chat: hay trabajo terminado y verificado pero SIN
-commitear.** En la sesión anterior se construyeron y verificaron de punta a punta dos
-bloques completos:
+**Estado al abrir este chat: todo lo de la sesión anterior está commiteado y empujado a
+`main`** (commits `9fcd523`, `7c473fe`, `470188b`). No debería haber nada pendiente en
+`git status` salvo `run-api-dev.cmd` (script local de conveniencia, deliberadamente fuera
+del repo). Confírmalo de todas formas al abrir, no lo asumas ciegamente.
 
-- **Módulo de Administración (B1)**: proyectos, equipos+miembros, usuarios, roles
-  (asignación + matriz en lote), horarios (tramos+festivos), ambientes. API completa +
-  pantallas bajo `/admin` (6 pestañas).
-- **Autenticación propia de GTE (B2, reemplaza el plan de Entra ID)**: el equipo decidió
-  que GTE no depende de ningún proveedor externo. Login con usuario+contraseña (BCrypt),
-  bloqueo temporal tras intentos fallidos, JWT propio + refresh token rotativo en cookie
-  HttpOnly (con detección de reuso), cambio de contraseña propio y reset por
-  administrador.
+En la sesión anterior se cerraron tres bloques completos, todos verificados de punta a
+punta (build limpio, `dotnet test` en 49/49, y prueba manual real en el navegador):
 
-Ambos bloques están verificados (`dotnet test` en 45/45, prueba manual completa en
-navegador incluyendo el flujo de login real, refresh silencioso y logout) y ya están
-documentados en `Doctos/PENDIENTES.md`. `git status` en el repo va a mostrar todos los
-archivos nuevos/modificados de estos dos bloques, todavía sin `git add`/`commit`/`push`.
+- **Comentarios y adjuntos (A1)**: hilos de comentarios sobre WorkItem con formato básico,
+  @menciones con autocompletado (TipTap) e imágenes pegadas del portapapeles; adjuntos con
+  subida/descarga por streaming autenticado. HTML sanitizado en el backend antes de
+  guardarse.
+- **Edición de WorkItem en la UI (A2)**: modal de edición sobre el endpoint `PUT
+  /workitems/{id}` ya existente (título, descripción, prioridad, complejidad, asignado,
+  compromiso, puntos), con el botón oculto cuando el usuario no podría guardar nada.
+- **Notificaciones + SignalR (A3 + A6)**: campana de notificaciones In-App que llega en
+  vivo (un solo `NotificacionesHub`), disparada al aprobar/rechazar/devolver una solicitud
+  y al mencionar a alguien en un comentario; el tablero Kanban también se refresca solo
+  cuando cualquier WorkItem cambia de estatus. Verificado con **dos sesiones reales
+  simultáneas** en el navegador (push a un usuario específico + refresco de tablero de
+  otra pestaña).
 
-**Primer paso de esta sesión, antes de cualquier otra cosa: revisar el diff (`git status`
-y `git diff`) y, si todo se ve bien, hacer `git add` + commit + push a `main`.** No asumas
-autorización de push sin confirmar primero con el usuario — pregunta explícitamente antes
-de empujar a `main`. Excluir del commit `run-api-dev.cmd` (script local de conveniencia
-para levantar la API con la cadena de conexión de LocalDB, no es parte del repo).
-
-**Objetivo de esta sesión (una vez cerrado el commit): a decidir con el usuario** entre
-las alternativas de abajo, o lo que él prefiera.
+**Objetivo de esta sesión: a decidir con el usuario** entre las alternativas de abajo, o
+lo que él prefiera.
 
 **Matices críticos (no negociables, aplican a cualquier frente que se elija):**
 
@@ -66,12 +64,20 @@ las alternativas de abajo, o lo que él prefiera.
 - GTE no usa Entra ID ni ningún proveedor de identidad externo (decisión firme,
   2026-08-01): la autenticación, los accesos y los roles se manejan enteramente dentro de
   `bdsGTE`.
+- **Si el módulo nuevo necesita avisarle algo a un usuario**, ya existe el mecanismo:
+  inyecta `IServicioNotificaciones` (Application) y llama `NotificarAsync(idsUsuarios,
+  titulo, mensaje, entidad, idEntidad, url)` después de que la acción de negocio tenga
+  éxito — no reinventes el alta de `tblNotificacion` a mano. `ICanalNotificacion` sigue
+  sin implementación (solo queda reservado para Correo/Teams cuando haya credenciales
+  reales); no lo uses todavía.
 - **Verifica de verdad antes de afirmar que algo funciona**: compila, corre
-  `dotnet test` (hoy 45 pruebas en verde) y prueba el flujo por API o en el navegador.
-  Si algo no se puede verificar en este entorno, dilo explícitamente.
+  `dotnet test` (hoy 49 pruebas en verde) y prueba el flujo por API o en el navegador.
+  Para features de tiempo real (SignalR) o drag-and-drop (dnd-kit), el Browser pane SÍ
+  puede probarlas con eventos sintéticos bien construidos — ver las lecciones nuevas en
+  `PENDIENTES.md` sección 5 antes de asumir que "no se puede verificar aquí".
+  Si algo de verdad no se puede verificar en este entorno, dilo explícitamente.
 
-Cómo levantar la base, la API y el SPA está en la sección 1 de `Doctos/PENDIENTES.md`
-(incluye la nota nueva sobre `Jwt:ClaveFirma` y cómo probar el login real).
+Cómo levantar la base, la API y el SPA está en la sección 1 de `Doctos/PENDIENTES.md`.
 
 **Al terminar**: actualiza `Doctos/PENDIENTES.md` con lo que quedó hecho y lo que falta,
 y haz commit y push a `main` (confirmando antes con el usuario).
@@ -85,9 +91,9 @@ Si se prefiere otro frente, sustituir la sección **Objetivo** por uno de estos
 
 | Frente | Por qué elegirlo |
 |---|---|
-| **Comentarios y adjuntos** (A1) | Es lo que más se usa a diario en un gestor de tareas; las tablas y el contrato `IAlmacenArchivos` ya existen |
-| **Edición de WorkItem en la UI** (A2) | Rápido: el endpoint con todas sus reglas ya existe, solo falta la pantalla |
-| **Notificaciones + Hangfire** (A3, A4) | Cierra el ciclo con el solicitante y activa la vigilancia de SLA y los KPIs |
 | **Migración de datos del GT** (B3) | Necesario para el corte real; el mapeo está en el Documento Maestro §15.4 |
-| **Despliegue** (B4) | Ya no bloquea en la parte de identidad (B2 resuelto); falta pipeline CI/CD, `appsettings.Production.json`, usuario de BD de mínimo privilegio, hosting (IIS/Kestrel/Docker) — ver el desglose completo que se armó para este frente en el historial de esta sesión |
+| **Despliegue** (B4) | Ya no bloquea en la parte de identidad (B2 resuelto); falta pipeline CI/CD, `appsettings.Production.json`, usuario de BD de mínimo privilegio, hosting (IIS/Kestrel/Docker) |
+| **Hangfire** (A4) | Vigilancia de SLA, snapshot de KPIs (`spSnapshotKpi` ya existe), recordatorios de compromiso, despacho del outbox `tblEventoDominio`; complementa las notificaciones ya resueltas |
+| **Portafolio** (A5) | Riesgos, hitos, OKRs, presupuesto/costo real por proyecto — módulo nuevo sin dependencias pendientes |
 | **Integración Git** (resto de Fase 3) | Traza commits y PRs contra los WorkItems, tras la abstracción `IProveedorGit` |
+| **Fase 4 (Operación y Soporte)** | Incidentes, Mesa de ayuda, Base de conocimiento (incluye migrar el Glosario Interflo del GT) |

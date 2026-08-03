@@ -25,6 +25,7 @@ public class RegistrarTiempoValidator : AbstractValidator<RegistrarTiempoCommand
 
 public class RegistrarTiempoHandler(
     IWorkItemRepository repositorio,
+    IVerificadorPermisos permisos,
     IProveedorUsuarioActual proveedorUsuario) : IRequestHandler<RegistrarTiempoCommand, int>
 {
     public async Task<int> Handle(RegistrarTiempoCommand command, CancellationToken cancellationToken)
@@ -38,6 +39,16 @@ public class RegistrarTiempoHandler(
         if (!estado.Activo || estado.IdEstatus == EstatusWorkItem.Cancelado)
         {
             throw new BusinessException("No se puede registrar tiempo en un elemento cancelado o eliminado.");
+        }
+
+        // RN-REQ-05: registrar tiempo en un item ajeno (asignado a otra persona O SIN
+        // asignar) tambien cuenta como "modificar" el elemento -- mismo gate que
+        // ActualizarWorkItemCommand y CambiarEstatusWorkItemCommand. Sin asignar cuenta
+        // como ajeno (decision del equipo 2026-08-02).
+        var esAjeno = estado.IdAsignado != usuario.IdUsuario;
+        if (esAjeno)
+        {
+            await permisos.ExigirPermisoAsync(PermisosWorkItem.ModificarAjeno, estado.IdProyecto, cancellationToken);
         }
 
         return await repositorio.RegistrarTiempoAsync(

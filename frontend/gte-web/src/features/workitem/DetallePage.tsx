@@ -11,12 +11,14 @@ import {
   formatearMinutos, obtenerCatalogosBandeja, obtenerTiempos, obtenerWorkItem,
 } from "../../shared/api/workitems";
 import { useSesion } from "../../shared/api/sesion";
+import { ContenidoEnriquecido } from "../../shared/editor/ContenidoEnriquecido";
 import { ModalTiempo } from "../trabajo/ModalTiempo";
 import { BotonesAcciones } from "./BotonesAcciones";
 import { ModalEditarWorkItem } from "./ModalEditarWorkItem";
 import { PanelRevisiones } from "./PanelRevisiones";
 import { PanelAdjuntos } from "./PanelAdjuntos";
 import { PanelComentarios } from "./PanelComentarios";
+import { PanelSubtareas } from "./PanelSubtareas";
 
 const ESTATUS_TERMINADO = 6;
 
@@ -135,14 +137,19 @@ export function DetallePage() {
               ? `Revisiones (${item.revisionesPendientes})`
               : "Revisiones"} />
             <Tab label="Adjuntos" />
+            <Tab label="Subtareas" />
           </Tabs>
 
           {pestana === 0 && (
             <Box>
               <Typography variant="subtitle2" sx={{ mb: 1 }}>Descripcion</Typography>
-              <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", mb: 3 }}>
-                {item.descripcion?.trim() || "Sin descripcion."}
-              </Typography>
+              {item.descripcion?.trim() ? (
+                <Box sx={{ mb: 3 }}>
+                  <ContenidoEnriquecido html={item.descripcion} />
+                </Box>
+              ) : (
+                <Typography variant="body2" sx={{ mb: 3 }}>Sin descripcion.</Typography>
+              )}
               <Typography variant="subtitle2" sx={{ mb: 1 }}>Criterios de aceptacion</Typography>
               <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
                 {item.criteriosAceptacion?.trim() || "Sin criterios capturados."}
@@ -202,6 +209,17 @@ export function DetallePage() {
           {pestana === 3 && (
             <PanelAdjuntos
               idWorkItem={item.idWorkItem}
+              alExito={(mensaje) => setAviso({ tipo: "success", mensaje })}
+              alError={(mensaje) => setAviso({ tipo: "error", mensaje })}
+            />
+          )}
+
+          {pestana === 4 && (
+            <PanelSubtareas
+              idWorkItem={item.idWorkItem}
+              folio={item.folio}
+              idProyecto={item.idProyecto}
+              catalogos={catalogos.data}
               alExito={(mensaje) => setAviso({ tipo: "success", mensaje })}
               alError={(mensaje) => setAviso({ tipo: "error", mensaje })}
             />

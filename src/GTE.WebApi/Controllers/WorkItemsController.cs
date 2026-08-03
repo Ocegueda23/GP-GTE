@@ -97,4 +97,13 @@ public class WorkItemsController(IMediator mediator) : ControllerBase
         var resultado = await mediator.Send(new ObtenerTiemposQuery(id), cancellationToken);
         return Ok(ApiResponse<IReadOnlyList<RegistroTiempoResponse>>.Exito(resultado));
     }
+
+    /// <summary>Subtareas (WorkItems hijos) de este elemento.</summary>
+    [HttpGet("{id:int}/hijos")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<WorkItemHijoResponse>>>> ObtenerHijos(
+        int id, CancellationToken cancellationToken)
+    {
+        var resultado = await mediator.Send(new ObtenerHijosQuery(id), cancellationToken);
+        return Ok(ApiResponse<IReadOnlyList<WorkItemHijoResponse>>.Exito(resultado));
+    }
 }

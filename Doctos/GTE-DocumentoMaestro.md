@@ -910,7 +910,14 @@ técnica base.
   (validación con CTE recursivo antes de guardar).
 - RN-ADM-02: el rol Administrador no cortocircuita las validaciones de negocio (a
   diferencia del `EsAdmin` del GT); solo otorga todos los permisos. Las reglas duras
-  (p. ej. no cerrar un WorkItem con revisiones pendientes) aplican a todos.
+  (p. ej. no cerrar un WorkItem con revisiones pendientes) aplican a todos. **Excepcion
+  acotada (decision del equipo, 2026-08-02):** el cierre de WorkItems (RN-REQ-03) y el
+  ownership de cambios de estatus (WI.ModificarAjeno, ver RN-REQ-05) SI se saltan para
+  quien tenga el permiso nuevo `WI.OmitirValidacionCierre` (sembrado solo para
+  Administrador, mismo patron RBAC data-driven, sin cortocircuito de codigo por rol). El
+  resto de reglas duras del proceso (RN-REQ-01 una sola tarea En Proceso por persona,
+  RN-REQ-02 fecha compromiso) NO se saltan ni para Administrador. Ver
+  `CambiarEstatusWorkItemHandler` y `14_2026-08-02_INSERT_bdsGTE_PermisoOmitirValidacionCierre.sql`.
 - RN-ADM-03: la jerarquía jefe-subordinado define el alcance de visibilidad por defecto
   de bandejas y reportes (CTE recursivo, heredado del GT); los permisos pueden ampliarlo.
 - RN-ADM-04: cambios de nivel de un usuario NO recalculan presupuestos de WorkItems ya
@@ -968,11 +975,24 @@ costo, riesgo.
 - RN-REQ-02: INICIAR exige `FechaCompromiso` capturada.
 - RN-REQ-03: TERMINAR exige: al menos un registro de tiempo o subtarea hija terminada, y
   cero revisiones con `Corregido = 0`. Una sola implementación en el dominio (corrige los
-  dos caminos inconsistentes de FrmRegistro vs FrmTareaSTS.btnTerminar).
+  dos caminos inconsistentes de FrmRegistro vs FrmTareaSTS.btnTerminar). Bypass acotado
+  para `WI.OmitirValidacionCierre` (ver RN-ADM-02).
 - RN-REQ-04: `FechaCompromiso` no puede ser anterior a hoy, salvo permiso
   `WI.ModificarCompromiso`.
-- RN-REQ-05: editar un item Terminado exige `WI.ModificarTerminado`; editar item ajeno
-  exige `WI.ModificarAjeno`.
+- RN-REQ-05: editar un item Terminado exige `WI.ModificarTerminado`; editar, cambiar el
+  estatus (INICIAR/TERMINAR/etc.), registrar tiempo, o marcar CORREGIDO un hallazgo (no
+  reabrirlo, eso es RN-QA-02) en un item ajeno exige `WI.ModificarAjeno` -- el gate de
+  ownership aplica igual en `ActualizarWorkItemCommand`, `CambiarEstatusWorkItemCommand`,
+  `RegistrarTiempoCommand` y `CorregirRevisionCommand` (unificado 2026-08-02; los dos
+  ultimos se quedaron sin el gate en pasadas anteriores del mismo dia y se corrigieron al
+  reproducirlos en vivo con cuentas Desarrollador reales -- ver lecciones en PENDIENTES.md
+  seccion 5). **"Ajeno" incluye SIN asignar** (decision del equipo 2026-08-02): un
+  WorkItem con `IdAsignado = NULL` se trata igual que uno asignado a otra persona -- nadie
+  "toma" trabajo del backlog solo con INICIAR o registrando tiempo; un Lider/Admin con
+  `WI.ModificarAjeno` tiene que asignarlo primero (vía editar). Deliberadamente SIN este
+  gate (no es un hueco, es el diseño): comentar, adjuntar archivos y reportar un hallazgo
+  -- son acciones de colaboracion/revision hechas por definicion por alguien mas, no una
+  modificacion del registro propio del WorkItem.
 - RN-REQ-06: eliminar solo en estatus Borrador/Pendiente con permiso `WI.Eliminar` (hard
   delete si Borrador, baja lógica si Pendiente).
 - RN-REQ-07: COPIAR duplica el item limpiando: estatus (lo fija el backend), compromiso,
@@ -1055,6 +1075,19 @@ duplicar a Gitea.
 - RN-QA-03: el estatus del WorkItem reacciona a las revisiones: alguna con Corregido=0
   regresa el item de Terminado a Corrección vía workflow (formaliza
   `ValidarSiHayRevisionesPendientes`).
+- RN-QA-04 (2026-08-02): aprobar (TERMINAR) o rechazar (RECHAZAR_QA) la fase de pruebas de
+  un WorkItem, desde En Pruebas, exige el permiso `WI.AprobarPruebas` (sembrado para el rol
+  QA por datos en `tblTransicionConfig.RequierePermiso`, no un cortocircuito de código). El
+  TERMINAR desde En Proceso (la ruta "proyectos sin fase QA") sigue sin exigirlo.
+- RN-QA-05 (2026-08-02): no autoaprobación ni autorechazo -- quien aprueba/rechaza la fase
+  de pruebas no puede ser el propio asignado del WorkItem. Por esto mismo, el gate de "item
+  ajeno" (RN-REQ-05) se excluye a propósito para estas dos transiciones: lo normal es que
+  el revisor sea otra persona.
+- RN-QA-06 (2026-08-02): no se puede rechazar (RECHAZAR_QA desde En Pruebas) sin que ya
+  exista un Hallazgo/Revisión pendiente registrado para el WorkItem -- un motivo de texto
+  libre ya no basta. Implementado en `CambiarEstatusWorkItemHandler.ValidarRevisionPruebasAsync`;
+  las tres reglas anteriores tienen bypass acotado con `WI.OmitirValidacionCierre`
+  (Administrador, ver RN-ADM-02).
 
 ### 3.7 Releases (Entregas)
 

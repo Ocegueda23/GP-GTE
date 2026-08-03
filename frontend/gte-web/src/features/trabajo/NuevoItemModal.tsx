@@ -13,11 +13,13 @@ interface Props {
   alCerrar: () => void;
   alExito: (mensaje: string) => void;
   alError: (mensaje: string) => void;
+  /** Al capturarse, el alta crea una subtarea: proyecto bloqueado al del padre. */
+  padre?: { idWorkItem: number; folio: string; idProyecto: number };
 }
 
 /** Alta rapida de elementos: el folio y el estatus inicial los fija el backend. */
-export function NuevoItemModal({ abierto, catalogos, alCerrar, alExito, alError }: Props) {
-  const [idProyecto, setIdProyecto] = useState<number | "">("");
+export function NuevoItemModal({ abierto, catalogos, alCerrar, alExito, alError, padre }: Props) {
+  const [idProyecto, setIdProyecto] = useState<number | "">(padre?.idProyecto ?? "");
   const [idTipo, setIdTipo] = useState<number | "">("");
   const [idPrioridad, setIdPrioridad] = useState<number | "">("");
   const [idAsignado, setIdAsignado] = useState<number | "">("");
@@ -48,11 +50,15 @@ export function NuevoItemModal({ abierto, catalogos, alCerrar, alExito, alError 
         idPrioridad: idPrioridad as number,
         idAsignado: idAsignado === "" ? null : (idAsignado as number),
         fechaCompromiso: compromiso || null,
+        idPadre: padre?.idWorkItem,
       });
       alExito(`${mensaje} (${dato.folio})`);
       limpiar();
       alCerrar();
       await clienteQuery.invalidateQueries({ queryKey: ["bandeja"] });
+      if (padre) {
+        await clienteQuery.invalidateQueries({ queryKey: ["hijos", padre.idWorkItem] });
+      }
     } catch (error) {
       alError(error instanceof ErrorApi ? error.message : "Error al crear el elemento.");
     } finally {
@@ -62,9 +68,9 @@ export function NuevoItemModal({ abierto, catalogos, alCerrar, alExito, alError 
 
   return (
     <Dialog open={abierto} onClose={alCerrar} fullWidth maxWidth="sm">
-      <DialogTitle>Nuevo elemento de trabajo</DialogTitle>
+      <DialogTitle>{padre ? `Nueva subtarea de ${padre.folio}` : "Nuevo elemento de trabajo"}</DialogTitle>
       <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
-        <FormControl size="small" required>
+        <FormControl size="small" required disabled={padre !== undefined}>
           <InputLabel>Proyecto</InputLabel>
           <Select label="Proyecto" value={idProyecto}
             onChange={(e) => setIdProyecto(e.target.value as number | "")}>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { Box, Button, IconButton, Stack, Typography } from "@mui/material";
 import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import ReplyIcon from "@mui/icons-material/Reply";
@@ -6,51 +6,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   crearComentario, eliminarComentario, obtenerComentarios, type Comentario,
 } from "../../shared/api/comentarios";
-import { descargarArchivoBlob } from "../../shared/api/archivos";
 import { obtenerCatalogosBandeja } from "../../shared/api/workitems";
 import { ErrorApi } from "../../shared/api/http";
 import { useSesion } from "../../shared/api/sesion";
+import { ContenidoEnriquecido } from "../../shared/editor/ContenidoEnriquecido";
 import { EditorComentario } from "./EditorComentario";
-
-/**
- * El HTML guardado solo trae `data-guid` en las imagenes pegadas (nunca una URL,
- * ver EditorComentario/ImagenProtegida): aqui se resuelve el blob autenticado para
- * mostrarlas, igual que hace el NodeView dentro del editor.
- */
-function ContenidoComentario({ html }: { html: string }) {
-  const contenedorRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const contenedor = contenedorRef.current;
-    if (!contenedor) return;
-    const urls: string[] = [];
-    const imagenes = Array.from(contenedor.querySelectorAll<HTMLImageElement>("img[data-guid]"));
-    imagenes.forEach((img) => {
-      const guid = img.getAttribute("data-guid");
-      if (!guid) return;
-      descargarArchivoBlob(guid)
-        .then((blob) => {
-          const url = URL.createObjectURL(blob);
-          urls.push(url);
-          img.src = url;
-        })
-        .catch(() => {});
-    });
-    return () => urls.forEach((url) => URL.revokeObjectURL(url));
-  }, [html]);
-
-  return (
-    <Box
-      ref={contenedorRef}
-      sx={{
-        "& p": { m: 0 },
-        "& .mencion": { color: "primary.main", fontWeight: 600 },
-        "& img[data-guid]": { maxWidth: "100%", maxHeight: 320, borderRadius: 1, display: "block", mt: 0.5 },
-      }}
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
-  );
-}
 
 interface Props {
   idWorkItem: number;
@@ -130,7 +90,7 @@ export function PanelComentarios({ idWorkItem, alError }: Props) {
             </Typography>
             <Box sx={{ mt: 0.5 }}>
               {/* El HTML ya viene sanitizado por el backend (ISanitizadorHtml); nunca se confia en HTML sin sanear. */}
-              <ContenidoComentario html={comentario.contenido} />
+              <ContenidoEnriquecido html={comentario.contenido} />
             </Box>
           </Box>
           <Stack direction="row" spacing={0.5} sx={{ flexShrink: 0 }}>

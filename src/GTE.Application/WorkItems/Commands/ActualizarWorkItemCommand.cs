@@ -27,11 +27,13 @@ public class ActualizarWorkItemHandler(
     IWorkItemRepository repositorio,
     IWorkItemQueryService consultas,
     IVerificadorPermisos permisos,
-    IProveedorUsuarioActual proveedorUsuario) : IRequestHandler<ActualizarWorkItemCommand, WorkItemResponse>
+    IProveedorUsuarioActual proveedorUsuario,
+    ISanitizadorHtml sanitizador) : IRequestHandler<ActualizarWorkItemCommand, WorkItemResponse>
 {
     public async Task<WorkItemResponse> Handle(ActualizarWorkItemCommand command, CancellationToken cancellationToken)
     {
         var datos = command.Datos;
+        var descripcion = string.IsNullOrWhiteSpace(datos.Descripcion) ? null : sanitizador.Sanitizar(datos.Descripcion);
         var estado = await repositorio.ObtenerEstadoAsync(command.IdWorkItem, cancellationToken)
             ?? throw new NotFoundException("WorkItem", command.IdWorkItem);
 
@@ -41,9 +43,12 @@ public class ActualizarWorkItemHandler(
             await permisos.ExigirPermisoAsync(PermisosWorkItem.ModificarTerminado, estado.IdProyecto, cancellationToken);
         }
 
-        // RN-REQ-05: item ajeno (asignado a otra persona) solo con permiso
+        // RN-REQ-05: item ajeno (asignado a otra persona O SIN asignar) solo con permiso --
+        // decision del equipo 2026-08-02: una tarea sin asignar no es "de nadie que la pueda
+        // tocar libremente", se trata igual que ajena (evita que cualquiera tome trabajo del
+        // backlog sin que un Lider/Admin con WI.ModificarAjeno la asigne primero).
         var usuarioActual = await proveedorUsuario.ObtenerAsync(cancellationToken);
-        var esAjeno = estado.IdAsignado.HasValue && estado.IdAsignado != usuarioActual?.IdUsuario;
+        var esAjeno = estado.IdAsignado != usuarioActual?.IdUsuario;
         if (esAjeno)
         {
             await permisos.ExigirPermisoAsync(PermisosWorkItem.ModificarAjeno, estado.IdProyecto, cancellationToken);
@@ -75,7 +80,7 @@ public class ActualizarWorkItemHandler(
         }
 
         await repositorio.ActualizarAsync(new WorkItemEdicion(
-            command.IdWorkItem, datos.Titulo.Trim(), datos.Descripcion, datos.CriteriosAceptacion,
+            command.IdWorkItem, datos.Titulo.Trim(), descripcion, datos.CriteriosAceptacion,
             datos.IdPrioridad, datos.IdComplejidad, datos.IdAsignado, datos.PuntosHistoria,
             recalcularPresupuesto, minutosPresupuesto, datos.FechaCompromiso), cancellationToken);
 

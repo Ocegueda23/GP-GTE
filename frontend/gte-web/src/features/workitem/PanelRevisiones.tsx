@@ -5,6 +5,8 @@ import {
 } from "@mui/material";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
+import { ContenidoEnriquecido } from "../../shared/editor/ContenidoEnriquecido";
+import { EditorEnriquecido } from "../../shared/editor/EditorEnriquecido";
 import {
   corregirRevision, crearRevision, obtenerRevisiones, type Revision,
 } from "../../shared/api/workitems";
@@ -26,6 +28,7 @@ function formatearFecha(iso: string | null): string {
 export function PanelRevisiones({ idWorkItem, folio, alExito, alError }: Props) {
   const [modalNuevo, setModalNuevo] = useState(false);
   const [comentarios, setComentarios] = useState("");
+  const [comentariosVacio, setComentariosVacio] = useState(true);
   const [reabrir, setReabrir] = useState<Revision | null>(null);
   const [motivo, setMotivo] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -50,7 +53,7 @@ export function PanelRevisiones({ idWorkItem, folio, alExito, alError }: Props) 
   const reportar = async () => {
     setEnviando(true);
     try {
-      const { mensaje } = await crearRevision(idWorkItem, comentarios.trim());
+      const { mensaje } = await crearRevision(idWorkItem, comentarios);
       alExito(mensaje);
       setModalNuevo(false);
       setComentarios("");
@@ -122,10 +125,10 @@ export function PanelRevisiones({ idWorkItem, folio, alExito, alError }: Props) 
             <ListItemText
               sx={{ flex: 1, minWidth: 0 }}
               primary={
-                <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                <Stack spacing={0.5} sx={{ alignItems: "flex-start" }}>
                   <Chip size="small" color={revision.corregido ? "success" : "warning"}
                     label={revision.corregido ? "Corregido" : "Pendiente"} />
-                  <Typography variant="body2">{revision.comentarios}</Typography>
+                  <ContenidoEnriquecido html={revision.comentarios ?? ""} />
                 </Stack>
               }
               secondary={`${revision.revisor} - reportado ${formatearFecha(revision.fechaRegistro)}`
@@ -148,17 +151,23 @@ export function PanelRevisiones({ idWorkItem, folio, alExito, alError }: Props) 
 
       <Dialog open={modalNuevo} onClose={() => setModalNuevo(false)} fullWidth maxWidth="sm">
         <DialogTitle>Reportar hallazgo - {folio}</DialogTitle>
-        <DialogContent>
-          <TextField autoFocus fullWidth multiline minRows={3} margin="dense"
+        <DialogContent sx={{ pt: "12px !important" }}>
+          <EditorEnriquecido
             label="Que se encontro y que hay que ajustar"
-            value={comentarios} onChange={(e) => setComentarios(e.target.value)} />
-          <Typography variant="caption" color="text.secondary">
+            placeholder="Describe el hallazgo..."
+            value={comentarios}
+            onChange={setComentarios}
+            onVacioChange={setComentariosVacio}
+            idWorkItemParaAdjuntos={idWorkItem}
+            onError={alError}
+          />
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
             Si el elemento ya estaba terminado, el hallazgo lo regresa a Correccion.
           </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setModalNuevo(false)}>Cancelar</Button>
-          <Button variant="contained" disabled={enviando || comentarios.trim().length === 0}
+          <Button variant="contained" disabled={enviando || comentariosVacio}
             onClick={() => void reportar()}>
             Reportar
           </Button>

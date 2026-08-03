@@ -18,6 +18,12 @@ import { DetallePage } from "./features/workitem/DetallePage";
 import { MiDiaPage } from "./features/midia/MiDiaPage";
 import { PortalPage } from "./features/solicitudes/PortalPage";
 import { TriagePage } from "./features/triage/TriagePage";
+import { PortalTicketsPage } from "./features/soporte/PortalTicketsPage";
+import { BandejaTicketsPage } from "./features/soporte/BandejaTicketsPage";
+import { DetalleTicketPage } from "./features/soporte/DetalleTicketPage";
+import { BandejaIncidentesPage } from "./features/operacion/BandejaIncidentesPage";
+import { DetalleIncidentePage } from "./features/operacion/DetalleIncidentePage";
+import { PortafolioPage } from "./features/portafolio/PortafolioPage";
 import { BacklogPage } from "./features/planeacion/BacklogPage";
 import { TableroPage } from "./features/planeacion/TableroPage";
 import { QaPage } from "./features/calidad/QaPage";
@@ -54,6 +60,10 @@ const NAVEGACION: { ruta: string; etiqueta: string; permiso: string | string[] |
   { ruta: "/releases", etiqueta: "Releases", permiso: "REL.Crear" },
   { ruta: "/solicitudes", etiqueta: "Solicitudes", permiso: null },
   { ruta: "/triage", etiqueta: "Revision de solicitudes", permiso: "SOL.Triage" },
+  { ruta: "/tickets", etiqueta: "Mis tickets", permiso: null },
+  { ruta: "/soporte", etiqueta: "Mesa de ayuda", permiso: "TKT.Atender" },
+  { ruta: "/operacion/incidentes", etiqueta: "Incidentes", permiso: "INC.Gestionar" },
+  { ruta: "/portafolio", etiqueta: "Portafolio", permiso: ["POR.GestionarCosteo", "POR.GestionarOkr", "RPT.Costos"] },
   { ruta: "/admin", etiqueta: "Administracion", permiso: ["ADM.Usuarios", "ADM.Roles"] },
   { ruta: "/ayuda", etiqueta: "Ayuda", permiso: null },
 ];
@@ -164,6 +174,9 @@ function BarraSuperior({ alAbrirMenu }: { alAbrirMenu: () => void }) {
   return (
     <AppBar position="fixed" sx={{ zIndex: (t) => t.zIndex.drawer + 1 }}>
       <Toolbar variant="dense">
+        <IconButton color="inherit" onClick={alAbrirMenu} sx={{ display: { sm: "none" }, mr: 1 }}>
+          <MenuIcon />
+        </IconButton>
         <Typography variant="h6" sx={{ fontWeight: 700, letterSpacing: 1, flex: 1 }}>GTE</Typography>
         <CampanaNotificaciones />
         <Tooltip title={`${sesion?.dominio} - ${sesion?.roles.join(", ")}`}>
@@ -182,9 +195,6 @@ function BarraSuperior({ alAbrirMenu }: { alAbrirMenu: () => void }) {
           <MenuItem disabled>{sesion?.correo ?? sesion?.dominio}</MenuItem>
           <MenuItem onClick={salir}>Cerrar sesion</MenuItem>
         </Menu>
-        <IconButton color="inherit" onClick={alAbrirMenu} sx={{ display: { sm: "none" }, ml: 1 }}>
-          <MenuIcon />
-        </IconButton>
       </Toolbar>
     </AppBar>
   );
@@ -203,7 +213,7 @@ export default function App() {
 
             {/* Menu lateral fijo (pantallas medianas o mas grandes) */}
             <Drawer
-              anchor="right"
+              anchor="left"
               variant="permanent"
               sx={{
                 display: { xs: "none", sm: "block" },
@@ -218,7 +228,7 @@ export default function App() {
 
             {/* Menu lateral deslizable (celular) */}
             <Drawer
-              anchor="right"
+              anchor="left"
               variant="temporary"
               open={menuMovilAbierto}
               onClose={() => setMenuMovilAbierto(false)}
@@ -245,6 +255,12 @@ export default function App() {
                 <Route path="/releases" element={<ReleasesPage />} />
                 <Route path="/solicitudes" element={<PortalPage />} />
                 <Route path="/triage" element={<TriagePage />} />
+                <Route path="/tickets" element={<PortalTicketsPage />} />
+                <Route path="/tickets/:folio" element={<DetalleTicketPage />} />
+                <Route path="/soporte" element={<BandejaTicketsPage />} />
+                <Route path="/operacion/incidentes" element={<BandejaIncidentesPage />} />
+                <Route path="/operacion/incidentes/:folio" element={<DetalleIncidentePage />} />
+                <Route path="/portafolio" element={<PortafolioPage />} />
                 <Route path="/admin" element={<AdminPage />} />
                 <Route path="/ayuda" element={<ManualUsuarioPage />} />
               </Routes>

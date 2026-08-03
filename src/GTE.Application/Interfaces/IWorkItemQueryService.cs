@@ -24,4 +24,6 @@ public interface IWorkItemQueryService
     Task<WorkItemResponse?> ObtenerPorFolioAsync(string folio, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<RegistroTiempoResponse>> ObtenerTiemposAsync(int idWorkItem, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<WorkItemHijoResponse>> ObtenerHijosAsync(int idWorkItemPadre, CancellationToken cancellationToken = default);
 }

@@ -214,6 +214,8 @@ public partial class DbContextGTE : DbContext
 
     public virtual DbSet<VwTiempoInvertido> VwTiempoInvertido { get; set; }
 
+    public virtual DbSet<VwCostoRegistroTiempo> VwCostoRegistroTiempo { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.UseCollation("Modern_Spanish_CI_AS");
@@ -1524,6 +1526,33 @@ public partial class DbContextGTE : DbContext
                 .HasConstraintName("FK_tblPullRequest_tblWorkItem");
         });
 
+        modelBuilder.Entity<TblRefreshToken>(entity =>
+        {
+            entity.HasKey(e => e.IdRefreshToken);
+
+            entity.ToTable("tblRefreshToken");
+
+            entity.HasIndex(e => e.IdUsuario, "IX_tblRefreshToken_Usuario");
+
+            entity.HasIndex(e => new { e.IdUsuario, e.FechaExpiracion }, "IX_tblRefreshToken_Vigentes").HasFilter("([FechaRevocado] IS NULL)");
+
+            entity.HasIndex(e => e.TokenHash, "UQ_tblRefreshToken_TokenHash").IsUnique();
+
+            entity.Property(e => e.FechaRegistro).HasDefaultValueSql("(sysdatetime())");
+            entity.Property(e => e.IpOrigen).HasMaxLength(50);
+            entity.Property(e => e.TokenHash).HasMaxLength(100);
+            entity.Property(e => e.UsuarioRegistro).HasMaxLength(200);
+
+            entity.HasOne(d => d.IdReemplazadoPorNavigation).WithMany(p => p.InverseIdReemplazadoPorNavigation)
+                .HasForeignKey(d => d.IdReemplazadoPor)
+                .HasConstraintName("FK_tblRefreshToken_tblRefreshToken");
+
+            entity.HasOne(d => d.IdUsuarioNavigation).WithMany(p => p.TblRefreshToken)
+                .HasForeignKey(d => d.IdUsuario)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_tblRefreshToken_tblUsuario");
+        });
+
         modelBuilder.Entity<TblRegistroTiempo>(entity =>
         {
             entity.HasKey(e => e.IdRegistroTiempo);
@@ -2150,30 +2179,6 @@ public partial class DbContextGTE : DbContext
             entity.Property(e => e.UsuarioRegistro).HasMaxLength(200);
         });
 
-        modelBuilder.Entity<TblRefreshToken>(entity =>
-        {
-            entity.HasKey(e => e.IdRefreshToken);
-
-            entity.ToTable("tblRefreshToken");
-
-            entity.HasIndex(e => e.TokenHash, "UQ_tblRefreshToken_TokenHash").IsUnique();
-
-            entity.HasIndex(e => e.IdUsuario, "IX_tblRefreshToken_Usuario");
-
-            entity.Property(e => e.FechaRegistro).HasDefaultValueSql("(sysdatetime())");
-            entity.Property(e => e.IpOrigen).HasMaxLength(50);
-            entity.Property(e => e.TokenHash).HasMaxLength(100);
-            entity.Property(e => e.UsuarioRegistro).HasMaxLength(200);
-
-            entity.HasOne(d => d.IdUsuarioNavigation).WithMany(p => p.TblRefreshToken)
-                .HasForeignKey(d => d.IdUsuario)
-                .HasConstraintName("FK_tblRefreshToken_tblUsuario");
-
-            entity.HasOne(d => d.IdReemplazadoPorNavigation).WithMany(p => p.InverseIdReemplazadoPorNavigation)
-                .HasForeignKey(d => d.IdReemplazadoPor)
-                .HasConstraintName("FK_tblRefreshToken_tblRefreshToken");
-        });
-
         modelBuilder.Entity<TblUsuario>(entity =>
         {
             entity.HasKey(e => e.IdUsuario);
@@ -2185,12 +2190,10 @@ public partial class DbContextGTE : DbContext
             entity.HasIndex(e => e.Dominio, "UQ_tblUsuario_Dominio").IsUnique();
 
             entity.Property(e => e.Activo).HasDefaultValue(true);
-            entity.Property(e => e.BloqueadoHasta).HasColumnType("datetime2");
             entity.Property(e => e.Correo).HasMaxLength(200);
             entity.Property(e => e.Dominio).HasMaxLength(100);
             entity.Property(e => e.FechaMovto).HasColumnType("datetime");
             entity.Property(e => e.FechaRegistro).HasDefaultValueSql("(sysdatetime())");
-            entity.Property(e => e.FechaUltimoCambioPassword).HasColumnType("datetime2");
             entity.Property(e => e.IntentosFallidos).HasDefaultValue(0);
             entity.Property(e => e.Nombre).HasMaxLength(200);
             entity.Property(e => e.PasswordHash).HasMaxLength(200);
@@ -2269,6 +2272,8 @@ public partial class DbContextGTE : DbContext
 
             entity.HasIndex(e => new { e.IdAsignado, e.IdEstatusWorkItem, e.Activo }, "IX_tblWorkItem_Bandeja");
 
+            entity.HasIndex(e => e.IdEquipo, "IX_tblWorkItem_Equipo");
+
             entity.HasIndex(e => e.IdPadre, "IX_tblWorkItem_Padre").HasFilter("([IdPadre] IS NOT NULL)");
 
             entity.HasIndex(e => new { e.IdProyecto, e.IdEstatusWorkItem }, "IX_tblWorkItem_Proyecto");
@@ -2286,6 +2291,7 @@ public partial class DbContextGTE : DbContext
             entity.Property(e => e.FechaMovto).HasColumnType("datetime");
             entity.Property(e => e.FechaRegistro).HasDefaultValueSql("(sysdatetime())");
             entity.Property(e => e.Folio).HasMaxLength(50);
+            entity.Property(e => e.Locacion).HasMaxLength(100);
             entity.Property(e => e.PuntosHistoria).HasColumnType("decimal(6, 2)");
             entity.Property(e => e.Titulo).HasMaxLength(200);
             entity.Property(e => e.UsuarioMovto).HasMaxLength(50);
@@ -2302,6 +2308,10 @@ public partial class DbContextGTE : DbContext
             entity.HasOne(d => d.IdEjecucionPruebaOrigenNavigation).WithMany(p => p.TblWorkItem)
                 .HasForeignKey(d => d.IdEjecucionPruebaOrigen)
                 .HasConstraintName("FK_tblWorkItem_tblEjecucionPrueba");
+
+            entity.HasOne(d => d.IdEquipoNavigation).WithMany(p => p.TblWorkItem)
+                .HasForeignKey(d => d.IdEquipo)
+                .HasConstraintName("FK_tblWorkItem_tblEquipo");
 
             entity.HasOne(d => d.IdEstatusWorkItemNavigation).WithMany(p => p.TblWorkItem)
                 .HasForeignKey(d => d.IdEstatusWorkItem)
@@ -2395,6 +2405,16 @@ public partial class DbContextGTE : DbContext
             entity
                 .HasNoKey()
                 .ToView("vwTiempoInvertido");
+        });
+
+        modelBuilder.Entity<VwCostoRegistroTiempo>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToView("vwCostoRegistroTiempo");
+
+            entity.Property(e => e.CostoHora).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.Costo).HasColumnType("decimal(18, 4)");
         });
 
         OnModelCreatingPartial(modelBuilder);

@@ -3,16 +3,14 @@ import { Box, Button, IconButton, List, ListItemButton, ListItemText, Paper, Sta
 import FormatBoldIcon from "@mui/icons-material/FormatBold";
 import FormatItalicIcon from "@mui/icons-material/FormatItalic";
 import FormatListBulletedIcon from "@mui/icons-material/FormatListBulleted";
-import {
-  EditorContent, Node, NodeViewWrapper, ReactNodeViewRenderer, ReactRenderer,
-  mergeAttributes, useEditor, useEditorState, type NodeViewProps,
-} from "@tiptap/react";
+import { EditorContent, ReactRenderer, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import Mention from "@tiptap/extension-mention";
 import type { SuggestionKeyDownProps, SuggestionProps } from "@tiptap/suggestion";
 import { useQueryClient } from "@tanstack/react-query";
-import { descargarArchivoBlob, subirArchivo } from "../../shared/api/archivos";
+import { subirArchivo } from "../../shared/api/archivos";
+import { ImagenProtegida } from "../../shared/editor/ImagenProtegida";
 import type { CatalogoItem } from "../../shared/api/workitems";
 
 interface ItemMencion {
@@ -104,68 +102,6 @@ function crearSugerenciaMenciones(usuarios: CatalogoItem[]) {
       };
     },
   };
-}
-
-/** Nodo inline que solo guarda el GUID del adjunto; nunca una URL (evita exponer el JWT). */
-const ImagenProtegida = Node.create({
-  name: "imagenProtegida",
-  group: "inline",
-  inline: true,
-  atom: true,
-  addAttributes() {
-    return {
-      guid: {
-        default: null,
-        parseHTML: (elemento: HTMLElement) => elemento.getAttribute("data-guid"),
-        renderHTML: (atributos: Record<string, unknown>) => ({ "data-guid": atributos.guid }),
-      },
-    };
-  },
-  parseHTML() {
-    return [{ tag: "img[data-guid]" }];
-  },
-  renderHTML({ HTMLAttributes }) {
-    return ["img", mergeAttributes(HTMLAttributes)];
-  },
-  addNodeView() {
-    return ReactNodeViewRenderer(ImagenProtegidaView);
-  },
-});
-
-/** Arma el blob autenticado a partir del GUID; nunca <img src> directo al endpoint. */
-function ImagenProtegidaView({ node }: NodeViewProps) {
-  const [src, setSrc] = useState<string | null>(null);
-
-  useEffect(() => {
-    const guid = node.attrs.guid as string | null;
-    if (!guid) return;
-    let cancelado = false;
-    let objectUrl: string | null = null;
-    descargarArchivoBlob(guid)
-      .then((blob) => {
-        if (cancelado) return;
-        objectUrl = URL.createObjectURL(blob);
-        setSrc(objectUrl);
-      })
-      .catch(() => {});
-    return () => {
-      cancelado = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [node.attrs.guid]);
-
-  return (
-    <NodeViewWrapper as="span" style={{ display: "inline-block", verticalAlign: "middle" }}>
-      {src ? (
-        <img
-          src={src} alt=""
-          style={{ maxWidth: "100%", maxHeight: 320, borderRadius: 4, display: "block" }}
-        />
-      ) : (
-        <Box sx={{ width: 120, height: 80, bgcolor: "grey.200", borderRadius: 1 }} />
-      )}
-    </NodeViewWrapper>
-  );
 }
 
 interface Props {

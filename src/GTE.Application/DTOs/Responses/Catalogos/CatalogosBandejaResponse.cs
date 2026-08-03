@@ -24,4 +24,6 @@ public class CatalogosBandejaResponse
     public IReadOnlyList<CatalogoItemResponse> TiposSolicitud { get; set; } = [];
     public IReadOnlyList<CatalogoItemResponse> Equipos { get; set; } = [];
     public IReadOnlyList<CatalogoItemResponse> Complejidades { get; set; } = [];
+    public IReadOnlyList<CatalogoItemResponse> CategoriasTicket { get; set; } = [];
+    public IReadOnlyList<CatalogoItemResponse> Severidades { get; set; } = [];
 }

@@ -76,6 +76,20 @@ builder.Services.AddScoped<GTE.Application.Interfaces.IMiDiaQueryService, GTE.In
 builder.Services.AddScoped<GTE.Domain.Interfaces.ISolicitudRepository, GTE.Infrastructure.Repositories.SolicitudRepository>();
 builder.Services.AddScoped<GTE.Application.Interfaces.ISolicitudQueryService, GTE.Infrastructure.Services.SolicitudQueryService>();
 
+// Modulo Tickets (Mesa de ayuda y SLA)
+builder.Services.AddScoped<GTE.Domain.Interfaces.ITicketRepository, GTE.Infrastructure.Repositories.TicketRepository>();
+builder.Services.AddScoped<GTE.Application.Interfaces.ITicketQueryService, GTE.Infrastructure.Services.TicketQueryService>();
+
+// Modulo Incidentes (Operacion)
+builder.Services.AddScoped<GTE.Domain.Interfaces.IIncidenteRepository, GTE.Infrastructure.Repositories.IncidenteRepository>();
+builder.Services.AddScoped<GTE.Application.Interfaces.IIncidenteQueryService, GTE.Infrastructure.Services.IncidenteQueryService>();
+
+// Modulo Portafolio (Costeo + OKR)
+builder.Services.AddScoped<GTE.Domain.Interfaces.ICosteoRepository, GTE.Infrastructure.Repositories.CosteoRepository>();
+builder.Services.AddScoped<GTE.Application.Interfaces.ICosteoQueryService, GTE.Infrastructure.Services.CosteoQueryService>();
+builder.Services.AddScoped<GTE.Domain.Interfaces.IOkrRepository, GTE.Infrastructure.Repositories.OkrRepository>();
+builder.Services.AddScoped<GTE.Application.Interfaces.IOkrQueryService, GTE.Infrastructure.Services.OkrQueryService>();
+
 // Modulo Administracion
 builder.Services.AddScoped<GTE.Domain.Interfaces.IAdministracionRepository, GTE.Infrastructure.Repositories.AdministracionRepository>();
 builder.Services.AddScoped<GTE.Application.Interfaces.IAdministracionQueryService, GTE.Infrastructure.Services.AdministracionQueryService>();

@@ -36,4 +36,6 @@ public partial class TblEquipo
     public virtual ICollection<TblTablero> TblTablero { get; set; } = new List<TblTablero>();
 
     public virtual ICollection<TblUsuarioRol> TblUsuarioRol { get; set; } = new List<TblUsuarioRol>();
+
+    public virtual ICollection<TblWorkItem> TblWorkItem { get; set; } = new List<TblWorkItem>();
 }

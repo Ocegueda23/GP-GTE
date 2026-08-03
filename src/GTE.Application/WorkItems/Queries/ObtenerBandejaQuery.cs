@@ -42,3 +42,15 @@ public class ObtenerTiemposHandler(IWorkItemQueryService consultas)
         return await consultas.ObtenerTiemposAsync(query.IdWorkItem, cancellationToken);
     }
 }
+
+public record ObtenerHijosQuery(int IdWorkItem) : IRequest<IReadOnlyList<WorkItemHijoResponse>>;
+
+public class ObtenerHijosHandler(IWorkItemQueryService consultas)
+    : IRequestHandler<ObtenerHijosQuery, IReadOnlyList<WorkItemHijoResponse>>
+{
+    public async Task<IReadOnlyList<WorkItemHijoResponse>> Handle(
+        ObtenerHijosQuery query, CancellationToken cancellationToken)
+    {
+        return await consultas.ObtenerHijosAsync(query.IdWorkItem, cancellationToken);
+    }
+}

@@ -65,11 +65,17 @@ public partial class TblWorkItem
 
     public bool Activo { get; set; }
 
+    public string? Locacion { get; set; }
+
+    public int? IdEquipo { get; set; }
+
     public virtual TblUsuario? IdAsignadoNavigation { get; set; }
 
     public virtual TblComplejidad? IdComplejidadNavigation { get; set; }
 
     public virtual TblEjecucionPrueba? IdEjecucionPruebaOrigenNavigation { get; set; }
+
+    public virtual TblEquipo? IdEquipoNavigation { get; set; }
 
     public virtual TblEstatusWorkItem IdEstatusWorkItemNavigation { get; set; } = null!;
 

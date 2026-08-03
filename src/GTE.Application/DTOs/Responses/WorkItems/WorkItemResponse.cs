@@ -9,6 +9,7 @@ public class WorkItemResponse
     public string Titulo { get; set; } = string.Empty;
     public string? Descripcion { get; set; }
     public string? CriteriosAceptacion { get; set; }
+    public int IdProyecto { get; set; }
     public string ClaveProyecto { get; set; } = string.Empty;
     public string Proyecto { get; set; } = string.Empty;
     public bool EsMantenimiento { get; set; }

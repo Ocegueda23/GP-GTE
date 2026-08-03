@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using FluentValidation;
 using GTE.Application.DTOs.Request.Revisiones;
 using GTE.Application.DTOs.Responses.Revisiones;
@@ -32,7 +33,8 @@ public class CrearRevisionHandler(
     IRevisionQueryService consultas,
     IWorkItemRepository workItems,
     IMotorWorkflow motor,
-    IProveedorUsuarioActual proveedorUsuario) : IRequestHandler<CrearRevisionCommand, RevisionResponse>
+    IProveedorUsuarioActual proveedorUsuario,
+    ISanitizadorHtml sanitizador) : IRequestHandler<CrearRevisionCommand, RevisionResponse>
 {
     public async Task<RevisionResponse> Handle(CrearRevisionCommand command, CancellationToken cancellationToken)
     {
@@ -47,8 +49,15 @@ public class CrearRevisionHandler(
             throw new BusinessException("No se pueden reportar hallazgos en un elemento cancelado o eliminado.");
         }
 
+        var comentarios = sanitizador.Sanitizar(command.Datos.Comentarios);
+        var textoSinEtiquetas = Regex.Replace(comentarios, "<[^>]*>", string.Empty).Trim();
+        if (textoSinEtiquetas.Length == 0 && !comentarios.Contains("<img", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new BusinessException("El hallazgo quedo vacio despues de limpiar el formato.");
+        }
+
         var idRevision = await repositorio.CrearAsync(
-            new RevisionNueva(command.IdWorkItem, usuario.IdUsuario, command.Datos.Comentarios.Trim()),
+            new RevisionNueva(command.IdWorkItem, usuario.IdUsuario, comentarios),
             cancellationToken);
 
         // RN-QA-03: un hallazgo sobre trabajo ya cerrado lo regresa a Correccion

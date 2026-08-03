@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace GTE.Infrastructure.Modelos.bdsGTE;
@@ -23,9 +23,9 @@ public partial class TblRefreshToken
 
     public string UsuarioRegistro { get; set; } = null!;
 
-    public virtual TblUsuario IdUsuarioNavigation { get; set; } = null!;
-
     public virtual TblRefreshToken? IdReemplazadoPorNavigation { get; set; }
+
+    public virtual TblUsuario IdUsuarioNavigation { get; set; } = null!;
 
     public virtual ICollection<TblRefreshToken> InverseIdReemplazadoPorNavigation { get; set; } = new List<TblRefreshToken>();
 }

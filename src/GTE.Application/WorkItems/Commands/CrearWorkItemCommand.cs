@@ -28,11 +28,13 @@ public class CrearWorkItemHandler(
     IWorkItemRepository repositorio,
     IWorkItemQueryService consultas,
     IGeneradorFolios folios,
-    IVerificadorPermisos permisos) : IRequestHandler<CrearWorkItemCommand, WorkItemResponse>
+    IVerificadorPermisos permisos,
+    ISanitizadorHtml sanitizador) : IRequestHandler<CrearWorkItemCommand, WorkItemResponse>
 {
     public async Task<WorkItemResponse> Handle(CrearWorkItemCommand command, CancellationToken cancellationToken)
     {
         var datos = command.Datos;
+        var descripcion = string.IsNullOrWhiteSpace(datos.Descripcion) ? null : sanitizador.Sanitizar(datos.Descripcion);
 
         var proyecto = await repositorio.ObtenerProyectoAsync(datos.IdProyecto, cancellationToken)
             ?? throw new NotFoundException("Proyecto", datos.IdProyecto);
@@ -57,7 +59,7 @@ public class CrearWorkItemHandler(
         // El estatus inicial lo fija el backend (Pendiente); el repositorio siembra el historial
         var idWorkItem = await repositorio.CrearAsync(new WorkItemNuevo(
             folio, datos.IdTipoWorkItem, datos.IdPadre, datos.IdProyecto, datos.IdSolicitud,
-            datos.Titulo.Trim(), datos.Descripcion, datos.CriteriosAceptacion, datos.IdPrioridad,
+            datos.Titulo.Trim(), descripcion, datos.CriteriosAceptacion, datos.IdPrioridad,
             datos.IdComplejidad, datos.IdAsignado, datos.IdSolicitante, datos.PuntosHistoria,
             minutosPresupuesto, datos.FechaCompromiso), cancellationToken);
 
