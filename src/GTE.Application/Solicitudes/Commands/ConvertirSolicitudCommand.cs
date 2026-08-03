@@ -37,7 +37,9 @@ public class ConvertirSolicitudValidator : AbstractValidator<ConvertirSolicitudC
 /// Responde el eco uiId -> Id/folio reales para rehidratar el front sin depender del orden.
 /// Notifica al solicitante igual que Aprobar/Rechazar/Devolver en
 /// CambiarEstatusSolicitudCommand (ahi no cubre Convertir a proposito, tiene su
-/// propio comando por el desglose de items).
+/// propio comando por el desglose de items); tambien notifica al usuario
+/// asignado de cada item del desglose que traiga IdAsignado (no todos lo
+/// traen -- el triage puede dejarlo sin asignar).
 /// </summary>
 public class ConvertirSolicitudHandler(
     ISolicitudRepository repositorio,
@@ -86,6 +88,13 @@ public class ConvertirSolicitudHandler(
                 IdWorkItem = creado.IdWorkItem,
                 Folio = creado.Folio
             });
+
+            if (item.IdAsignado.HasValue)
+            {
+                await notificaciones.NotificarAsync(
+                    [item.IdAsignado.Value], $"Se te asigno el elemento de trabajo {creado.Folio}",
+                    item.Titulo, "WorkItem", creado.IdWorkItem, $"/wi/{creado.Folio}", cancellationToken);
+            }
         }
 
         await motor.EjecutarAccionAsync(
