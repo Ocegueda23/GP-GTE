@@ -18,9 +18,16 @@ import {
 
 interface FilaConversion extends ItemConversion {}
 
+/** crypto.randomUUID() exige contexto seguro (HTTPS o localhost); produccion
+ * corre en HTTP plano, asi que se usa un id simple -- el uiId es solo
+ * correlacion cliente-servidor de esta pantalla, no necesita ser criptografico. */
+function generarUiId(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
 function nuevaFila(titulo = ""): FilaConversion {
   return {
-    uiId: crypto.randomUUID(),
+    uiId: generarUiId(),
     idTipoWorkItem: 3,   // Historia
     titulo,
     descripcion: null,
