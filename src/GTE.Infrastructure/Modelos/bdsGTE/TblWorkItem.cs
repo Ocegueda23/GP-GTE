@@ -33,6 +33,8 @@ public partial class TblWorkItem
 
     public int? IdSolicitante { get; set; }
 
+    public int? IdUsuarioSolicitante { get; set; }
+
     public int? IdSprint { get; set; }
 
     public int? IdRelease { get; set; }
@@ -90,6 +92,8 @@ public partial class TblWorkItem
     public virtual TblUsuario? IdSolicitanteNavigation { get; set; }
 
     public virtual TblSolicitud? IdSolicitudNavigation { get; set; }
+
+    public virtual TblUsuarioSolicitante? IdUsuarioSolicitanteNavigation { get; set; }
 
     public virtual TblSprint? IdSprintNavigation { get; set; }
 

@@ -25,6 +25,7 @@ public class SolicitudRepository(FabricaContexto fabrica, AuditContext auditoria
             IdEstatusSolicitud = EstatusSolicitud.Borrador,   // el estatus inicial lo fija el backend
             FechaDeseada = datos.FechaDeseada.HasValue ? DateOnly.FromDateTime(datos.FechaDeseada.Value) : null,
             JustificacionNegocio = datos.JustificacionNegocio,
+            IdUsuarioSolicitante = datos.IdUsuarioSolicitante,
             UsuarioRegistro = Auditoria.Usuario,
             Activo = true
         };
@@ -52,7 +53,7 @@ public class SolicitudRepository(FabricaContexto fabrica, AuditContext auditoria
             .Where(s => s.IdSolicitud == idSolicitud)
             .Select(s => new EstadoSolicitud(
                 s.IdSolicitud, s.Folio, s.IdEstatusSolicitud, s.IdProyecto,
-                s.IdSolicitante, s.Titulo, s.Activo))
+                s.IdSolicitante, s.Titulo, s.Activo, s.IdUsuarioSolicitante))
             .FirstOrDefaultAsync(cancellationToken);
     }
 

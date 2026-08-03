@@ -11,6 +11,7 @@ public class SolicitudResponse
     public int IdEstatus { get; set; }
     public string Estatus { get; set; } = string.Empty;
     public string Solicitante { get; set; } = string.Empty;
+    public string? UsuarioSolicitante { get; set; }
     public string? Proyecto { get; set; }
     public int? IdProyecto { get; set; }
     public DateTime? FechaDeseada { get; set; }

@@ -17,6 +17,7 @@ export interface Solicitud {
   idEstatus: number;
   estatus: string;
   solicitante: string;
+  usuarioSolicitante: string | null;
   proyecto: string | null;
   idProyecto: number | null;
   fechaDeseada: string | null;
@@ -33,6 +34,7 @@ export interface NuevaSolicitud {
   idPrioridad: number;
   fechaDeseada: string | null;
   justificacionNegocio: string | null;
+  idUsuarioSolicitante?: number | null;
 }
 
 export interface ItemConversion {

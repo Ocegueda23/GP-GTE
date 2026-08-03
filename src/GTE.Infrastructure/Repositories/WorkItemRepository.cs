@@ -29,6 +29,7 @@ public class WorkItemRepository(FabricaContexto fabrica, AuditContext auditoria)
             IdComplejidad = datos.IdComplejidad,
             IdAsignado = datos.IdAsignado,
             IdSolicitante = datos.IdSolicitante,
+            IdUsuarioSolicitante = datos.IdUsuarioSolicitante,
             PuntosHistoria = datos.PuntosHistoria,
             MinutosPresupuesto = datos.MinutosPresupuesto,
             FechaCompromiso = datos.FechaCompromiso,

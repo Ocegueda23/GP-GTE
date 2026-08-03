@@ -18,6 +18,10 @@ public class TicketResponse
     public DateTime? FechaLimiteResolucion { get; set; }
     public DateTime? FechaPrimeraRespuesta { get; set; }
     public DateTime? FechaResolucion { get; set; }
+    public string? Solucion { get; set; }
+    public int? MinutosSolucion { get; set; }
+    public string? UsuarioSolicitante { get; set; }
+    public string? Locacion { get; set; }
     public int? IdWorkItemDerivado { get; set; }
     public string? FolioWorkItemDerivado { get; set; }
     public DateTime FechaRegistro { get; set; }

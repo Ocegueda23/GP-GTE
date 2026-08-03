@@ -25,5 +25,8 @@ public class CatalogosBandejaResponse
     public IReadOnlyList<CatalogoItemResponse> Equipos { get; set; } = [];
     public IReadOnlyList<CatalogoItemResponse> Complejidades { get; set; } = [];
     public IReadOnlyList<CatalogoItemResponse> CategoriasTicket { get; set; } = [];
+    public IReadOnlyList<CatalogoItemResponse> EstatusTicket { get; set; } = [];
     public IReadOnlyList<CatalogoItemResponse> Severidades { get; set; } = [];
+    public IReadOnlyList<CatalogoItemResponse> UsuariosSolicitantes { get; set; } = [];
+    public IReadOnlyList<CatalogoItemResponse> Locaciones { get; set; } = [];
 }

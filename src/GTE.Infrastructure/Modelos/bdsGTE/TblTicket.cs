@@ -33,7 +33,15 @@ public partial class TblTicket
 
     public DateTime? FechaResolucion { get; set; }
 
+    public string? Solucion { get; set; }
+
+    public int? MinutosSolucion { get; set; }
+
     public int? IdWorkItemDerivado { get; set; }
+
+    public int? IdUsuarioSolicitante { get; set; }
+
+    public int? IdLocacion { get; set; }
 
     public DateTime FechaRegistro { get; set; }
 
@@ -58,6 +66,10 @@ public partial class TblTicket
     public virtual TblUsuario IdSolicitanteNavigation { get; set; } = null!;
 
     public virtual TblWorkItem? IdWorkItemDerivadoNavigation { get; set; }
+
+    public virtual TblUsuarioSolicitante? IdUsuarioSolicitanteNavigation { get; set; }
+
+    public virtual TblLocacion? IdLocacionNavigation { get; set; }
 
     public virtual TblEncuestaSatisfaccion? TblEncuestaSatisfaccion { get; set; }
 }

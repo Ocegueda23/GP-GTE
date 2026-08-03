@@ -1,17 +1,21 @@
+import type { ReactNode } from "react";
 import {
   Badge, Box, Chip, Link, Paper, Table, TableBody, TableCell, TableContainer,
-  TableHead, TablePagination, TableRow, Tooltip, Typography,
+  TableHead, TablePagination, TableRow, TableSortLabel, Tooltip, Typography,
 } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
 import RateReviewIcon from "@mui/icons-material/RateReview";
 import type { ResultadoPaginado } from "../../shared/api/http";
-import { formatearMinutos, type BandejaItem } from "../../shared/api/workitems";
+import {
+  formatearMinutos, type BandejaItem, type CatalogosBandeja, type FiltroBandeja,
+} from "../../shared/api/workitems";
 import { useFiltrosBandeja } from "./storeFiltros";
 import { MenuAcciones } from "./MenuAcciones";
 
 interface Props {
   datos: ResultadoPaginado<BandejaItem> | undefined;
   cargando: boolean;
+  catalogos: CatalogosBandeja | undefined;
   alExito: (mensaje: string) => void;
   alError: (mensaje: string) => void;
 }
@@ -41,25 +45,59 @@ function formatearFecha(iso: string | null): string {
   return fecha.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-export function TablaBandeja({ datos, cargando, alExito, alError }: Props) {
+/** Encabezado de columna ordenable: el orden real lo aplica el backend (la bandeja es paginada). */
+function EncabezadoOrdenable({
+  clave, filtro, alOrdenar, align, children,
+}: {
+  clave: string;
+  filtro: FiltroBandeja;
+  alOrdenar: (clave: string) => void;
+  align?: "right" | "center";
+  children: ReactNode;
+}) {
+  const activo = filtro.ordenarPor === clave;
+  const direccion = activo && filtro.ordenDescendente ? "desc" : "asc";
+  return (
+    <TableCell align={align} sortDirection={activo ? direccion : false}>
+      <TableSortLabel
+        active={activo}
+        direction={direccion}
+        onClick={() => alOrdenar(clave)}
+        sx={align === "right" ? { flexDirection: "row-reverse" } : undefined}
+      >
+        {children}
+      </TableSortLabel>
+    </TableCell>
+  );
+}
+
+export function TablaBandeja({ datos, cargando, catalogos, alExito, alError }: Props) {
   const { filtro, cambiarPagina, establecer } = useFiltrosBandeja();
 
+  const manejarOrden = (clave: string) => {
+    if (filtro.ordenarPor === clave) {
+      establecer({ ordenarPor: clave, ordenDescendente: !filtro.ordenDescendente });
+    } else {
+      establecer({ ordenarPor: clave, ordenDescendente: false });
+    }
+  };
+
   return (
-    <Paper variant="outlined">
-      <TableContainer sx={{ overflowX: "auto" }}>
-        <Table size="small" aria-label="Bandeja de trabajo">
+    <Paper variant="outlined" sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <TableContainer sx={{ flex: 1, minHeight: 0, overflow: "auto" }}>
+        <Table size="small" stickyHeader aria-label="Bandeja de trabajo">
           <TableHead>
             <TableRow sx={{ "& th": { fontWeight: 700, whiteSpace: "nowrap" } }}>
-              <TableCell>Folio</TableCell>
-              <TableCell>Tipo</TableCell>
-              <TableCell>Titulo</TableCell>
-              <TableCell>Proyecto</TableCell>
-              <TableCell>Asignado</TableCell>
-              <TableCell>Estatus</TableCell>
-              <TableCell>Prioridad</TableCell>
-              <TableCell>Compromiso</TableCell>
-              <TableCell align="right">Presupuesto</TableCell>
-              <TableCell align="right">Invertido</TableCell>
+              <EncabezadoOrdenable clave="folio" filtro={filtro} alOrdenar={manejarOrden}>Folio</EncabezadoOrdenable>
+              <EncabezadoOrdenable clave="tipo" filtro={filtro} alOrdenar={manejarOrden}>Tipo</EncabezadoOrdenable>
+              <EncabezadoOrdenable clave="titulo" filtro={filtro} alOrdenar={manejarOrden}>Titulo</EncabezadoOrdenable>
+              <EncabezadoOrdenable clave="proyecto" filtro={filtro} alOrdenar={manejarOrden}>Proyecto</EncabezadoOrdenable>
+              <EncabezadoOrdenable clave="asignado" filtro={filtro} alOrdenar={manejarOrden}>Asignado</EncabezadoOrdenable>
+              <EncabezadoOrdenable clave="estatus" filtro={filtro} alOrdenar={manejarOrden}>Estatus</EncabezadoOrdenable>
+              <EncabezadoOrdenable clave="prioridad" filtro={filtro} alOrdenar={manejarOrden}>Prioridad</EncabezadoOrdenable>
+              <EncabezadoOrdenable clave="compromiso" filtro={filtro} alOrdenar={manejarOrden}>Compromiso</EncabezadoOrdenable>
+              <EncabezadoOrdenable clave="presupuesto" filtro={filtro} alOrdenar={manejarOrden} align="right">Presupuesto</EncabezadoOrdenable>
+              <EncabezadoOrdenable clave="invertido" filtro={filtro} alOrdenar={manejarOrden} align="right">Invertido</EncabezadoOrdenable>
               <TableCell align="center">Rev.</TableCell>
               <TableCell align="center">Acciones</TableCell>
             </TableRow>
@@ -111,7 +149,7 @@ export function TablaBandeja({ datos, cargando, alExito, alError }: Props) {
                   )}
                 </TableCell>
                 <TableCell align="center">
-                  <MenuAcciones item={item} alExito={alExito} alError={alError} />
+                  <MenuAcciones item={item} catalogos={catalogos} alExito={alExito} alError={alError} />
                 </TableCell>
               </TableRow>
             ))}
@@ -120,6 +158,7 @@ export function TablaBandeja({ datos, cargando, alExito, alError }: Props) {
       </TableContainer>
       <TablePagination
         component="div"
+        sx={{ flexShrink: 0 }}
         count={datos?.totalItems ?? 0}
         page={(datos?.page ?? filtro.page) - 1}
         rowsPerPage={filtro.pageSize}

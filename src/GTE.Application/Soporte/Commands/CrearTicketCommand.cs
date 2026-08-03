@@ -25,13 +25,18 @@ public class CrearTicketValidator : AbstractValidator<CrearTicketCommand>
 /// Alta de ticket: estatus inicial Nuevo (lo fija el backend), folio de la serie
 /// TKT-anio, y fechas limite de SLA calculadas por prioridad con el calendario laboral
 /// del horario del SLA (si hay uno configurado para esa prioridad; si no, el ticket se
-/// crea sin fechas limite en vez de fallar el alta).
+/// crea sin fechas limite en vez de fallar el alta). Si quien registra el ticket ya
+/// tiene TKT.Atender (un ingeniero de soporte registrando su propio caso, no un usuario
+/// autoreportandose), se autoasigna de inmediato via el mismo grafo de ASIGNAR (el
+/// motor invoca la transicion, no se reimplementa el cambio de estatus a mano).
 /// </summary>
 public class CrearTicketHandler(
     ITicketRepository repositorio,
     ITicketQueryService consultas,
     IGeneradorFolios folios,
     ICalendarioLaboral calendario,
+    IMotorWorkflow motor,
+    IVerificadorPermisos permisos,
     IProveedorUsuarioActual proveedorUsuario) : IRequestHandler<CrearTicketCommand, TicketResponse>
 {
     public async Task<TicketResponse> Handle(CrearTicketCommand command, CancellationToken cancellationToken)
@@ -56,7 +61,16 @@ public class CrearTicketHandler(
         var idTicket = await repositorio.CrearAsync(new TicketNuevo(
             folio, usuario.IdUsuario, command.Datos.Titulo.Trim(), command.Datos.Descripcion,
             command.Datos.IdCategoriaTicket, command.Datos.IdPrioridad, sla?.IdSla,
-            fechaLimiteRespuesta, fechaLimiteResolucion), cancellationToken);
+            fechaLimiteRespuesta, fechaLimiteResolucion,
+            command.Datos.IdUsuarioSolicitante, command.Datos.IdLocacion), cancellationToken);
+
+        if (await permisos.TienePermisoAsync(PermisosTicket.Atender, null, cancellationToken))
+        {
+            await repositorio.AsignarAsync(idTicket, usuario.IdUsuario, cancellationToken);
+            await motor.EjecutarAccionAsync("Ticket", idTicket, AccionesTicket.Asignar, null, null, cancellationToken);
+            await repositorio.AplicarEfectosTransicionAsync(
+                idTicket, AccionesTicket.Asignar, cancellationToken: cancellationToken);
+        }
 
         return await consultas.ObtenerPorIdAsync(idTicket, cancellationToken)
             ?? throw new NotFoundException("Ticket", idTicket);

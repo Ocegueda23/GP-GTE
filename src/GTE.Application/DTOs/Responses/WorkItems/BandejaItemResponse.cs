@@ -7,11 +7,13 @@ public class BandejaItemResponse
     public string Folio { get; set; } = string.Empty;
     public string Tipo { get; set; } = string.Empty;
     public string Titulo { get; set; } = string.Empty;
+    public int IdProyecto { get; set; }
     public string ClaveProyecto { get; set; } = string.Empty;
     public string Proyecto { get; set; } = string.Empty;
     public int IdEstatus { get; set; }
     public string Estatus { get; set; } = string.Empty;
     public string Prioridad { get; set; } = string.Empty;
+    public int? IdAsignado { get; set; }
     public string? Asignado { get; set; }
     public DateTime? FechaCompromiso { get; set; }
     public bool EsVencida { get; set; }

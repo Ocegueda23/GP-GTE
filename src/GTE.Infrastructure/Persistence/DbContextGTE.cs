@@ -112,6 +112,8 @@ public partial class DbContextGTE : DbContext
 
     public virtual DbSet<TblKpiValor> TblKpiValor { get; set; }
 
+    public virtual DbSet<TblLocacion> TblLocacion { get; set; }
+
     public virtual DbSet<TblMatrizPresupuesto> TblMatrizPresupuesto { get; set; }
 
     public virtual DbSet<TblNivel> TblNivel { get; set; }
@@ -203,6 +205,8 @@ public partial class DbContextGTE : DbContext
     public virtual DbSet<TblUsuario> TblUsuario { get; set; }
 
     public virtual DbSet<TblUsuarioRol> TblUsuarioRol { get; set; }
+
+    public virtual DbSet<TblUsuarioSolicitante> TblUsuarioSolicitante { get; set; }
 
     public virtual DbSet<TblVersionSistema> TblVersionSistema { get; set; }
 
@@ -1167,6 +1171,20 @@ public partial class DbContextGTE : DbContext
                 .HasConstraintName("FK_tblKpiValor_tblKpiDefinicion");
         });
 
+        modelBuilder.Entity<TblLocacion>(entity =>
+        {
+            entity.HasKey(e => e.IdLocacion);
+
+            entity.ToTable("tblLocacion");
+
+            entity.Property(e => e.Descripcion).HasMaxLength(150);
+            entity.Property(e => e.FechaMovto).HasColumnType("datetime");
+            entity.Property(e => e.FechaRegistro).HasDefaultValueSql("(sysdatetime())");
+            entity.Property(e => e.Locacion).HasMaxLength(50);
+            entity.Property(e => e.UsuarioMovto).HasMaxLength(50);
+            entity.Property(e => e.UsuarioRegistro).HasMaxLength(200);
+        });
+
         modelBuilder.Entity<TblMatrizPresupuesto>(entity =>
         {
             entity.HasKey(e => e.IdMatrizPresupuesto);
@@ -1901,6 +1919,10 @@ public partial class DbContextGTE : DbContext
                 .HasForeignKey(d => d.IdTipoSolicitud)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_tblSolicitud_tblTipoSolicitud");
+
+            entity.HasOne(d => d.IdUsuarioSolicitanteNavigation).WithMany(p => p.TblSolicitud)
+                .HasForeignKey(d => d.IdUsuarioSolicitante)
+                .HasConstraintName("FK_tblSolicitud_tblUsuarioSolicitanteCatalogo");
         });
 
         modelBuilder.Entity<TblSprint>(entity =>
@@ -2046,6 +2068,14 @@ public partial class DbContextGTE : DbContext
             entity.HasOne(d => d.IdWorkItemDerivadoNavigation).WithMany(p => p.TblTicket)
                 .HasForeignKey(d => d.IdWorkItemDerivado)
                 .HasConstraintName("FK_tblTicket_tblWorkItem");
+
+            entity.HasOne(d => d.IdUsuarioSolicitanteNavigation).WithMany(p => p.TblTicket)
+                .HasForeignKey(d => d.IdUsuarioSolicitante)
+                .HasConstraintName("FK_tblTicket_tblUsuarioSolicitanteCatalogo");
+
+            entity.HasOne(d => d.IdLocacionNavigation).WithMany(p => p.TblTicket)
+                .HasForeignKey(d => d.IdLocacion)
+                .HasConstraintName("FK_tblTicket_tblLocacion");
         });
 
         modelBuilder.Entity<TblTipoArtefacto>(entity =>
@@ -2251,6 +2281,22 @@ public partial class DbContextGTE : DbContext
                 .HasConstraintName("FK_tblUsuarioRol_tblUsuario");
         });
 
+        modelBuilder.Entity<TblUsuarioSolicitante>(entity =>
+        {
+            entity.HasKey(e => e.IdUsuarioSolicitante);
+
+            entity.ToTable("tblUsuarioSolicitante");
+
+            entity.Property(e => e.Activo).HasDefaultValue(true);
+            entity.Property(e => e.Correo).HasMaxLength(150);
+            entity.Property(e => e.FechaMovto).HasColumnType("datetime");
+            entity.Property(e => e.FechaRegistro).HasDefaultValueSql("(sysdatetime())");
+            entity.Property(e => e.Nombre).HasMaxLength(500);
+            entity.Property(e => e.Usuario).HasMaxLength(50);
+            entity.Property(e => e.UsuarioMovto).HasMaxLength(50);
+            entity.Property(e => e.UsuarioRegistro).HasMaxLength(200);
+        });
+
         modelBuilder.Entity<TblVersionSistema>(entity =>
         {
             entity.HasKey(e => e.IdVersionSistema);
@@ -2352,6 +2398,10 @@ public partial class DbContextGTE : DbContext
                 .HasForeignKey(d => d.IdTipoWorkItem)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_tblWorkItem_tblTipoWorkItem");
+
+            entity.HasOne(d => d.IdUsuarioSolicitanteNavigation).WithMany(p => p.TblWorkItem)
+                .HasForeignKey(d => d.IdUsuarioSolicitante)
+                .HasConstraintName("FK_tblWorkItem_tblUsuarioSolicitanteCatalogo");
         });
 
         modelBuilder.Entity<TblWorkItemVinculo>(entity =>

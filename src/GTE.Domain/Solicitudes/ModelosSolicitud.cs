@@ -9,7 +9,8 @@ public record SolicitudNueva(
     int IdTipoSolicitud,
     int IdPrioridad,
     DateTime? FechaDeseada,
-    string? JustificacionNegocio);
+    string? JustificacionNegocio,
+    int? IdUsuarioSolicitante = null);
 
 /// <summary>Estado minimo de una solicitud para evaluar reglas.</summary>
 public record EstadoSolicitud(
@@ -19,4 +20,5 @@ public record EstadoSolicitud(
     int? IdProyecto,
     int IdSolicitante,
     string Titulo,
-    bool Activo);
+    bool Activo,
+    int? IdUsuarioSolicitante = null);

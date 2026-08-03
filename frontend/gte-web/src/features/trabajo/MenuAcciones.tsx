@@ -6,13 +6,15 @@ import {
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import { useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
+import { useSesion } from "../../shared/api/sesion";
 import {
-  cambiarEstatus, obtenerAcciones, type AccionDisponible, type BandejaItem,
+  cambiarEstatus, obtenerAcciones, type AccionDisponible, type BandejaItem, type CatalogosBandeja,
 } from "../../shared/api/workitems";
-import { ModalTiempo } from "./ModalTiempo";
+import { NuevoItemModal } from "./NuevoItemModal";
 
 interface Props {
   item: BandejaItem;
+  catalogos: CatalogosBandeja | undefined;
   alExito: (mensaje: string) => void;
   alError: (mensaje: string) => void;
 }
@@ -21,15 +23,21 @@ interface Props {
  * Acciones de la fila: se consultan al motor de workflow al abrir el menu,
  * de modo que solo se ofrecen transiciones validas para el usuario.
  */
-export function MenuAcciones({ item, alExito, alError }: Props) {
+export function MenuAcciones({ item, catalogos, alExito, alError }: Props) {
   const [ancla, setAncla] = useState<HTMLElement | null>(null);
   const [acciones, setAcciones] = useState<AccionDisponible[] | null>(null);
   const [cargando, setCargando] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [accionConMotivo, setAccionConMotivo] = useState<AccionDisponible | null>(null);
   const [motivo, setMotivo] = useState("");
-  const [modalTiempo, setModalTiempo] = useState(false);
+  const [modalSubtarea, setModalSubtarea] = useState(false);
   const clienteQuery = useQueryClient();
+  const sesion = useSesion((estado) => estado.sesion);
+  const puede = useSesion((estado) => estado.puede);
+
+  // RN-REQ-05: solo el propio asignado modifica un elemento; sin asignar tambien
+  // cuenta como ajeno (decision del equipo 2026-08-02). El backend revalida igual.
+  const esAjeno = item.idAsignado !== sesion?.idUsuario && !puede("WI.ModificarAjeno");
 
   const abrirMenu = async (evento: React.MouseEvent<HTMLElement>) => {
     setAncla(evento.currentTarget);
@@ -93,14 +101,16 @@ export function MenuAcciones({ item, alExito, alError }: Props) {
             {accion.etiqueta}
           </MenuItem>
         ))}
-        <MenuItem
-          onClick={() => {
-            cerrarMenu();
-            setModalTiempo(true);
-          }}
-        >
-          Registrar tiempo
-        </MenuItem>
+        {!esAjeno && (
+          <MenuItem
+            onClick={() => {
+              cerrarMenu();
+              setModalSubtarea(true);
+            }}
+          >
+            Registrar Subtarea
+          </MenuItem>
+        )}
       </Menu>
 
       <Dialog open={accionConMotivo !== null} onClose={() => setAccionConMotivo(null)} fullWidth>
@@ -129,10 +139,11 @@ export function MenuAcciones({ item, alExito, alError }: Props) {
         </DialogActions>
       </Dialog>
 
-      <ModalTiempo
-        abierto={modalTiempo}
-        item={item}
-        alCerrar={() => setModalTiempo(false)}
+      <NuevoItemModal
+        abierto={modalSubtarea}
+        catalogos={catalogos}
+        padre={{ idWorkItem: item.idWorkItem, folio: item.folio, idProyecto: item.idProyecto }}
+        alCerrar={() => setModalSubtarea(false)}
         alExito={alExito}
         alError={alError}
       />

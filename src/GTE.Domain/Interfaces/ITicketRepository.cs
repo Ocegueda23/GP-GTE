@@ -19,9 +19,11 @@ public interface ITicketRepository
     /// <summary>
     /// Auditoria de movimiento + bitacora tras una transicion exitosa, mas los efectos
     /// propios de la accion: FechaPrimeraRespuesta en INICIAR_ATENCION (solo si aun es
-    /// null), FechaResolucion en RESOLVER, y se limpia en REABRIR.
+    /// null), FechaResolucion/Solucion/MinutosSolucion en RESOLVER, y se limpia en REABRIR.
     /// </summary>
-    Task AplicarEfectosTransicionAsync(int idTicket, string accion, CancellationToken cancellationToken = default);
+    Task AplicarEfectosTransicionAsync(
+        int idTicket, string accion, string? solucion = null, int? minutosSolucion = null,
+        CancellationToken cancellationToken = default);
 
     /// <summary>Vincula el WorkItem creado al escalar. El ticket no cambia de estatus.</summary>
     Task EscalarAsync(int idTicket, int idWorkItem, CancellationToken cancellationToken = default);

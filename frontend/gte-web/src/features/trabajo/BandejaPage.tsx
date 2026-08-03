@@ -32,8 +32,10 @@ export function BandejaPage() {
   });
 
   return (
-    <Box sx={{ p: 2 }}>
-      <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+    <Box sx={{
+      p: 2, height: "calc(100vh - 48px)", display: "flex", flexDirection: "column", overflow: "hidden",
+    }}>
+      <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", mb: 2, flexShrink: 0 }}>
         <Typography variant="h5" sx={{ fontWeight: 700 }}>
           Bandeja de trabajo
         </Typography>
@@ -42,20 +44,25 @@ export function BandejaPage() {
         </Button>
       </Stack>
 
-      <BarraFiltros catalogos={catalogos.data} />
+      <Box sx={{ flexShrink: 0 }}>
+        <BarraFiltros catalogos={catalogos.data} />
+      </Box>
 
       {bandeja.isError && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <Alert severity="error" sx={{ mb: 2, flexShrink: 0 }}>
           No se pudo consultar la bandeja: {(bandeja.error as Error).message}
         </Alert>
       )}
 
-      <TablaBandeja
-        datos={bandeja.data}
-        cargando={bandeja.isLoading}
-        alExito={(mensaje) => setAviso({ tipo: "success", mensaje })}
-        alError={(mensaje) => setAviso({ tipo: "error", mensaje })}
-      />
+      <Box sx={{ flex: 1, minHeight: 0 }}>
+        <TablaBandeja
+          datos={bandeja.data}
+          cargando={bandeja.isLoading}
+          catalogos={catalogos.data}
+          alExito={(mensaje) => setAviso({ tipo: "success", mensaje })}
+          alError={(mensaje) => setAviso({ tipo: "error", mensaje })}
+        />
+      </Box>
 
       <NuevoItemModal
         abierto={modalNuevo}

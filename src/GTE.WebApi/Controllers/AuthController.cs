@@ -110,7 +110,10 @@ public class AuthController(
     {
         var refreshCrudo = Request.Cookies[CookieRefresh];
         await mediator.Send(new CerrarSesionCommand(refreshCrudo), cancellationToken);
-        Response.Cookies.Delete(CookieRefresh);
+        // El Path debe calzar con el de EstablecerCookieRefresh: un Delete con Path
+        // distinto (el default es "/") no sobrescribe la cookie real y el navegador
+        // la sigue mandando aunque ya este revocada en bdsGTE.
+        Response.Cookies.Delete(CookieRefresh, new CookieOptions { Path = "/api/v1/auth" });
         return Ok(ApiResponse<object>.Exito(new { }, "Sesion cerrada."));
     }
 
@@ -169,13 +172,24 @@ public class AuthController(
         }, $"Sesion de desarrollo iniciada como {sesion.Nombre}."));
     }
 
+    /// <summary>
+    /// Secure debe reflejar la conexion real (Request.IsHttps): un valor fijo en true
+    /// hace que el navegador descarte la cookie por completo sobre HTTP -- ni desarrollo
+    /// (localhost sin TLS) ni el despliegue real (Kestrel plano, sin IIS/reverse proxy,
+    /// ver Doctos/MANUAL_INSTALACION_GTE.md) sirven la API por HTTPS hoy, asi que el
+    /// refresh nunca se guardaba y la sesion "expiraba" a los 15 minutos del access
+    /// token en vez de durar las 8 horas del refresh token. SameSite=Lax alcanza: el
+    /// SPA y la API comparten site (localhost, o el mismo proceso en produccion), Lax
+    /// solo restringe navegaciones cross-site de nivel superior, no el fetch/XHR propio
+    /// de esta API.
+    /// </summary>
     private void EstablecerCookieRefresh(string tokenCrudo, DateTime expira)
     {
         Response.Cookies.Append(CookieRefresh, tokenCrudo, new CookieOptions
         {
             HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.None,
+            Secure = Request.IsHttps,
+            SameSite = SameSiteMode.Lax,
             Expires = expira,
             Path = "/api/v1/auth"
         });

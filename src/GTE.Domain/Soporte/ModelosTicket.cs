@@ -10,7 +10,9 @@ public record TicketNuevo(
     int IdPrioridad,
     int? IdSla,
     DateTime? FechaLimiteRespuesta,
-    DateTime? FechaLimiteResolucion);
+    DateTime? FechaLimiteResolucion,
+    int? IdUsuarioSolicitante = null,
+    int? IdLocacion = null);
 
 /// <summary>Estado minimo de un ticket para evaluar reglas.</summary>
 public record EstadoTicket(

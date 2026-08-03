@@ -16,7 +16,8 @@ public record WorkItemNuevo(
     int? IdSolicitante,
     decimal? PuntosHistoria,
     int? MinutosPresupuesto,
-    DateTime? FechaCompromiso);
+    DateTime? FechaCompromiso,
+    int? IdUsuarioSolicitante = null);
 
 /// <summary>
 /// Datos editables de un elemento de trabajo. ActualizarPresupuesto distingue

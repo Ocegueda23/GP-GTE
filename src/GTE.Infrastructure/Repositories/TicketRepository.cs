@@ -26,6 +26,8 @@ public class TicketRepository(FabricaContexto fabrica, AuditContext auditoria)
             IdSla = datos.IdSla,
             FechaLimiteRespuesta = datos.FechaLimiteRespuesta,
             FechaLimiteResolucion = datos.FechaLimiteResolucion,
+            IdUsuarioSolicitante = datos.IdUsuarioSolicitante,
+            IdLocacion = datos.IdLocacion,
             UsuarioRegistro = Auditoria.Usuario,
             Activo = true
         };
@@ -77,7 +79,9 @@ public class TicketRepository(FabricaContexto fabrica, AuditContext auditoria)
         await contexto.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task AplicarEfectosTransicionAsync(int idTicket, string accion, CancellationToken cancellationToken = default)
+    public async Task AplicarEfectosTransicionAsync(
+        int idTicket, string accion, string? solucion = null, int? minutosSolucion = null,
+        CancellationToken cancellationToken = default)
     {
         await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
         var entidad = await contexto.TblTicket
@@ -91,6 +95,8 @@ public class TicketRepository(FabricaContexto fabrica, AuditContext auditoria)
         else if (accion == AccionesTicket.Resolver)
         {
             entidad.FechaResolucion = DateTime.Now;
+            entidad.Solucion = solucion;
+            entidad.MinutosSolucion = minutosSolucion;
         }
         else if (accion == AccionesTicket.Reabrir)
         {

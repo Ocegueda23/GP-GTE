@@ -66,10 +66,47 @@ public class WorkItemQueryService(FabricaContexto fabrica) : IWorkItemQueryServi
         var page = Math.Max(1, filtro.Page);
         var pageSize = Math.Clamp(filtro.PageSize, 1, 200);
 
-        var items = await consulta
-            .OrderBy(x => x.v.FechaCompromiso == null)
-            .ThenBy(x => x.v.FechaCompromiso)
-            .ThenByDescending(x => x.v.IdWorkItem)
+        // Default (sin ordenarPor): mismo criterio historico -- compromiso mas proximo primero
+        // (nulos al final), empate por lo mas reciente creado.
+        var ordenada = filtro.OrdenarPor switch
+        {
+            "folio" => filtro.OrdenDescendente
+                ? consulta.OrderByDescending(x => x.v.Folio)
+                : consulta.OrderBy(x => x.v.Folio),
+            "tipo" => filtro.OrdenDescendente
+                ? consulta.OrderByDescending(x => x.v.Tipo)
+                : consulta.OrderBy(x => x.v.Tipo),
+            "titulo" => filtro.OrdenDescendente
+                ? consulta.OrderByDescending(x => x.v.Titulo)
+                : consulta.OrderBy(x => x.v.Titulo),
+            "proyecto" => filtro.OrdenDescendente
+                ? consulta.OrderByDescending(x => x.v.ClaveProyecto)
+                : consulta.OrderBy(x => x.v.ClaveProyecto),
+            "asignado" => filtro.OrdenDescendente
+                ? consulta.OrderBy(x => x.v.Asignado == null).ThenByDescending(x => x.v.Asignado)
+                : consulta.OrderBy(x => x.v.Asignado == null).ThenBy(x => x.v.Asignado),
+            "estatus" => filtro.OrdenDescendente
+                ? consulta.OrderByDescending(x => x.v.IdEstatusWorkItem)
+                : consulta.OrderBy(x => x.v.IdEstatusWorkItem),
+            "prioridad" => filtro.OrdenDescendente
+                ? consulta.OrderByDescending(x => x.v.IdPrioridad)
+                : consulta.OrderBy(x => x.v.IdPrioridad),
+            "presupuesto" => filtro.OrdenDescendente
+                ? consulta.OrderBy(x => x.v.MinutosPresupuesto == null).ThenByDescending(x => x.v.MinutosPresupuesto)
+                : consulta.OrderBy(x => x.v.MinutosPresupuesto == null).ThenBy(x => x.v.MinutosPresupuesto),
+            "invertido" => filtro.OrdenDescendente
+                ? consulta.OrderBy(x => x.v.MinutosInvertidos == null).ThenByDescending(x => x.v.MinutosInvertidos)
+                : consulta.OrderBy(x => x.v.MinutosInvertidos == null).ThenBy(x => x.v.MinutosInvertidos),
+            "compromiso" => filtro.OrdenDescendente
+                ? consulta.OrderBy(x => x.v.FechaCompromiso == null).ThenByDescending(x => x.v.FechaCompromiso)
+                : consulta.OrderBy(x => x.v.FechaCompromiso == null).ThenBy(x => x.v.FechaCompromiso),
+            _ => consulta
+                .OrderBy(x => x.v.FechaCompromiso == null)
+                .ThenBy(x => x.v.FechaCompromiso)
+                .ThenByDescending(x => x.v.IdWorkItem)
+        };
+
+        var items = await ordenada
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(x => new BandejaItemResponse
@@ -78,11 +115,13 @@ public class WorkItemQueryService(FabricaContexto fabrica) : IWorkItemQueryServi
                 Folio = x.v.Folio,
                 Tipo = x.v.Tipo,
                 Titulo = x.v.Titulo,
+                IdProyecto = x.w.IdProyecto,
                 ClaveProyecto = x.v.ClaveProyecto,
                 Proyecto = x.v.Proyecto,
                 IdEstatus = x.v.IdEstatusWorkItem,
                 Estatus = x.v.Estatus,
                 Prioridad = x.v.Prioridad,
+                IdAsignado = x.v.IdAsignado,
                 Asignado = x.v.Asignado,
                 FechaCompromiso = x.v.FechaCompromiso,
                 EsVencida = x.v.EsVencida == true,
@@ -160,6 +199,8 @@ public class WorkItemQueryService(FabricaContexto fabrica) : IWorkItemQueryServi
     {
         return from v in contexto.VwBandejaTrabajo.AsNoTracking()
                join w in contexto.TblWorkItem.AsNoTracking() on v.IdWorkItem equals w.IdWorkItem
+               join us in contexto.TblUsuarioSolicitante.AsNoTracking() on w.IdUsuarioSolicitante equals us.IdUsuarioSolicitante into solicitantesExternos
+               from us in solicitantesExternos.DefaultIfEmpty()
                select new WorkItemResponse
                {
                    IdWorkItem = v.IdWorkItem,
@@ -180,6 +221,7 @@ public class WorkItemQueryService(FabricaContexto fabrica) : IWorkItemQueryServi
                    IdAsignado = v.IdAsignado,
                    Asignado = v.Asignado,
                    Solicitante = v.Solicitante,
+                   UsuarioSolicitante = us != null ? (us.Nombre ?? us.Usuario) : null,
                    IdSprint = v.IdSprint,
                    Sprint = v.Sprint,
                    PuntosHistoria = v.PuntosHistoria,

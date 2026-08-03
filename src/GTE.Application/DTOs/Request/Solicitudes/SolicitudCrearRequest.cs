@@ -8,6 +8,10 @@ public class SolicitudCrearRequest
     public int IdPrioridad { get; set; }
     public DateTime? FechaDeseada { get; set; }
     public string? JustificacionNegocio { get; set; }
+    /// <summary>Quien pide el trabajo en realidad (catalogo tblUsuarioSolicitante, no
+    /// necesariamente con cuenta de GTE); opcional, para cuando quien registra la
+    /// solicitud lo hace a nombre de otra persona.</summary>
+    public int? IdUsuarioSolicitante { get; set; }
 }
 
 /// <summary>El frontend manda la ACCION; APROBAR ademas exige el proyecto destino.</summary>

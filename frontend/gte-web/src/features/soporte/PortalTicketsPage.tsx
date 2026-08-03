@@ -9,6 +9,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link as RouterLink } from "react-router-dom";
 import { ErrorApi } from "../../shared/api/http";
 import { obtenerCatalogosBandeja } from "../../shared/api/workitems";
+import { useSesion } from "../../shared/api/sesion";
 import {
   colorEstatusTicket, crearTicket, obtenerMisTickets, registrarEncuestaTicket, type Ticket,
 } from "../../shared/api/tickets";
@@ -29,8 +30,12 @@ export function PortalTicketsPage() {
   const [descripcion, setDescripcion] = useState("");
   const [idCategoria, setIdCategoria] = useState<number | "">("");
   const [idPrioridad, setIdPrioridad] = useState<number | "">("");
+  const [idUsuarioSolicitante, setIdUsuarioSolicitante] = useState<number | "">("");
+  const [idLocacion, setIdLocacion] = useState<number | "">("");
   const [enviando, setEnviando] = useState(false);
   const clienteQuery = useQueryClient();
+  const puede = useSesion((estado) => estado.puede);
+  const esIngeniero = puede("TKT.Atender");
 
   const catalogos = useQuery({
     queryKey: ["catalogos-bandeja"],
@@ -50,6 +55,8 @@ export function PortalTicketsPage() {
         descripcion: descripcion.trim() || null,
         idCategoriaTicket: idCategoria === "" ? null : (idCategoria as number),
         idPrioridad: idPrioridad as number,
+        idUsuarioSolicitante: idUsuarioSolicitante === "" ? null : (idUsuarioSolicitante as number),
+        idLocacion: idLocacion === "" ? null : (idLocacion as number),
       });
       setAviso({ tipo: "success", mensaje });
       setModal(false);
@@ -57,6 +64,8 @@ export function PortalTicketsPage() {
       setDescripcion("");
       setIdCategoria("");
       setIdPrioridad("");
+      setIdUsuarioSolicitante("");
+      setIdLocacion("");
       await clienteQuery.invalidateQueries({ queryKey: ["mis-tickets"] });
     } catch (error) {
       setAviso({
@@ -146,6 +155,30 @@ export function PortalTicketsPage() {
           </FormControl>
           <TextField size="small" label="Descripcion" multiline minRows={3}
             value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
+          {esIngeniero && (
+            <>
+              <FormControl size="small">
+                <InputLabel>Usuario solicitante</InputLabel>
+                <Select label="Usuario solicitante" value={idUsuarioSolicitante}
+                  onChange={(e) => setIdUsuarioSolicitante(e.target.value as number | "")}>
+                  <MenuItem value="">Sin especificar</MenuItem>
+                  {catalogos.data?.usuariosSolicitantes.map((u) => (
+                    <MenuItem key={u.id} value={u.id}>{u.nombre}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <FormControl size="small">
+                <InputLabel>Locacion</InputLabel>
+                <Select label="Locacion" value={idLocacion}
+                  onChange={(e) => setIdLocacion(e.target.value as number | "")}>
+                  <MenuItem value="">Sin especificar</MenuItem>
+                  {catalogos.data?.locaciones.map((l) => (
+                    <MenuItem key={l.id} value={l.id}>{l.nombre}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setModal(false)}>Cancelar</Button>

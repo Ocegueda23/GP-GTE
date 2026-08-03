@@ -27,6 +27,8 @@ public partial class TblSolicitud
 
     public string? JustificacionNegocio { get; set; }
 
+    public int? IdUsuarioSolicitante { get; set; }
+
     public DateTime FechaRegistro { get; set; }
 
     public string UsuarioRegistro { get; set; } = null!;
@@ -46,6 +48,8 @@ public partial class TblSolicitud
     public virtual TblUsuario IdSolicitanteNavigation { get; set; } = null!;
 
     public virtual TblTipoSolicitud IdTipoSolicitudNavigation { get; set; } = null!;
+
+    public virtual TblUsuarioSolicitante? IdUsuarioSolicitanteNavigation { get; set; }
 
     public virtual ICollection<TblWorkItem> TblWorkItem { get; set; } = new List<TblWorkItem>();
 }

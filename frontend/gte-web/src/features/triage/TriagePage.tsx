@@ -95,7 +95,13 @@ export function TriagePage() {
                       <Typography noWrap variant="body2">{s.titulo}</Typography>
                     </Tooltip>
                   </TableCell>
-                  <TableCell sx={{ whiteSpace: "nowrap" }}>{s.solicitante}</TableCell>
+                  <TableCell sx={{ whiteSpace: "nowrap" }}>
+                    {s.usuarioSolicitante ? (
+                      <Tooltip title={`A nombre de: ${s.usuarioSolicitante}`}>
+                        <span>{s.solicitante}*</span>
+                      </Tooltip>
+                    ) : s.solicitante}
+                  </TableCell>
                   <TableCell>{s.tipo}</TableCell>
                   <TableCell>{s.prioridad}</TableCell>
                   <TableCell align="center">{s.diasEspera}</TableCell>

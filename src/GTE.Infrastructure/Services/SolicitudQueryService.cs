@@ -133,6 +133,8 @@ public class SolicitudQueryService(FabricaContexto fabrica) : ISolicitudQuerySer
                join u in contexto.TblUsuario.AsNoTracking() on s.IdSolicitante equals u.IdUsuario
                join pr in contexto.TblProyecto.AsNoTracking() on s.IdProyecto equals pr.IdProyecto into proyectos
                from pr in proyectos.DefaultIfEmpty()
+               join us in contexto.TblUsuarioSolicitante.AsNoTracking() on s.IdUsuarioSolicitante equals us.IdUsuarioSolicitante into solicitantesExternos
+               from us in solicitantesExternos.DefaultIfEmpty()
                where s.Activo
                select new SolicitudProyeccion
                {
@@ -145,6 +147,7 @@ public class SolicitudQueryService(FabricaContexto fabrica) : ISolicitudQuerySer
                    IdEstatus = s.IdEstatusSolicitud,
                    Estatus = e.Descripcion,
                    Solicitante = u.Nombre,
+                   UsuarioSolicitante = us != null ? (us.Nombre ?? us.Usuario) : null,
                    IdSolicitanteInterno = s.IdSolicitante,
                    Proyecto = pr != null ? pr.Nombre : null,
                    IdProyecto = s.IdProyecto,

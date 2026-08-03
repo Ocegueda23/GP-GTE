@@ -26,6 +26,7 @@ function formatearFecha(iso: string | null): string {
 /** P15 - Mesa de ayuda: bandeja de agentes (permiso TKT.Atender). */
 export function BandejaTicketsPage() {
   const [texto, setTexto] = useState("");
+  const [estatus, setEstatus] = useState<number[]>([-1]);
   const [aviso, setAviso] = useState<{ tipo: "success" | "error"; mensaje: string } | null>(null);
   const clienteQuery = useQueryClient();
 
@@ -35,8 +36,8 @@ export function BandejaTicketsPage() {
     staleTime: 5 * 60_000,
   });
   const bandeja = useQuery({
-    queryKey: ["bandeja-tickets", texto],
-    queryFn: () => obtenerBandejaTickets({ ...filtroBandejaTicketsInicial, texto }),
+    queryKey: ["bandeja-tickets", texto, estatus],
+    queryFn: () => obtenerBandejaTickets({ ...filtroBandejaTicketsInicial, texto, estatus }),
     placeholderData: (anterior) => anterior,
   });
 
@@ -46,8 +47,42 @@ export function BandejaTicketsPage() {
     <Box sx={{ p: 2 }}>
       <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>Mesa de ayuda</Typography>
 
-      <TextField size="small" label="Buscar folio, titulo o solicitante" value={texto}
-        onChange={(e) => setTexto(e.target.value)} sx={{ mb: 2, minWidth: 300 }} />
+      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5, mb: 2 }}>
+        <TextField size="small" label="Buscar folio, titulo o solicitante" value={texto}
+          onChange={(e) => setTexto(e.target.value)} sx={{ minWidth: 300 }} />
+
+        <FormControl size="small" sx={{ minWidth: 200 }}>
+          <InputLabel>Estatus</InputLabel>
+          <Select
+            multiple
+            label="Estatus"
+            value={estatus}
+            onChange={(e) => {
+              const valor = e.target.value as number[];
+              // -1 (Todos) es excluyente: elegirlo limpia cualquier otro estatus marcado
+              const eligioTodos = valor.includes(-1) && !estatus.includes(-1);
+              setEstatus(eligioTodos ? [-1] : valor.filter((v) => v !== -1));
+            }}
+            renderValue={(seleccion) =>
+              seleccion.includes(-1) ? (
+                <Chip size="small" label="Todos" />
+              ) : (
+                <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
+                  {seleccion.map((id) => (
+                    <Chip key={id} size="small"
+                      label={catalogos.data?.estatusTicket.find((c) => c.id === id)?.nombre ?? id} />
+                  ))}
+                </Box>
+              )
+            }
+          >
+            <MenuItem value={-1}>Todos</MenuItem>
+            {catalogos.data?.estatusTicket.map((c) => (
+              <MenuItem key={c.id} value={c.id}>{c.nombre}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Box>
 
       {bandeja.isError && (
         <Alert severity="error" sx={{ mb: 2 }}>{(bandeja.error as Error).message}</Alert>
@@ -74,7 +109,7 @@ export function BandejaTicketsPage() {
                 <TableRow>
                   <TableCell colSpan={9}>
                     <Typography color="text.secondary" sx={{ py: 4, textAlign: "center" }}>
-                      No hay tickets abiertos.
+                      No hay tickets con estos filtros.
                     </Typography>
                   </TableCell>
                 </TableRow>
@@ -148,6 +183,9 @@ function MenuAccionesTicket({ ticket, catalogos, alExito, alError }: PropsAccion
   const [motivo, setMotivo] = useState("");
   const [dialogoAsignar, setDialogoAsignar] = useState(false);
   const [idAsignado, setIdAsignado] = useState<number | "">("");
+  const [dialogoResolver, setDialogoResolver] = useState(false);
+  const [solucion, setSolucion] = useState("");
+  const [minutosSolucion, setMinutosSolucion] = useState<number | "">("");
   const [dialogoEscalar, setDialogoEscalar] = useState(false);
   const [idProyecto, setIdProyecto] = useState<number | "">("");
   const [idAsignadoEscalar, setIdAsignadoEscalar] = useState<number | "">("");
@@ -171,16 +209,21 @@ function MenuAccionesTicket({ ticket, catalogos, alExito, alError }: PropsAccion
     setAcciones(null);
   };
 
-  const ejecutar = async (accion: string, motivoCapturado?: string, asignado?: number) => {
+  const ejecutar = async (
+    accion: string, motivoCapturado?: string, asignado?: number,
+    solucionCapturada?: string, minutosCapturados?: number,
+  ) => {
     setEnviando(true);
     try {
       const { mensaje } = await cambiarEstatusTicket(ticket.idTicket, {
         accion, motivo: motivoCapturado, idAsignado: asignado,
+        solucion: solucionCapturada, minutosSolucion: minutosCapturados,
       });
       alExito(mensaje);
       setAccionConMotivo(null);
       setMotivo("");
       setDialogoAsignar(false);
+      setDialogoResolver(false);
     } catch (error) {
       alError(error instanceof ErrorApi ? error.message : "Error al ejecutar la accion.");
     } finally {
@@ -211,6 +254,10 @@ function MenuAccionesTicket({ ticket, catalogos, alExito, alError }: PropsAccion
     if (accion.accion === "ASIGNAR") {
       setIdAsignado("");
       setDialogoAsignar(true);
+    } else if (accion.accion === "RESOLVER") {
+      setSolucion("");
+      setMinutosSolucion("");
+      setDialogoResolver(true);
     } else if (accion.requiereMotivo) {
       setAccionConMotivo(accion);
     } else {
@@ -276,6 +323,26 @@ function MenuAccionesTicket({ ticket, catalogos, alExito, alError }: PropsAccion
           <Button variant="contained" disabled={enviando || idAsignado === ""}
             onClick={() => void ejecutar("ASIGNAR", undefined, idAsignado as number)}>
             Asignar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={dialogoResolver} onClose={() => setDialogoResolver(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Resolver {ticket.folio}</DialogTitle>
+        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
+          <TextField autoFocus fullWidth multiline minRows={3} label="Solucion (obligatorio)"
+            value={solucion} onChange={(e) => setSolucion(e.target.value)} />
+          <TextField size="small" type="number" label="Minutos invertidos (obligatorio)"
+            value={minutosSolucion}
+            onChange={(e) => setMinutosSolucion(e.target.value === "" ? "" : Number(e.target.value))}
+            slotProps={{ htmlInput: { min: 1 } }} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDialogoResolver(false)}>Cancelar</Button>
+          <Button variant="contained"
+            disabled={enviando || solucion.trim().length === 0 || minutosSolucion === "" || minutosSolucion <= 0}
+            onClick={() => void ejecutar("RESOLVER", undefined, undefined, solucion.trim(), minutosSolucion as number)}>
+            Resolver
           </Button>
         </DialogActions>
       </Dialog>

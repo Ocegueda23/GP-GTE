@@ -8,8 +8,9 @@ using MediatR;
 
 namespace GTE.Application.Soporte.Commands;
 
-public record CambiarEstatusTicketCommand(int IdTicket, string Accion, string? Motivo, int? IdAsignado)
-    : IRequest<TicketResponse>;
+public record CambiarEstatusTicketCommand(
+    int IdTicket, string Accion, string? Motivo, int? IdAsignado,
+    string? Solucion = null, int? MinutosSolucion = null) : IRequest<TicketResponse>;
 
 public class CambiarEstatusTicketValidator : AbstractValidator<CambiarEstatusTicketCommand>
 {
@@ -18,6 +19,7 @@ public class CambiarEstatusTicketValidator : AbstractValidator<CambiarEstatusTic
         RuleFor(c => c.IdTicket).GreaterThan(0);
         RuleFor(c => c.Accion).NotEmpty().WithMessage("La accion es obligatoria.").MaximumLength(50);
         RuleFor(c => c.Motivo).MaximumLength(500);
+        RuleFor(c => c.Solucion).MaximumLength(4000);
     }
 }
 
@@ -49,10 +51,19 @@ public class CambiarEstatusTicketHandler(
             }
             await repositorio.AsignarAsync(command.IdTicket, command.IdAsignado.Value, cancellationToken);
         }
+        else if (command.Accion == AccionesTicket.Resolver)
+        {
+            if (string.IsNullOrWhiteSpace(command.Solucion) || !command.MinutosSolucion.HasValue
+                || command.MinutosSolucion.Value <= 0)
+            {
+                throw new BusinessException("Resolver un ticket requiere capturar la solucion y el tiempo invertido.");
+            }
+        }
 
         await motor.EjecutarAccionAsync(
             "Ticket", command.IdTicket, command.Accion, command.Motivo, null, cancellationToken);
-        await repositorio.AplicarEfectosTransicionAsync(command.IdTicket, command.Accion, cancellationToken);
+        await repositorio.AplicarEfectosTransicionAsync(
+            command.IdTicket, command.Accion, command.Solucion, command.MinutosSolucion, cancellationToken);
 
         return await consultas.ObtenerPorIdAsync(command.IdTicket, cancellationToken)
             ?? throw new NotFoundException("Ticket", command.IdTicket);

@@ -67,13 +67,17 @@ public class TicketsController(IMediator mediator) : ControllerBase
         return Ok(ApiResponse<IReadOnlyList<AccionDisponibleResponse>>.Exito(resultado));
     }
 
-    /// <summary>ASIGNAR (con idAsignado), INICIAR_ATENCION, ESPERAR_USUARIO, REANUDAR, RESOLVER, CERRAR, REABRIR.</summary>
+    /// <summary>
+    /// ASIGNAR (con idAsignado), INICIAR_ATENCION, ESPERAR_USUARIO, REANUDAR,
+    /// RESOLVER (con solucion y minutosSolucion), CERRAR, REABRIR.
+    /// </summary>
     [HttpPut("{id:int}/estatus")]
     public async Task<ActionResult<ApiResponse<TicketResponse>>> CambiarEstatus(
         int id, [FromBody] CambiarEstatusTicketRequest request, CancellationToken cancellationToken)
     {
         var resultado = await mediator.Send(new CambiarEstatusTicketCommand(
-            id, request.Accion, request.Motivo, request.IdAsignado), cancellationToken);
+            id, request.Accion, request.Motivo, request.IdAsignado,
+            request.Solucion, request.MinutosSolucion), cancellationToken);
         return Ok(ApiResponse<TicketResponse>.Exito(resultado,
             $"El ticket paso a {resultado.Estatus}."));
     }

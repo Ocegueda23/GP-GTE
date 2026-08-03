@@ -59,10 +59,25 @@ public class CatalogosQueryService(FabricaContexto fabrica) : ICatalogosQuerySer
                 .OrderBy(c => c.Nombre)
                 .Select(c => new CatalogoItemResponse { Id = c.IdCategoriaTicket, Nombre = c.Nombre })
                 .ToListAsync(cancellationToken),
+            EstatusTicket = await contexto.TblEstatusTicket.AsNoTracking()
+                .Where(e => e.Activo)
+                .OrderBy(e => e.Orden)
+                .Select(e => new CatalogoItemResponse { Id = e.Id, Nombre = e.Descripcion })
+                .ToListAsync(cancellationToken),
             Severidades = await contexto.TblSeveridad.AsNoTracking()
                 .Where(s => s.Activo)
                 .OrderBy(s => s.Id)
                 .Select(s => new CatalogoItemResponse { Id = s.Id, Nombre = s.Nombre })
+                .ToListAsync(cancellationToken),
+            UsuariosSolicitantes = await contexto.TblUsuarioSolicitante.AsNoTracking()
+                .Where(u => u.Activo)
+                .OrderBy(u => u.Nombre)
+                .Select(u => new CatalogoItemResponse { Id = u.IdUsuarioSolicitante, Nombre = (u.Nombre ?? u.Usuario) ?? string.Empty })
+                .ToListAsync(cancellationToken),
+            Locaciones = await contexto.TblLocacion.AsNoTracking()
+                .Where(l => l.Activo == true)
+                .OrderBy(l => l.Locacion)
+                .Select(l => new CatalogoItemResponse { Id = l.IdLocacion, Nombre = (l.Locacion ?? l.Descripcion) ?? string.Empty })
                 .ToListAsync(cancellationToken)
         };
     }

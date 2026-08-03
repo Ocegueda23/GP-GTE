@@ -21,6 +21,7 @@ public class WorkItemResponse
     public int? IdAsignado { get; set; }
     public string? Asignado { get; set; }
     public string? Solicitante { get; set; }
+    public string? UsuarioSolicitante { get; set; }
     public int? IdSprint { get; set; }
     public string? Sprint { get; set; }
     public decimal? PuntosHistoria { get; set; }

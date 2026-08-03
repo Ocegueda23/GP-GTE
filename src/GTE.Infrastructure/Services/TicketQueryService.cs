@@ -108,6 +108,10 @@ public class TicketQueryService(FabricaContexto fabrica) : ITicketQueryService
                from wi in workitems.DefaultIfEmpty()
                join enc in contexto.TblEncuestaSatisfaccion.AsNoTracking() on t.IdTicket equals enc.IdTicket into encuestas
                from enc in encuestas.DefaultIfEmpty()
+               join us in contexto.TblUsuarioSolicitante.AsNoTracking() on t.IdUsuarioSolicitante equals us.IdUsuarioSolicitante into solicitantes
+               from us in solicitantes.DefaultIfEmpty()
+               join loc in contexto.TblLocacion.AsNoTracking() on t.IdLocacion equals loc.IdLocacion into locaciones
+               from loc in locaciones.DefaultIfEmpty()
                where t.Activo
                select new TicketProyeccion
                {
@@ -129,6 +133,10 @@ public class TicketQueryService(FabricaContexto fabrica) : ITicketQueryService
                    FechaLimiteResolucion = t.FechaLimiteResolucion,
                    FechaPrimeraRespuesta = t.FechaPrimeraRespuesta,
                    FechaResolucion = t.FechaResolucion,
+                   Solucion = t.Solucion,
+                   MinutosSolucion = t.MinutosSolucion,
+                   UsuarioSolicitante = us != null ? (us.Nombre ?? us.Usuario) : null,
+                   Locacion = loc != null ? loc.Locacion : null,
                    IdWorkItemDerivado = t.IdWorkItemDerivado,
                    FolioWorkItemDerivado = wi != null ? wi.Folio : null,
                    FechaRegistro = t.FechaRegistro,

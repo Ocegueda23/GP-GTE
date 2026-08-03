@@ -8,6 +8,7 @@ import AddIcon from "@mui/icons-material/Add";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
 import { obtenerCatalogosBandeja } from "../../shared/api/workitems";
+import { useSesion } from "../../shared/api/sesion";
 import {
   colorEstatusSolicitud, crearSolicitud, obtenerMisSolicitudes,
 } from "../../shared/api/solicitudes";
@@ -28,8 +29,11 @@ export function PortalPage() {
   const [idTipo, setIdTipo] = useState<number | "">("");
   const [idPrioridad, setIdPrioridad] = useState<number | "">("");
   const [fechaDeseada, setFechaDeseada] = useState("");
+  const [idUsuarioSolicitante, setIdUsuarioSolicitante] = useState<number | "">("");
   const [enviando, setEnviando] = useState(false);
   const clienteQuery = useQueryClient();
+  const puede = useSesion((estado) => estado.puede);
+  const puedeCapturarSolicitante = puede("SOL.Triage");
 
   const catalogos = useQuery({
     queryKey: ["catalogos-bandeja"],
@@ -51,6 +55,7 @@ export function PortalPage() {
         idPrioridad: idPrioridad as number,
         fechaDeseada: fechaDeseada || null,
         justificacionNegocio: justificacion.trim() || null,
+        idUsuarioSolicitante: idUsuarioSolicitante === "" ? null : (idUsuarioSolicitante as number),
       });
       setAviso({ tipo: "success", mensaje });
       setModal(false);
@@ -58,6 +63,7 @@ export function PortalPage() {
       setDescripcion("");
       setJustificacion("");
       setFechaDeseada("");
+      setIdUsuarioSolicitante("");
       await clienteQuery.invalidateQueries({ queryKey: ["mis-solicitudes"] });
     } catch (error) {
       setAviso({
@@ -166,6 +172,18 @@ export function PortalPage() {
           <TextField size="small" type="date" label="Fecha deseada" value={fechaDeseada}
             onChange={(e) => setFechaDeseada(e.target.value)}
             slotProps={{ inputLabel: { shrink: true } }} />
+          {puedeCapturarSolicitante && (
+            <FormControl size="small">
+              <InputLabel>Usuario solicitante</InputLabel>
+              <Select label="Usuario solicitante" value={idUsuarioSolicitante}
+                onChange={(e) => setIdUsuarioSolicitante(e.target.value as number | "")}>
+                <MenuItem value="">Sin especificar</MenuItem>
+                {catalogos.data?.usuariosSolicitantes.map((u) => (
+                  <MenuItem key={u.id} value={u.id}>{u.nombre}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setModal(false)}>Cancelar</Button>

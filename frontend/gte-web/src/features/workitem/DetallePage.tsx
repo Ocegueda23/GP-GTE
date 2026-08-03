@@ -235,6 +235,9 @@ export function DetallePage() {
           <Typography variant="subtitle2" sx={{ mb: 1 }}>Datos</Typography>
           <Campo etiqueta="Asignado" valor={item.asignado ?? "-"} />
           <Campo etiqueta="Solicitante" valor={item.solicitante ?? "-"} />
+          {item.usuarioSolicitante && (
+            <Campo etiqueta="Usuario solicitante" valor={item.usuarioSolicitante} />
+          )}
           <Campo etiqueta="Prioridad" valor={item.prioridad} />
           <Campo etiqueta="Sprint" valor={item.sprint ?? "-"} />
           <Campo etiqueta="Compromiso" valor={formatearFecha(item.fechaCompromiso)} resaltar={item.esVencida} />

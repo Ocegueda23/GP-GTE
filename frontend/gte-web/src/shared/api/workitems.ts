@@ -5,11 +5,13 @@ export interface BandejaItem {
   folio: string;
   tipo: string;
   titulo: string;
+  idProyecto: number;
   claveProyecto: string;
   proyecto: string;
   idEstatus: number;
   estatus: string;
   prioridad: string;
+  idAsignado: number | null;
   asignado: string | null;
   fechaCompromiso: string | null;
   esVencida: boolean;
@@ -47,7 +49,10 @@ export interface CatalogosBandeja {
   equipos: CatalogoItem[];
   complejidades: CatalogoItem[];
   categoriasTicket: CatalogoItem[];
+  estatusTicket: CatalogoItem[];
   severidades: CatalogoItem[];
+  usuariosSolicitantes: CatalogoItem[];
+  locaciones: CatalogoItem[];
 }
 
 export interface FiltroBandeja {
@@ -59,6 +64,8 @@ export interface FiltroBandeja {
   idTipo: number | null;
   texto: string;
   soloVencidas: boolean;
+  ordenarPor: string | null;
+  ordenDescendente: boolean;
 }
 
 export const filtroInicial: FiltroBandeja = {
@@ -70,6 +77,8 @@ export const filtroInicial: FiltroBandeja = {
   idTipo: null,
   texto: "",
   soloVencidas: false,
+  ordenarPor: null,
+  ordenDescendente: false,
 };
 
 export async function obtenerBandeja(filtro: FiltroBandeja) {
@@ -82,6 +91,8 @@ export async function obtenerBandeja(filtro: FiltroBandeja) {
   if (filtro.idTipo) params.set("idTipo", String(filtro.idTipo));
   if (filtro.texto.trim()) params.set("texto", filtro.texto.trim());
   if (filtro.soloVencidas) params.set("soloVencidas", "true");
+  if (filtro.ordenarPor) params.set("ordenarPor", filtro.ordenarPor);
+  if (filtro.ordenDescendente) params.set("ordenDescendente", "true");
   return obtener<ResultadoPaginado<BandejaItem>>("/api/v1/workitems", params);
 }
 
@@ -135,6 +146,7 @@ export interface WorkItemDetalle {
   idAsignado: number | null;
   asignado: string | null;
   solicitante: string | null;
+  usuarioSolicitante: string | null;
   sprint: string | null;
   puntosHistoria: number | null;
   minutosPresupuesto: number | null;

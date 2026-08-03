@@ -72,6 +72,7 @@ public class ConvertirSolicitudHandler(
                 IdAsignado = item.IdAsignado,
                 IdSolicitante = estado.IdSolicitante,
                 IdSolicitud = estado.IdSolicitud,
+                IdUsuarioSolicitante = estado.IdUsuarioSolicitante,
                 FechaCompromiso = item.FechaCompromiso
             }), cancellationToken);
 

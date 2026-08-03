@@ -132,6 +132,12 @@ export function DetalleTicketPage() {
         <Campo etiqueta="Categoria" valor={ticket.categoria ?? "-"} />
         <Campo etiqueta="Prioridad" valor={ticket.prioridad} />
         <Campo etiqueta="Solicitante" valor={ticket.solicitante} />
+        {ticket.usuarioSolicitante && (
+          <Campo etiqueta="Usuario solicitante" valor={ticket.usuarioSolicitante} />
+        )}
+        {ticket.locacion && (
+          <Campo etiqueta="Locacion" valor={ticket.locacion} />
+        )}
         <Campo etiqueta="Asignado" valor={ticket.asignado ?? "-"} />
         <Campo etiqueta="SLA" valor={ticket.sla ?? "-"} />
         <Campo etiqueta="Limite de primera respuesta" valor={formatearFecha(ticket.fechaLimiteRespuesta)}
@@ -143,6 +149,15 @@ export function DetalleTicketPage() {
             && new Date(ticket.fechaLimiteResolucion) < new Date()} />
         <Campo etiqueta="Resolucion" valor={formatearFecha(ticket.fechaResolucion)} />
         <Campo etiqueta="Registrado" valor={formatearFecha(ticket.fechaRegistro)} />
+        {ticket.minutosSolucion !== null && (
+          <Campo etiqueta="Tiempo de solucion" valor={`${ticket.minutosSolucion} min`} />
+        )}
+        {ticket.solucion && (
+          <Box sx={{ pt: 1 }}>
+            <Typography variant="body2" color="text.secondary">Solucion</Typography>
+            <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>{ticket.solucion}</Typography>
+          </Box>
+        )}
         {ticket.folioWorkItemDerivado && (
           <Box sx={{ display: "flex", justifyContent: "space-between", gap: 2, py: 0.5 }}>
             <Typography variant="body2" color="text.secondary">Escalado a</Typography>
@@ -189,17 +204,27 @@ function BotonesAccionesTicket({ idTicket, folio, acciones, alExito, alError }: 
   const [motivo, setMotivo] = useState("");
   const [dialogoAsignar, setDialogoAsignar] = useState(false);
   const [idAsignado, setIdAsignado] = useState<number | "">("");
+  const [dialogoResolver, setDialogoResolver] = useState(false);
+  const [solucion, setSolucion] = useState("");
+  const [minutosSolucion, setMinutosSolucion] = useState<number | "">("");
   const [enviando, setEnviando] = useState(false);
   const catalogos = useQuery({ queryKey: ["catalogos-bandeja"], queryFn: obtenerCatalogosBandeja, staleTime: 5 * 60_000 });
 
-  const ejecutar = async (accion: string, motivoCapturado?: string, asignado?: number) => {
+  const ejecutar = async (
+    accion: string, motivoCapturado?: string, asignado?: number,
+    solucionCapturada?: string, minutosCapturados?: number,
+  ) => {
     setEnviando(true);
     try {
-      const { mensaje } = await cambiarEstatusTicket(idTicket, { accion, motivo: motivoCapturado, idAsignado: asignado });
+      const { mensaje } = await cambiarEstatusTicket(idTicket, {
+        accion, motivo: motivoCapturado, idAsignado: asignado,
+        solucion: solucionCapturada, minutosSolucion: minutosCapturados,
+      });
       alExito(mensaje);
       setAccionConMotivo(null);
       setMotivo("");
       setDialogoAsignar(false);
+      setDialogoResolver(false);
     } catch (error) {
       alError(error instanceof ErrorApi ? error.message : "Error al cambiar el estatus.");
     } finally {
@@ -216,6 +241,7 @@ function BotonesAccionesTicket({ idTicket, folio, acciones, alExito, alError }: 
             disabled={enviando}
             onClick={() => {
               if (accion.accion === "ASIGNAR") { setIdAsignado(""); setDialogoAsignar(true); }
+              else if (accion.accion === "RESOLVER") { setSolucion(""); setMinutosSolucion(""); setDialogoResolver(true); }
               else if (accion.requiereMotivo) setAccionConMotivo(accion);
               else void ejecutar(accion.accion);
             }}>
@@ -256,6 +282,26 @@ function BotonesAccionesTicket({ idTicket, folio, acciones, alExito, alError }: 
           <Button variant="contained" disabled={enviando || idAsignado === ""}
             onClick={() => void ejecutar("ASIGNAR", undefined, idAsignado as number)}>
             Asignar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={dialogoResolver} onClose={() => setDialogoResolver(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Resolver {folio}</DialogTitle>
+        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
+          <TextField autoFocus fullWidth multiline minRows={3} label="Solucion (obligatorio)"
+            value={solucion} onChange={(e) => setSolucion(e.target.value)} />
+          <TextField size="small" type="number" label="Minutos invertidos (obligatorio)"
+            value={minutosSolucion}
+            onChange={(e) => setMinutosSolucion(e.target.value === "" ? "" : Number(e.target.value))}
+            slotProps={{ htmlInput: { min: 1 } }} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDialogoResolver(false)}>Cancelar</Button>
+          <Button variant="contained"
+            disabled={enviando || solucion.trim().length === 0 || minutosSolucion === "" || minutosSolucion <= 0}
+            onClick={() => void ejecutar("RESOLVER", undefined, undefined, solucion.trim(), minutosSolucion as number)}>
+            Resolver
           </Button>
         </DialogActions>
       </Dialog>

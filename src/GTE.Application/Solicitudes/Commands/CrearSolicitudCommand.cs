@@ -47,7 +47,8 @@ public class CrearSolicitudHandler(
         var idSolicitud = await repositorio.CrearAsync(new SolicitudNueva(
             folio, usuario.IdUsuario, command.Datos.Titulo.Trim(), command.Datos.Descripcion,
             command.Datos.IdTipoSolicitud, command.Datos.IdPrioridad,
-            command.Datos.FechaDeseada, command.Datos.JustificacionNegocio), cancellationToken);
+            command.Datos.FechaDeseada, command.Datos.JustificacionNegocio,
+            command.Datos.IdUsuarioSolicitante), cancellationToken);
 
         await motor.EjecutarAccionAsync(
             "Solicitud", idSolicitud, AccionesSolicitud.Enviar, null, null, cancellationToken);

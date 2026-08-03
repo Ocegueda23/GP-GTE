@@ -29,7 +29,8 @@ public class CrearWorkItemHandler(
     IWorkItemQueryService consultas,
     IGeneradorFolios folios,
     IVerificadorPermisos permisos,
-    ISanitizadorHtml sanitizador) : IRequestHandler<CrearWorkItemCommand, WorkItemResponse>
+    ISanitizadorHtml sanitizador,
+    IProveedorUsuarioActual proveedorUsuario) : IRequestHandler<CrearWorkItemCommand, WorkItemResponse>
 {
     public async Task<WorkItemResponse> Handle(CrearWorkItemCommand command, CancellationToken cancellationToken)
     {
@@ -41,6 +42,24 @@ public class CrearWorkItemHandler(
         if (!proyecto.Activo)
         {
             throw new BusinessException("El proyecto esta inactivo; no admite elementos nuevos.");
+        }
+
+        // RN-REQ-05: agregar una subtarea a un elemento ajeno (asignado a otra persona
+        // o sin asignar) cuenta como "modificar" el padre -- mismo gate que
+        // RegistrarTiempoCommand/CambiarEstatusWorkItemCommand. Sin asignar cuenta como
+        // ajeno (decision del equipo 2026-08-02).
+        if (datos.IdPadre.HasValue)
+        {
+            var usuarioActual = await proveedorUsuario.ObtenerAsync(cancellationToken)
+                ?? throw new ForbiddenException("La identidad actual no esta registrada como usuario de GTE.");
+            var estadoPadre = await repositorio.ObtenerEstadoAsync(datos.IdPadre.Value, cancellationToken)
+                ?? throw new NotFoundException("WorkItem", datos.IdPadre.Value);
+
+            var esAjeno = estadoPadre.IdAsignado != usuarioActual.IdUsuario;
+            if (esAjeno)
+            {
+                await permisos.ExigirPermisoAsync(PermisosWorkItem.ModificarAjeno, estadoPadre.IdProyecto, cancellationToken);
+            }
         }
 
         // RN-REQ-04: compromiso en el pasado solo con permiso
@@ -61,7 +80,7 @@ public class CrearWorkItemHandler(
             folio, datos.IdTipoWorkItem, datos.IdPadre, datos.IdProyecto, datos.IdSolicitud,
             datos.Titulo.Trim(), descripcion, datos.CriteriosAceptacion, datos.IdPrioridad,
             datos.IdComplejidad, datos.IdAsignado, datos.IdSolicitante, datos.PuntosHistoria,
-            minutosPresupuesto, datos.FechaCompromiso), cancellationToken);
+            minutosPresupuesto, datos.FechaCompromiso, datos.IdUsuarioSolicitante), cancellationToken);
 
         return await consultas.ObtenerPorIdAsync(idWorkItem, cancellationToken)
             ?? throw new NotFoundException("WorkItem", idWorkItem);

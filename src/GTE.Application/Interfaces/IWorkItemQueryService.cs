@@ -12,7 +12,9 @@ public record FiltroBandeja(
     int? IdAsignado = null,
     int? IdTipoWorkItem = null,
     string? Texto = null,
-    bool SoloVencidas = false);
+    bool SoloVencidas = false,
+    string? OrdenarPor = null,
+    bool OrdenDescendente = false);
 
 /// <summary>Contrato de LECTURA del modulo WorkItems: proyecta directo a DTOs.</summary>
 public interface IWorkItemQueryService

@@ -18,6 +18,10 @@ export interface Ticket {
   fechaLimiteResolucion: string | null;
   fechaPrimeraRespuesta: string | null;
   fechaResolucion: string | null;
+  solucion: string | null;
+  minutosSolucion: number | null;
+  usuarioSolicitante: string | null;
+  locacion: string | null;
   idWorkItemDerivado: number | null;
   folioWorkItemDerivado: string | null;
   fechaRegistro: string;
@@ -30,6 +34,8 @@ export interface NuevoTicket {
   descripcion: string | null;
   idCategoriaTicket: number | null;
   idPrioridad: number;
+  idUsuarioSolicitante?: number | null;
+  idLocacion?: number | null;
 }
 
 export interface FiltroBandejaTickets {
@@ -76,12 +82,17 @@ export async function obtenerAccionesTicket(id: number) {
 
 export async function cambiarEstatusTicket(
   id: number,
-  datos: { accion: string; motivo?: string; idAsignado?: number },
+  datos: {
+    accion: string; motivo?: string; idAsignado?: number;
+    solucion?: string; minutosSolucion?: number;
+  },
 ) {
   return enviar<Ticket>("put", `/api/v1/tickets/${id}/estatus`, {
     accion: datos.accion,
     motivo: datos.motivo || null,
     idAsignado: datos.idAsignado ?? null,
+    solucion: datos.solucion || null,
+    minutosSolucion: datos.minutosSolucion ?? null,
   });
 }
 

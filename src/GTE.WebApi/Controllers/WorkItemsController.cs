@@ -30,9 +30,12 @@ public class WorkItemsController(IMediator mediator) : ControllerBase
         [FromQuery] int? idTipo = null,
         [FromQuery] string? texto = null,
         [FromQuery] bool soloVencidas = false,
+        [FromQuery] string? ordenarPor = null,
+        [FromQuery] bool ordenDescendente = false,
         CancellationToken cancellationToken = default)
     {
-        var filtro = new FiltroBandeja(page, pageSize, estatus, idProyecto, idAsignado, idTipo, texto, soloVencidas);
+        var filtro = new FiltroBandeja(
+            page, pageSize, estatus, idProyecto, idAsignado, idTipo, texto, soloVencidas, ordenarPor, ordenDescendente);
         var resultado = await mediator.Send(new ObtenerBandejaQuery(filtro), cancellationToken);
         return Ok(ApiResponse<PagedResult<BandejaItemResponse>>.Exito(resultado));
     }
