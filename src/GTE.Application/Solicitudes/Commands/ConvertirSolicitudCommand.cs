@@ -35,11 +35,15 @@ public class ConvertirSolicitudValidator : AbstractValidator<ConvertirSolicitudC
 /// comando de creacion (folios, presupuesto, historial, reglas) con IdSolicitud
 /// e IdSolicitante de la solicitud, y despues ejecuta la transicion a Convertida.
 /// Responde el eco uiId -> Id/folio reales para rehidratar el front sin depender del orden.
+/// Notifica al solicitante igual que Aprobar/Rechazar/Devolver en
+/// CambiarEstatusSolicitudCommand (ahi no cubre Convertir a proposito, tiene su
+/// propio comando por el desglose de items).
 /// </summary>
 public class ConvertirSolicitudHandler(
     ISolicitudRepository repositorio,
     IMotorWorkflow motor,
     IVerificadorPermisos permisos,
+    IServicioNotificaciones notificaciones,
     ISender mediator) : IRequestHandler<ConvertirSolicitudCommand, ConversionResponse>
 {
     public async Task<ConversionResponse> Handle(
@@ -88,6 +92,14 @@ public class ConvertirSolicitudHandler(
             "Solicitud", command.IdSolicitud, AccionesSolicitud.Convertir, null, null, cancellationToken);
         await repositorio.AplicarEfectosTransicionAsync(
             command.IdSolicitud, AccionesSolicitud.Convertir, cancellationToken);
+
+        var folios = string.Join(", ", convertidos.Select(c => c.Folio));
+        var mensaje = convertidos.Count == 1
+            ? $"Se genero el elemento de trabajo {folios}."
+            : $"Se generaron los elementos de trabajo: {folios}.";
+        await notificaciones.NotificarAsync(
+            [estado.IdSolicitante], $"Tu solicitud {estado.Titulo} fue convertida en trabajo", mensaje,
+            "Solicitud", command.IdSolicitud, "/solicitudes", cancellationToken);
 
         return new ConversionResponse { Items = convertidos };
     }
