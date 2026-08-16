@@ -3,7 +3,381 @@
 > Documento de continuidad. Sirve para retomar el proyecto en otra sesión sin
 > contexto previo. Actualizar al cerrar cada bloque de trabajo.
 >
-> **Última actualización:** 2026-08-03 (Notificacion al convertir una Solicitud, segunda pasada: ademas de avisar al solicitante (ver abajo), `ConvertirSolicitudHandler` ahora notifica tambien al **usuario asignado** de cada item del desglose que traiga `IdAsignado` -- "Se te asigno el elemento de trabajo {folio}" con el titulo del item, ligado a la entidad `WorkItem`/ruta `/wi/{folio}` (no todos los items traen asignado, el triage puede dejarlos sin asignar). Verificado en vivo en LocalDB con dos cuentas reales: convertida una Solicitud con Asignado=Luis Garcia, la notificacion aparece de inmediato en la campana de `lgarcia`. Ver seccion 2)
+> **Última actualización:** 2026-08-13 (**Catalogo de Reportes R01-R14 + vistas vwBI*** --
+> segundo bloque de la "Fase 5 completa" (Dashboard P18 -> Reportes/PowerBI -> Automatizaciones
+> -> IA). Extiende el modulo `Reportes` que ya existia con un solo reporte (Actividad de
+> usuario, permiso `RPT.Actividad`) en vez de duplicarlo: mismo `IReportesQueryService`/
+> `ReportesController`/namespace `GTE.Application.Reportes`, 13 metodos nuevos + el ya
+> existente. Permisos nuevos `RPT.Ver` (general) y `RPT.Auditoria` (R14); `RPT.Costos`
+> (ya sembrado desde el script 02 sin consumidor) ahora lo usan R08/R09 -- ver script
+> `31_2026-08-13_INSERT_bdsGTE_PermisosReportes.sql`.
+>
+> **Los 14 reportes reusan fuentes ya existentes en vez de duplicar calculo** (misma
+> disciplina que el Dashboard P18): `vwBandejaTrabajo`/`vwTiempoInvertido` (R01/R03),
+> `vwCostoRegistroTiempo` (R08/R09, igual que `ICosteoQueryService`), `tblRiesgo` (R06, mismo
+> gap que P18 -- sin CRUD todavia via A5, normalmente vacio), `tblKpiDefinicion`/`tblKpiValor`
+> (R11, mismo snapshot de Hangfire del Dashboard P18). Piezas nuevas construidas desde cero
+> (sin apoyo previo en el repo): R13 Flujo/CFD (reconstruye el estatus de cada WorkItem dia
+> por dia a partir de `tblHistorialEstatus`, con una entrada sintetica de creacion en
+> Pendiente para no depender de que el trigger haya logueado el estado inicial) y R14
+> Auditoria (primer consumidor de `tblBitacora`, que ya se llenaba via
+> `RepositoryBase.RegistrarBitacoraAsync` pero nadie la leia). Constantes nuevas en Domain
+> para dejar de usar numeros magicos: `GTE.Domain.WorkItems.TiposWorkItem` (antes solo
+> `EstatusIncidente.IdTipoWorkItemCorreccion`, mismo valor 9).
+>
+> **Exportacion a Excel**: `ClosedXML` (MIT, gratis) instalado -- decision ya confirmada con
+> el usuario en el bloque anterior sobre EPPlus (licencia comercial de paga desde v5).
+> `IExportadorExcel`/`ExportadorExcelClosedXml` generico (encabezados + filas de
+> `object?`), cada reporte tiene un endpoint gemelo `.../exportar` que re-corre la misma
+> query y aplana el DTO a filas -- sin libreria de PDF nueva, "Exportar PDF" sigue sin
+> construirse en Reportes (a diferencia del Dashboard, aqui el Documento Maestro no lo pedia
+> explicito por pantalla, solo Excel).
+>
+> **Power BI**: vistas `vwBIWorkItems`, `vwBICostos`, `vwBIReleases`, `vwBIRiesgos`,
+> `vwBISla` (script `33_2026-08-13_SCRIPT_bdsGTE_VistasBI.sql`) -- tablas de hechos planas
+> con nombres ya resueltos, para que el analista arme sus propios pivotes. R13 (necesita
+> reconstruir estatus dia por dia, no es una fila-por-hecho) y R14 (sensible/paginada) se
+> quedan fuera a proposito; R02/R07/R11 ya son planas de origen y no necesitaban vista
+> nueva. Usuario SQL de solo lectura `bi_gte_sololectura` (`db_datareader` unicamente, sin
+> datawriter ni EXECUTE) en script `32_2026-08-13_SCRIPT_bdsGTE_UsuarioSoloLecturaBI.sql` --
+> mismo patron de blindaje que `svc_gte`, requiere editar `@Password` antes de correr (no se
+> corrio en esta sesion, es un script de despliegue).
+>
+> **Frontend**: `features/reportes/CatalogoReportesPage.tsx` (nueva, sidebar con los 14
+> reportes + tabla/grafica por reporte, filtros Desde/Hasta/Proyecto/Equipo segun aplique,
+> boton Exportar Excel por reporte) en la ruta `/reportes` -- el menu "Reportes" ahora
+> apunta aqui (antes iba directo a `/reportes/actividad-usuario`, que se dejo intacto como
+> ruta valida sin quitar del router, solo ya no es el destino del menu). R11 usa `recharts`
+> `LineChart` (serie del anio vs anio comparativo); R13 usa `AreaChart` apilado (`stackId`)
+> para el CFD -- `Line` de recharts no soporta `stackId` en la tipificacion actual, hubo que
+> usar `Area`/`AreaChart` en su lugar.
+>
+> **Bug real encontrado y corregido en la misma sesion antes de llegar a produccion**: R07
+> (tiempos de triage por area) calculaba mal el promedio -- usaba `g.First(s => true).FechaRegistro`
+> (la fecha de la PRIMERA solicitud del grupo) como base para TODAS las solicitudes del area
+> en vez de la fecha de registro de cada una. Corregido antes de la verificacion en vivo.
+>
+> **Verificado**: `dotnet build`/`dotnet test` (53/53) y `tsc -b`/`vite build` limpios.
+> Prueba manual real en el navegador (LocalDB real, login `aviramontes`) via el mismo
+> `.claude/launch.json` temporal de la sesion anterior (revertido al terminar): R01 con
+> datos reales de Julio 2026 (Lead/items/puntos/% a tiempo coherentes con lo ya visto en el
+> Dashboard P18); R08 Costos con montos reales por proyecto/mes y por desarrollador
+> (confirma que `vwCostoRegistroTiempo` resuelve tarifas correctamente); R06 Riesgos vacio
+> como se esperaba; R11 KPIs vacio hasta correr manualmente `spSnapshotKpi` contra LocalDB
+> (se corrio a mano para la prueba, mismo criterio que otros datos de prueba dejados adrede
+> en LocalDB -- confirma el pipeline completo SP -> tblKpiValor -> reporte -> grafica); R13
+> Flujo con un proyecto real mostro el area apilada por estatus sin errores; R14 Auditoria
+> mostro 11 paginas de bitacora real (transiciones de workflow, altas JIT, etc.) -- primer
+> consumidor real de esa tabla; exportar a Excel (R08) confirmado 200 OK por red. **No
+> verificado en profundidad**: R02, R04, R05, R09, R10, R12 (mismos patrones ya probados en
+> R01/R03/R08 y en el Dashboard P18, no se click-through uno por uno por tiempo). **Pendiente
+> real**: pruebas automatizadas del modulo nuevo; decidir si vale la pena una pantalla de
+> administracion de riesgos (R06/A5) ya que ahora hay tres consumidores esperando datos
+> (Dashboard P18, este reporte, y la vista BI) sin ninguna forma de capturarlos.
+>
+> **Siguiente en la secuencia acordada**: bloque 3 (motor de automatizaciones A01-A23,
+> Hangfire ya instalado desde el bloque 1 -- reusar esa infraestructura), luego IA cuando
+> haya API key de Anthropic.
+>
+> **Actualización anterior 15:** 2026-08-13 (**Dashboard Ejecutivo P18** -- primer bloque de la
+> "Fase 5 completa" pedida por el usuario (Dashboard P18 -> Reportes/PowerBI -> Automatizaciones ->
+> IA, en ese orden; IA excluida de esta ronda por falta de API key de Anthropic disponible;
+> Reportes usara ClosedXML en vez de EPPlus; Automatizaciones solo InApp+Correo reales, Teams/
+> WhatsApp/Slack quedan como interfaz sin implementar -- decisiones confirmadas con el usuario
+> antes de codear). Implementa la seccion 3.10/5.10 del Documento Maestro: vista de
+> equipo/proyecto (DORA, costo, rentabilidad, OKR), **distinta del Dashboard de colaborador
+> individual** ya existente (`/dashboard-ejecutivo`, GET /api/v1/dashboard) -- para evitar
+> confundir ambos conceptos se le puso nombre y ruta propios: **"Indicadores ejecutivos"**
+> (`/indicadores-ejecutivos`, `GET/PUT api/v1/indicadores-ejecutivos`). Requiere permiso
+> `DASH.Ejecutivo` o `DASH.VerDepartamento` (ambos ya sembrados) -- a diferencia del dashboard
+> individual, aqui SI bloquea con 403 sin ninguno de los dos: no hay "alcance personal" razonable
+> para cifras de costo/DORA de proyecto.
+>
+> **Indicadores calculados en tiempo real** (mismo criterio que el dashboard de colaborador, sin
+> job para lo que se puede calcular al vuelo): Lead Time (percentil 50/85 en horas laborales via
+> `ICalendarioLaboral`, horario del asignado o un default resuelto por el mas antiguo activo),
+> Cycle Time (reusa `vwBandejaTrabajo.MinutosInvertidos`, ya materializado), Entrega a tiempo
+> (semaforo heredado 90/80), Eficiencia y Retrabajo (tipo Correccion=9), Productividad (puntos
+> entre personas distintas), SLA+CSAT (global, `tblTicket` no tiene FK de proyecto en el modelo
+> asi que no se puede acotar por alcance -- limitacion real, no bug), Semaforo de proyectos
+> (entrega a tiempo por proyecto + costo real/presupuesto reusando `ICosteoQueryService` tal
+> cual, sin duplicar logica de costeo), OKR (reusa `IOkrQueryService` tal cual), Top riesgos
+> (query real contra `tblRiesgo`, que ya existe con workflow sembrado pero sigue sin CRUD/UI --
+> A5 -- asi que normalmente aparecera vacio hasta que exista forma de capturar riesgos), y
+> Burndown del sprint activo por equipo (ideal lineal vs real dia por dia, requiere seleccionar
+> equipo en el filtro).
+>
+> **DORA**: Deployment Frequency y Change Failure Rate se calculan reales (`tblDespliegue`
+> exitoso a un ambiente con "PROD" en el nombre, `tblRelease`/`tblIncidente.IdReleaseCausante`
+> en ventana de 7 dias) y MTTR real (`tblIncidente.FechaResolucion - FechaOcurrencia`). **Lead
+> Time for Changes queda explicitamente "sin datos"** -- necesita integracion Git (PR merge ->
+> deploy), que sigue pendiente (resto de Fase 3, tblPullRequest sin consumidor). Nota de la
+> prueba en vivo: MTTR salio negativo (-5.9h) en LocalDB porque un incidente migrado/semilla
+> (`INC-2026-0001`) tiene `FechaResolucion` anterior a `FechaOcurrencia` -- es un dato de prueba
+> inconsistente, no un bug de la formula (se decidio no forzar un piso en 0 para no esconder el
+> problema de datos).
+>
+> **KPIs personalizados** (`tblKpiDefinicion`/`tblKpiValor`, sin consumidor desde que se crearon
+> el 2026-07-30): esta es la pieza que si necesitaba un job nocturno, asi que se instalo
+> **Hangfire** (`Hangfire.AspNetCore`/`Hangfire.SqlServer`, LGPLv3 gratis) -- primer consumidor
+> real de A4 (adelantado desde el bloque 3 de automatizaciones porque el propio P18 lo
+> necesitaba). `SnapshotKpiJob` llama `dbo.spSnapshotKpi` (ya existia, con `@Mensaje OUTPUT`)
+> via ADO igual que `GeneradorFolios`/`spGenerarFolio`; recurrente diario a la 1am con
+> `IRecurringJobManager` (API por servicio, no la estatica `RecurringJob` -- la estatica depende
+> de `JobStorage.Current` y truena en pruebas de integracion, donde el proceso hospeda varios
+> hosts). Storage propio en `bdsGTE` (schema `[HangFire]` que la libreria crea sola). **Sin
+> dashboard web de Hangfire expuesto** (no entiende el JWT propio de GTE, exigiria un filtro de
+> autorizacion dedicado -- pendiente si se necesita mas adelante). El registro del job recurrente
+> al arrancar esta en try/catch: si `bdsGTE` no esta disponible en ese instante, el resto de la
+> API igual arranca (encontrado real con `VersionEndpointTests`, que arranca la API sin BD real).
+> **Deshabilitado explicitamente en pruebas de integracion** (`Hangfire:Deshabilitado=true` en
+> `FabricaApiAutenticada`): cada prueba levanta su propio `WebApplicationFactory`, y reinstalar/
+> consultar el storage SQL de Hangfire en cada una saturaria LocalDB (mismo tipo de congestion ya
+> documentado en este archivo) ademas de que `RecurringJob` estatico no se reinicializa entre
+> hosts sucesivos del mismo proceso -- encontrado real que rompia 27 de 28 pruebas de
+> `GTE.Api.Tests` antes de aislarlo.
+>
+> **Tabla nueva**: `tblDashboardLayoutUsuario` (script 30, IdUsuario PK/FK 1:1, LayoutJson
+> NVARCHAR(MAX)) para persistir el layout de widgets (orden + ocultos) por usuario -- upsert por
+> EF en `IndicadoresEjecutivosRepository`, sin SP (mismo criterio del resto de GTE, sin stored
+> procedures para CRUD simple). Sin permiso nuevo: reusa `DASH.Ejecutivo`/`DASH.VerDepartamento`.
+>
+> **Frontend**: `features/indicadoresEjecutivos/IndicadoresEjecutivosPage.tsx`, widgets
+> arrastrables via `@dnd-kit/sortable` (ya era dependencia del repo, sin agregar libreria nueva)
+> con boton de ocultar/mostrar por widget, persistidos de inmediato al arrastrar/ocultar. Reusa
+> `obtenerCatalogosBandeja()` para los combos de Proyecto/Equipo (no se construyo un endpoint de
+> filtros propio, ese catalogo ya trae ambos). "Exportar Excel" es CSV client-side y "Exportar
+> PDF" es `window.print()`, mismas simplificaciones ya establecidas en el dashboard de
+> colaborador. Menu nuevo "Indicadores ejecutivos" gateado por permiso (a diferencia de
+> "Dashboard ejecutivo" que es publico).
+>
+> **Verificado**: `dotnet build`/`dotnet test` (53/53, incluye la correccion de las 27 pruebas
+> rotas por Hangfire) y `tsc -b`/`vite build` limpios. Prueba manual real en el navegador
+> (API en LocalDB real + SPA, login `aviramontes`/Administrador) via `.claude/launch.json`
+> temporal para esta sesion (revertido al terminar, no se toco el `launch.json` compartido del
+> equipo): pantalla carga con datos reales (Julio 2026 con datos migrados dio Lead Time
+> P50=9.0h/P85=17.4h, Cycle Time=2.7h, Entrega a tiempo=14.9%; Agosto 2026, sin cierres aun, dio
+> ceros/100% consistentes); filtro de mes recalcula todo en vivo; semaforo de los ~47 proyectos
+> activos renderiza (todos "Verde" por falta de compromiso/presupuesto capturado, esperado);
+> OKR real ("Mejorar tiempo de entrega", Plantilla Angular, 2/3) se ve con barra de avance;
+> ocultar un widget y recargar la pagina confirma que el layout persiste (GET/PUT reales). **No
+> verificado end-to-end**: el arrastre real de widgets con mouse -- un `left_click_drag` simple y
+> tambien una secuencia sintetica de PointerEvent (el mismo patron que ya funciono para el
+> kanban) no dispararon el sensor de `@dnd-kit/sortable` en este entorno de automatizacion; el
+> mecanismo de guardado (misma funcion que ya se probo con ocultar/mostrar) esta verificado, solo
+> falta el drag en si con mouse real. Pendiente real: pruebas automatizadas (Domain.Tests para
+> `CalculadoraIndicadoresEjecutivos.Percentil`, Api.Tests para el endpoint nuevo).
+>
+> **Siguiente en la secuencia acordada**: bloque 2 (Reportes R01-R14 + vistas `vwBI*` con
+> ClosedXML), luego bloque 3 (motor de automatizaciones A01-A23 + Hangfire ya instalado, solo
+> canales InApp/Correo reales), luego IA cuando haya API key de Anthropic.
+>
+> **Actualización anterior 14:** 2026-08-07 (**Dashboard Ejecutivo de Metricas** -- modulo nuevo pedido
+> directo por el usuario a partir de una especificacion funcional amplia (empleado del mes,
+> resumen ejecutivo, carga de trabajo, indicadores por empleado, comparativos, rankings,
+> tendencias, filtros globales, permisos por rol, exportacion). Antes de codear se reconcilio
+> contra lo ya documentado en la seccion 3.10/5.10 de este Documento Maestro (P18 Dashboard
+> Ejecutivo, enfocado a DORA/costo/OKR de equipo) -- son cosas distintas: este modulo nuevo mide
+> **colaboradores individuales**, no reemplaza el P18 original. Decisiones de diseno acordadas
+> con el usuario: el puntaje/evaluacion mensual se calcula 100% automatico (sin captura manual),
+> el Empleado del mes se elige automatico por mayor puntaje, y la jerarquia "colaboradores de un
+> lider" usa `tblUsuario.IdJefe` (ya existia en el modelo, no fue necesario agregarlo) mas
+> `tblEquipo.IdLider`/`tblEquipoMiembro`.
+>
+> **Sin tablas nuevas**: todo se calcula en tiempo real contra datos existentes (WorkItem,
+> Ticket, Incidente, Release, RegistroTiempo, Comentario) -- no hay job nocturno ni snapshot
+> persistido (a diferencia de lo que el Documento Maestro dejaba previsto via
+> `tblKpiDefinicion`/`tblKpiValor` para KPIs de equipo/proyecto, que siguen sin consumidor). Si
+> el volumen de datos crece mucho, ese job queda como mejora futura natural sin cambiar el
+> contrato de la API. Foto de "Empleado del mes": se reutiliza el mecanismo generico de archivos
+> ya existente (`tblArchivo`/`tblArchivoVinculo`, `Entidad='Usuario'`) en modo **solo lectura**
+> -- no se construyo pantalla de carga de foto en esta pasada (no hay hoy ningun lugar en
+> Administracion > Usuarios para subir una foto de perfil; si no hay foto se muestra un avatar
+> con iniciales).
+>
+> **Formulas de puntaje (heuristicas v1, documentadas y aisladas en
+> `GTE.Domain.Dashboard.CalculadoraPuntaje` para poder ajustarlas despues sin tocar el resto)**:
+> de las 6 dimensiones de evaluacion mensual (Calidad, Productividad, Puntualidad, Trabajo en
+> equipo, Cumplimiento, Comunicacion), 4 tienen una fuente de datos solida (Puntualidad =
+> % de entregas a tiempo; Cumplimiento = % de asignados vigentes sin vencer; Productividad =
+> terminados vs promedio del equipo; Calidad = 100 menos % de reaperturas via incidente ligado
+> a un WorkItem ya cerrado) y 2 son proxies mas debiles por falta de un dato mejor en el modelo
+> actual (Trabajo en equipo = comentarios en items ajenos vs promedio del equipo; Comunicacion =
+> total de comentarios vs promedio del equipo) -- senalado explicitamente al usuario, no
+> silenciado. Una dimension sin datos suficientes se reporta como "sin datos" y no participa en
+> el promedio general.
+>
+> **Alcance/visibilidad por rol** (sin tabla de roles nueva tipo Director/Gerente/Empleado que
+> no existen en el seed de `tblRol`): permiso `DASH.Ejecutivo` (ya sembrado desde el script 02,
+> sin consumidor hasta ahora) = alcance Global; permiso nuevo `DASH.VerDepartamento` (script 26)
+> = alcance del area propia (via `tblUsuario.IdPuesto -> tblPuesto.IdArea`); sin ninguno de los
+> dos pero liderando un equipo o con subordinados directos = alcance "Equipo" (por datos, sin
+> permiso adicional); caso base = alcance "Personal" (solo su propia informacion). La ruta
+> `/dashboard-ejecutivo` es visible para **cualquier usuario autenticado** (`permiso: null` en
+> `NAVEGACION`, igual que "Mi dia") -- el permiso no gatea la pantalla, solo escala cuanto ve.
+>
+> **Simplificaciones deliberadas frente al prompt original** (por alcance/tiempo, senaladas
+> directo al usuario): sin tema claro/oscuro (la app entera no tiene hoy infraestructura de
+> dark mode; agregarlo solo para esta pantalla habria sido inconsistente); filtros globales
+> implementados solo para Anio/Mes/Proyecto/Area/Empleado (Lider es redundante con el alcance
+> automatico; Estado/Prioridad/Tipo de trabajo no tienen un catalogo unico coherente entre
+> WorkItem/Ticket/Incidente/Release a la vez, se hubiera visto roto); "Exportar Excel" es un
+> CSV client-side (sin libreria nueva) y "Exportar PDF" es `window.print()` del navegador (sin
+> hoja de estilos de impresion dedicada); Incidencias/Releases no tienen asignacion directa a un
+> usuario en el modelo (gap ya documentado en sesiones previas para "solo mis proyectos") --
+> se acotan por **proyectos visibles** (responsable/equipo del alcance), no por persona.
+>
+> **Backend**: `GTE.Domain.Dashboard` (formulas), `IDashboardQueryService`/`DashboardQueryService`
+> (Infrastructure, un solo `DbContextGTE` por consulta via `FabricaContexto`, reusa
+> `ICalendarioLaboral` para horas disponibles), `DashboardController` con 4 endpoints
+> (`GET /api/v1/dashboard`, `.../empleados/{id}`, `.../tendencias`, `.../filtros`) --
+> patron de payload agregado como `/api/v1/mi-dia`, no fragmentado en llamadas sueltas.
+> Script SQL nuevo `26_2026-08-07_INSERT_bdsGTE_PermisoDashboardDepartamento.sql`
+> (`DASH.VerDepartamento`), aplicado contra LocalDB. **Frontend**: libreria `recharts` agregada
+> (no habia ninguna grafica en el repo todavia); `features/dashboard/DashboardEjecutivoPage.tsx`
+> + `EmpleadoDrillDownDialog.tsx`; `shared/api/dashboard.ts`; ruta y entrada de menu nuevas en
+> `App.tsx`.
+>
+> **Verificado**: `dotnet build`/`dotnet test` (53/53 en verde, sin pruebas nuevas -- no se
+> agregaron pruebas automatizadas para el modulo nuevo en esta pasada, queda como pendiente
+> real); `tsc -b`/`vite build` limpios. Prueba manual real en el navegador contra la API+SPA
+> levantadas con datos migrados reales (login `aviramontes`): los 4 endpoints responden 200 con
+> datos coherentes; filtro Empleado narrows correctamente todo el payload (empleado del mes,
+> carga de trabajo, rankings, y hace aparecer el comparativo "Empleado vs promedio del equipo");
+> seccion Tendencias (lazy, bajo demanda) carga y cambia de metrica; dialogo de indicadores
+> individuales (Eficiencia/Entregas/Evaluacion mensual/Evolucion anual) abre al hacer click en
+> una fila y trae datos reales; exportar CSV no truena. **Nota real encontrada en vivo**: al
+> filtrar el dashboard a un solo Empleado, las dimensiones relativas-al-equipo (Productividad,
+> Trabajo en equipo, Comunicacion) degeneran a compararse contra si mismas (el "equipo" del
+> filtro es un conjunto de 1) -- el dialogo de detalle individual no tiene este problema porque
+> siempre calcula sus colegas reales (equipo/area) sin importar el filtro superior; es course
+> intencional, no bug, pero vale la pena que el equipo lo sepa. **Pendiente real**: pruebas
+> automatizadas del modulo nuevo (Domain.Tests para `CalculadoraPuntaje`, Api.Tests para los 4
+> endpoints); revisar con el negocio si las formulas heuristicas de Trabajo en equipo/
+> Comunicacion son aceptables o si conviene moverlas a captura manual como hibrido.)
+>
+> **Correccion misma sesion, mismo dia** (feedback del usuario probando el dashboard en vivo):
+> (1) **Empleado del mes cambiaba con los filtros** -- estaba calculado sobre el mismo
+> `usuarios` (alcance+filtros) que el resto del dashboard; ahora se calcula SIEMPRE sobre todos
+> los empleados elegibles del sistema completo, sin importar el alcance de quien consulta ni
+> los filtros de Area/Proyecto/Empleado (actual e historico). (2) **Exclusion de cuentas que no
+> son colaboradores medibles**: nuevo helper `ObtenerIdsExcluidosAsync` en `DashboardQueryService`
+> -- excluye cuentas con rol Administrador (cuentas de operacion del sistema, no colaboradores)
+> y cuentas `EsExterno=true` (ej. "Solicitante Externo (migracion GT)") de TODAS las metricas
+> (empleado del mes, carga de trabajo, rankings, comparativos, catalogo de filtro Empleado) --
+> siguen pudiendo USAR el dashboard para ver a otros, solo no aparecen como sujeto medido.
+> (3) **Bug real encontrado y corregido de la sesion anterior**: el `UrlFoto` (tanto de
+> Empleado del mes como del drill-down individual) apuntaba directo a
+> `/api/v1/archivos/{guid}` usado como `<Avatar src>` -- un `<img src>` NUNCA manda el
+> Authorization Bearer (la app no usa cookies para el access token), asi que la foto jamas
+> habria cargado (401 silencioso, Avatar cae a las iniciales). Se creo `AvatarUsuario`
+> (`shared/components/AvatarUsuario.tsx`), que descarga el archivo autenticado como blob
+> (reutiliza `descargarArchivoBlob` ya existente) y usa un object URL -- mismo patron que ya
+> advertia el comentario de `archivos.ts` sobre nunca usar `<img src>`/`<a href>` directo.
+> (4) **Carga de trabajo por elementos**: seccion nueva (tabla + PieChart) que replica el
+> reporte "Carga de trabajo" del GT que el usuario tenia como referencia (Pendiente/EnProceso/
+> Terminado/Retrasos/PromDuracionDias/Total/EficienciaEntrega por colaborador, mas pie de
+> distribucion de carga total) -- nuevo `CargaTrabajoDetalleResponse` y
+> `ArmarDesgloseCargaTrabajoAsync`, con el mismo periodo (Anio/Mes) que el resto del dashboard
+> en vez de un selector de rango Inicio/Fin independiente (simplificacion deliberada para no
+> duplicar el filtro global). (5) **Rankings**: cada pestaña de metrica ahora muestra tambien
+> un BarChart (Top10 y Bottom10) ademas de la tabla, clickeable para abrir el mismo dialogo de
+> detalle. (6) **Tooltips explicativos** en KPIs del resumen ejecutivo, columnas de carga de
+> trabajo, pestañas de ranking y las 6 dimensiones de evaluacion mensual (componente
+> `EtiquetaConTooltip`), con la formula en lenguaje llano. (7) **Administracion > Usuarios**:
+> gap real confirmado -- el formulario ya podia asignar Puesto (que carga Area) pero no
+> exponia Area de forma directa, y no existia forma de subir foto de perfil (el modulo
+> completo de foto era de solo lectura hasta ahora). Se agrego combo Area (filtra las opciones
+> de Puesto) en alta/edicion, y subida de foto en edicion (`POST /api/v1/usuarios/{id}/foto`,
+> `SubirFotoUsuarioCommand` -- mismo patron que `SubirArchivoCommand` de WorkItem pero
+> reemplaza la foto anterior en vez de acumular, valida solo imagen vs la lista general de
+> `ConstantesArchivos.ExtensionesPermitidas`). `UsuarioResponse` ahora expone `UrlFoto`
+> (join con `tblArchivoVinculo`/`tblArchivo` filtrado a `Entidad='Usuario'`).
+> **Verificado**: `dotnet build`/`dotnet test` (53/53) y `tsc -b`/`vite build` limpios tras
+> cada cambio; prueba real en el navegador con datos migrados -- empleado del mes confirmado
+> igual con el filtro Empleado activo y sin el (antes cambiaba), Ana Viramontes (Administrador)
+> ya no aparece en ninguna metrica, tabla+pie de carga por elementos con datos reales, dialogo
+> de edicion de Usuario muestra el combo Area y el boton "Cambiar foto" correctamente. **No
+> verificado**: la subida de foto en si de punta a punta (requiere seleccionar un archivo real
+> desde el dialogo nativo del SO, fuera del alcance de la automatizacion de navegador
+> disponible en esta sesion) -- el endpoint se probo por codigo/compilacion y sigue el mismo
+> patron ya probado de adjuntos de WorkItem.
+> **Correccion misma sesion, mismo dia (2)**: el usuario reporto que un desarrollador siempre
+> sobrecargado "cumple con las metricas" -- investigando encontramos la causa real: RN-REQ-08
+> (presupuesto automatico via `tblMatrizPresupuesto`, complejidad x nivel del asignado) ya
+> existia pero **nunca se disparaba en la practica** porque `NuevoItemModal.tsx` no capturaba
+> Complejidad (solo el modal de Editar la tenia). Decision del usuario: Complejidad pasa a ser
+> **obligatoria al crear** (no en editar, ahi se queda opcional como antes) y **Puntos de
+> historia se congela automatico igual que los minutos** (antes era 100% manual y la columna
+> `tblMatrizPresupuesto.Puntos`, aunque sembrada por la migracion, nunca se leia). Cambios:
+> `IWorkItemRepository.ObtenerMinutosMatrizAsync` -> `ObtenerPresupuestoMatrizAsync` (nuevo
+> record `PresupuestoMatriz(Minutos, Puntos)`); `CrearWorkItemHandler.CalcularPresupuestoAsync`
+> devuelve ambos y `CrearWorkItemValidator` exige `IdComplejidad`; `ActualizarWorkItemCommand`
+> recalcula Puntos junto con Minutos solo cuando cambia complejidad/asignado (antes Puntos
+> viajaba tal cual del request); se quito `PuntosHistoria` de `WorkItemCrearRequest`/
+> `WorkItemActualizarRequest` (ya no se acepta a mano). Frontend: `NuevoItemModal.tsx` gano
+> combo Complejidad requerido con leyenda explicando que fija horas+puntos automatico;
+> `ModalEditarWorkItem.tsx` cambio el TextField de Puntos a solo lectura. **Pruebas de
+> integracion rotas por el cambio** (8 en `GTE.Api.Tests`, todas las que crean un WorkItem via
+> HTTP sin mandar complejidad): se agrego un helper compartido
+> `FabricaApiAutenticada.ObtenerOCrearComplejidadAsync()` (reutiliza cualquier fila activa o
+> crea una propia) y se uso en los 4 archivos de prueba afectados.
+> **Verificado**: `dotnet build`/`dotnet test` (53/53) limpios; `tsc -b` limpio; en vivo contra
+> LocalDB real (usuario lgarcia): crear sin complejidad -> 400 "La complejidad es obligatoria."
+> con el mensaje correcto; crear con Complejidad=Media(4) y asignado Luis Garcia -> devolvio
+> `minutosPresupuesto=840` y `puntosHistoria=7.00` automaticos (datos reales de la migracion);
+> editar sin tocar complejidad/asignado conserva ambos valores; editar cambiando complejidad
+> sin el permiso `WI.ModificarComplejidad` sigue bloqueado con 403 (la regla de permisos
+> existente no se toco). **Pendiente real**: revisar con el negocio si conviene tambien exigir
+> Complejidad en el modal de Editar para los WorkItems legacy que quedaron sin ella.
+>
+> **Correccion misma sesion, mismo dia (3)**: el usuario confirmo "si que los exija" (Complejidad
+> tambien obligatoria al editar). Al revisar donde mas se reutiliza `CrearWorkItemCommand` para
+> implementarlo, se encontro una **regresion real introducida en la correccion (2) de arriba**:
+> 4 flujos internos crean WorkItems SIN pasar `IdComplejidad`
+> (`ConvertirSolicitudCommand`/Triage, `VincularCorrectivoIncidenteCommand`, `EscalarTicketCommand`,
+> `CalidadCommands` al crear un bug desde una ejecucion fallida) -- con `IdComplejidad` obligatorio
+> a nivel de comando, los 4 habrian empezado a fallar con 400 en cuanto se desplegara. Se
+> corrigio ANTES de que llegara a produccion: `CrearWorkItemCommand` ya NO exige `IdComplejidad`
+> por FluentValidation (esos 4 flujos no tienen momento de captura humana); en vez de eso,
+> `CrearWorkItemHandler.Handle` ahora rellena un default (`ObtenerComplejidadPorDefectoAsync`,
+> la complejidad activa de menor `Orden`) cuando viene nula -- asi RN-REQ-08 siempre tiene con
+> que calcular presupuesto sin bloquear ni tocar esas 4 pantallas. El modal de alta manual
+> (`NuevoItemModal.tsx`) sigue exigiendola como campo obligatorio en la UI (una persona la elige
+> a conciencia en el camino principal), pero el backend ya no depende de eso para garantizar
+> que el presupuesto se calcule.
+>
+> Para Editar si se implemento la exigencia dura pedida: `ActualizarWorkItemValidator` exige
+> `IdComplejidad` (ahi NO hay flujos internos, se verifico que solo el controller construye
+> `ActualizarWorkItemCommand`). Para no bloquear retroactivamente los items legacy que se creen
+> sin ella, se aplico el mismo criterio que RN-REQ-04 (fecha compromiso): **fijarla por primera
+> vez (de vacia a un valor) queda libre; solo RE-CLASIFICAR una complejidad ya elegida sigue
+> exigiendo el permiso `WI.ModificarComplejidad`**.
+> **Verificado en vivo contra LocalDB real**: crear sin complejidad (simulando un flujo interno)
+> -> 200 OK con complejidad default (`Basica`, Orden 1) y presupuesto calculado (120 min / 1
+> punto); editar GTE-0012 (legacy, `idComplejidad=null`) sin mandar complejidad -> 400; el mismo
+> item capturando complejidad por primera vez como `lgarcia` (sin `WI.ModificarComplejidad`) ->
+> 200 OK con 840 min / 7 puntos calculados, SIN pedir el permiso especial. `dotnet test`
+> 53/53 (una corrida intermedia broto con timeouts/500 por congestion de LocalDB tras tantas
+> corridas seguidas en la misma sesion -- se resolvio con `sqllocaldb stop/start`, no era un
+> problema de codigo); `tsc -b` limpio.
+> **Actualización anterior 13:** 2026-08-04 (Correccion de 3 huecos reportados por el usuario probando la sesion anterior en vivo: (1) **"Mis solicitudes" (`PortalPage.tsx`) no tenia buscador ni orden** -- se me habia pasado esta lista al hacer el lote general de buscadores/orden (Revision de solicitudes SI ya lo tenia, confirmado de nuevo en vivo: si no se ve, es cache del navegador, refrescar). Mismo patron `useOrdenTabla`/`EncabezadoOrdenable` que el resto. (2) **Pegar imagenes en la Descripcion de una Solicitud era un callejon sin salida real**: la limitacion de "no se puede pegar antes de guardar" (documentada como aceptable, igual que WorkItem) se volvia permanente porque una Solicitud NUNCA se podia editar despues de creada -- sin edicion, jamas habia un momento para agregar imagenes. Se construyo edicion real de Solicitud (`PUT /api/v1/solicitudes/{id}`, `ActualizarSolicitudCommand`, nueva regla: el propio solicitante siempre puede editar la suya, cualquier otro necesita `SOL.Triage`, solo mientras el estatus siga en Enviada/EnAnalisis/Aprobada) y se extendio el mecanismo de adjuntos -- ya generico por diseño (`ArchivoNuevo(Entidad, IdEntidad, ...)`, solo WorkItem lo consumia -- a Solicitud (`POST/GET /api/v1/solicitudes/{id}/archivos`, mismo patron que WorkItem). `EditorEnriquecido` gano un prop generico `onSubirImagen` (con prioridad sobre `idWorkItemParaAdjuntos`) para no atarlo a una sola entidad. Con la Solicitud ya guardada, "Editar" abre el mismo editor con `idSolicitud` real -- pegar imagenes ya funciona. Se exponen `idTipoSolicitud`/`idPrioridad`/`idUsuarioSolicitante` en `SolicitudResponse` (antes solo el nombre resuelto) para poder precargar el formulario de edicion sin adivinar por nombre. (3) **Dialogo "Convertir en elementos de trabajo" con controles apretados**: una sola fila con Tipo/Titulo/Prioridad/Asignado/Compromiso + icono de borrar en un dialogo de 900px dejaba Titulo con el resto de espacio sobrante (a veces <150px) y el resto de campos en 120-150px. Rediseñado: dialogo mas ancho (900px -> ~1100px), cada item en su propia tarjeta (`Paper`) con Titulo en fila propia a ancho completo y el resto de campos envolviendo con `flex-wrap` y mas espacio cada uno. Verificado en vivo con datos reales (no solo tsc/build): edicion de una Solicitud real con pegado de una imagen real via evento `paste` sintetico -- `POST /solicitudes/{id}/archivos` y `PUT /solicitudes/{id}` ambos 200, la descripcion guardada trae `<img data-guid="...">`; dialogo Convertir confirmado en 1095px con Titulo en ~975px. 53/53 pruebas backend, `tsc`/build limpios.)
+> **Actualización anterior 11:** 2026-08-04 (Sesion grande sobre un lote de pendientes de UX/negocio pedidos directo por el usuario: proyectos administrados, QA obligatorio por categoria, fecha compromiso mas estricta, buscadores/orden en catalogos y bandejas, filtro de agente en Mesa de ayuda, total de horas registradas, editor enriquecido en Nueva Solicitud, ver detalle en Revision de solicitudes, catalogos Area/Puesto y el editor de Workflows (P21). Detalle completo:
+> (1) **Proyecto administrado** (`tblProyecto.Administrado`, script 22, mismo patron de bit flag que `EsMantenimiento`): checkbox nuevo en Administracion > Proyectos. En un proyecto marcado, crear un WorkItem exige `WI.CrearEnAdministrado` y cancelarlo (accion CANCELAR desde Pendiente, ya gateada por `WI.Eliminar` -- ese es el "eliminar" real del sistema, no hay borrado fisico de WorkItems) exige ademas `WI.EliminarEnAdministrado`; en proyectos NO administrados (default) nada cambia. Los demas usuarios en un proyecto administrado solo pueden cambiar estatus (INICIAR/TERMINAR/etc. siguen con sus propias reglas, sin tocar). Permisos nuevos sembrados en script 23, asignados solo a Administrador -- el equipo decide despues si algun otro rol los necesita, via Administracion > Roles (la matriz los toma automatico).
+> (2) **QA obligatorio por categoria de proyecto** (RN-QA-06 nueva): en proyectos categoria Desarrollo (`tblCategoriaProyecto.Id=1`), terminar un WorkItem directo desde En Proceso (saltando En Pruebas) exige el permiso nuevo `WI.SaltarPruebas`; TI (2) y Mantenimiento (3) quedan libres, igual que antes. Logica en `CambiarEstatusWorkItemHandler`, no en `tblTransicionConfig` (esa tabla no puede expresar una condicion sobre el proyecto, solo sobre la transicion).
+> (3) **RN-REQ-04 mas estricto**: antes solo se bloqueaba mover la fecha compromiso al pasado; ahora CUALQUIER cambio a una fecha compromiso YA capturada (a otra fecha, o borrarla) exige `WI.ModificarCompromiso` -- fijarla por primera vez (de vacia a una fecha) sigue libre. Un cambio de una linea en `ActualizarWorkItemCommand` (la condicion ya no mira si la fecha nueva es pasada, solo si la anterior existia).
+> (4) **Buscadores y orden en catalogos/bandejas**: hook nuevo `useOrdenTabla` + componente `EncabezadoOrdenable` (`frontend/gte-web/src/shared/hooks`, `.../shared/components`) para orden client-side en tablas que ya traen el arreglo completo -- aplicado en Administracion (Proyectos, Equipos, Usuarios, Ambientes, Horarios/festivos, y los dos catalogos nuevos Areas/Puestos) y en QA/Releases. Para Tickets/Incidentes/Triage (paginados, el cliente nunca tiene el 100% del dataset) se replico el patron server-side que ya usaba la Bandeja de trabajo: `ordenarPor`/`ordenDescendente` en el filtro, switch de `OrderBy`/`OrderByDescending` en el QueryService, mismo `TableSortLabel` en la UI. Buscador de texto agregado donde faltaba (Equipos, Ambientes, Proyectos, Horarios, QA, Releases) con simple `.filter()` en memoria.
+> (5) **Mesa de ayuda: filtro Agente**: mismo patron que ya tenia la Bandeja de trabajo (filtro Asignado) -- se inicializa con el usuario firmado al entrar a la pantalla, sin pisar una eleccion posterior a "Todos". El backend ya soportaba `idAsignado` en el filtro, solo faltaba exponerlo en `BandejaTicketsPage.tsx`.
+> (6) **Total de horas registradas**: suma client-side (sin cambios de backend, el endpoint `/tiempo` ya traia todo) mostrada en la pestaña Tiempo del Detalle de WorkItem (fila "Total" al pie de la tabla) y dentro del propio `ModalTiempo` ("Total ya registrado: Xh Ym", mismo query de React Query, sin round-trip extra si ya esta en cache).
+> (7) **Nueva Solicitud con editor enriquecido**: el campo Descripcion de `PortalPage.tsx` (antes `TextField` plano) ahora usa `EditorEnriquecido` (mismo componente TipTap que Descripcion de WorkItem/Hallazgos/Comentarios) -- negritas, listas, etc. `CrearSolicitudHandler` ahora sanitiza con `ISanitizadorHtml` (antes guardaba el texto tal cual, gap real encontrado al revisar el handler). **Fuera de alcance deliberado, igual que en NuevoItemModal de WorkItem**: pegar una imagen antes de guardar la Solicitud sigue bloqueado (no existe `idSolicitud` todavia en ese punto) -- no se construyo un endpoint de adjuntos para Solicitud en esta pasada porque no habria ningun consumidor real (sin pantalla de edicion post-alta), habria quedado codigo muerto.
+> (8) **Revision de solicitudes: ver detalle**: icono nuevo por fila en `TriagePage.tsx` que abre un dialogo de solo lectura (folio, solicitante, tipo, prioridad, fecha deseada, descripcion via `ContenidoEnriquecido`, justificacion) usando los datos que la bandeja YA trae, sin round-trip nuevo. El tooltip del titulo (que concatenaba Descripcion+Justificacion como texto plano) se corrigio para no mostrar tags HTML crudos ahora que Descripcion puede venir enriquecida (helper nuevo `htmlATextoPlano` en `shared/editor/textoPlano.ts`).
+> (9) **Catalogos Area y Puesto**: existian las tablas (`tblArea`, `tblPuesto`) y se leian para los combos de Usuarios, pero sin CRUD ni pantalla propia (gap documentado en la seccion 3.4 de este archivo). Se clono el patron de Ambientes (Domain/Application/Infrastructure/WebApi + `AreasTab.tsx`/`PuestosTab.tsx`) para alta/edicion/baja logica completas, con buscador+orden desde el dia 1. Sin script SQL de esquema (las tablas ya existian).
+> (10) **Editor de Workflows** (P21, `/admin/workflows`, permiso `ADM.Workflows` -- ya sembrado desde el script 02 pero sin ningun consumidor hasta ahora): pantalla nueva, ruta aparte (no pestana de Administracion, para respetar la URL pedida). Backend nuevo completo (`GTE.Domain/Workflow`, `GTE.Application/Workflow`, `WorkflowQueryService`, `WorkflowRepository`, `WorkflowController`): lista de procesos (`tblProceso`) -> grafo completo de un proceso (`tblTransicion` + metadatos de `tblTransicionConfig`, unidos en memoria por no tener FK real) -> edicion en lote de etiqueta/permiso/motivo/accion principal/orden. **Deliberadamente NO crea ni elimina transiciones** (el grafo estructural sigue siendo por script SQL, coherente con "no tocar CambiarST" de la seccion 9.3 del InterfloClaude.md) -- solo edita los metadatos de UI de transiciones que ya existen. **Trampa evitada**: no hay forma de leer dinamicamente "la tabla de catalogo de estatus de este proceso" sin SQL interpolado (`tblProceso.TablaEstatus` es solo texto descriptivo) -- se opto por un mapeo explicito en codigo (switch de 11 casos, uno por proceso) en vez de reflection o SQL dinamico, ver `WorkflowQueryService.ObtenerCatalogoEstatusAsync`.
+> **Verificado**: 53/53 pruebas backend en verde (`dotnet test`, incluye correr los scripts 22/23 contra LocalDB real -- una prueba existente, `VerticalCompleto_CrearIniciarSuspenderRegistrarTerminar`, tuvo que cambiar su proyecto de prueba a categoria TI en vez de Desarrollo porque probaba RN-REQ-03, no la regla nueva RN-QA-06); `tsc -b` + `vite build` limpios (incluye el `predev`/`prebuild` de sync del manual). Prueba manual real en el navegador contra la API+SPA levantadas con datos migrados reales: edicion de Workflows (cambio de etiqueta/permiso en la transicion APROBAR de Solicitud, guardado, recargado y confirmado persistido, despues revertido); checkbox Administrado en un proyecto (persistido); Nueva Solicitud con texto en negritas -> confirmado en la respuesta real del POST que el HTML llego sanitizado (`<strong>` preservado) y se ve igual en el dialogo de Ver detalle de Triage; filtro Agente de Mesa de ayuda confirmado por el querystring real (`idAsignado=1` enviado solo, sin tocar nada); registro de tiempo con el total apareciendo en ambos lugares; alta de un Area y un Puesto vinculado. Sin pruebas automatizadas nuevas para las piezas de frontend (buscadores/orden, editor de Workflows) mas alla de `tsc`/`vite build`. Ver seccion 2 para el detalle por modulo)
+> **Actualización anterior 10:** 2026-08-04 (**Manual de usuario (Ayuda): se reemplazo el contenido fijo en `ManualUsuarioPage.tsx` por el manual real y completo que vive en `Doctos/ManualUsuarioGTE.html`** -- HTML autocontenido con su propio sidebar/buscador/estilos, mucho mas extenso que el acordeon anterior (cubre los 27 modulos documentados, incluye seccion "Proximamente" y glosario). En vez de copiar el contenido a mano dentro del componente (lo que garantiza que se desactualice), `ManualUsuarioPage.tsx` ahora es un iframe apuntando a `/manual-usuario.html`, servido desde `public/` de Vite; un script nuevo (`frontend/gte-web/scripts/sync-manual.mjs`) copia `Doctos/ManualUsuarioGTE.html` a `public/manual-usuario.html` en cada `predev`/`prebuild` (enganchado en `package.json`), asi que `publicar.bat` (que ya corre `npm run build`) siempre empaqueta la version mas reciente del manual sin ningun paso manual adicional. El archivo generado en `public/manual-usuario.html` se agrego a `.gitignore` -- la unica fuente de verdad editable (a mano o con IA) sigue siendo `Doctos/ManualUsuarioGTE.html`. **Verificado**: `predev` corrio solo al levantar `npm run dev` y genero el archivo correctamente; `http://localhost:<puerto>/manual-usuario.html` sirvio el manual completo en el navegador. **No verificado end-to-end**: la ruta `/ayuda` dentro de la SPA autenticada (requiere login real, sin credenciales de prueba a mano en esta sesion) -- el cambio en si es minimo (un `<iframe>` apuntando a una ruta estatica ya confirmada), pero falta el click-through real logueado. **Nota**: `DiagramaFlujoSolicitud.tsx` (el diagrama SVG que usaba el acordeon viejo) quedo sin ninguna referencia -- se dejo el archivo tal cual por pedido explicito de no borrar nada en esta sesion, pendiente de que alguien decida si se borra o se reutiliza)
+> **Actualización anterior 9:** 2026-08-03 (Sesion larga de ajustes sobre Bandeja de trabajo/Nuevo elemento + Mi Dia extendido a Tickets/Incidentes/Solicitudes/Triage + accion Copiar + edicion de Proyecto + bloqueo de alta en proyecto cerrado (RN-PRY-02 nueva). Detalle completo: (1) **Bandeja de trabajo** (`BandejaPage.tsx`): el filtro Asignado se inicializa con el usuario firmado al entrar a la pantalla (solo si no habia uno ya elegido en la sesion, no pisa una eleccion posterior a "Todos"); se quito la columna Presupuesto de `TablaBandeja.tsx` (sin uso real, quedo pedido explicito); se regreso "Registrar tiempo" al menu de acciones de cada fila (`MenuAcciones.tsx`) -- el modal `ModalTiempo` ya existia pero solo estaba enganchado en Mi Dia y el Detalle, no ahi. (2) **Nuevo elemento de trabajo** (`NuevoItemModal.tsx`): Prioridad nace en Media (id 3, fijo por el enumerado `tblPrioridad`) y Asignado en el usuario firmado por default (antes ambos nacian vacios); si el Proyecto elegido es de categoria "TI", la Fecha compromiso se precarga con hoy (solo si el campo sigue vacio, no pisa una fecha ya escrita) -- exigio agregar `CategoriaProyecto` a `ProyectoItemResponse`/`CatalogosQueryService` (antes el catalogo de `/catalogos/bandeja` solo traia id/clave/nombre por proyecto). (3) **Filtro "solo mis proyectos"** en los 9 combos de Proyecto que salen de `/catalogos/bandeja` (bandeja, nuevo elemento, triage, incidentes, tickets, backlog, QA, releases): un proyecto aparece si el usuario es su Responsable o pertenece al equipo asignado (join contra `TblEquipoMiembro`, mismo patron que ya arma `sesion.equipos` en el login) -- resuelto en el Handler via `IProveedorUsuarioActual`, no en el QueryService. Deliberadamente EXCLUIDO de Ambientes/Costeo/OKR (`obtenerProyectos()` sin filtro, siguen viendo los 47 proyectos completos via `/api/v1/proyectos` -- son pantallas de administracion, no de trabajo personal). **Hallazgo real de la prueba en vivo**: la mayoria de proyectos migrados del GT no tienen Responsable ni Equipo capturado en BD -- los 8 proyectos de categoria "TI" probados tienen AMBOS campos NULL; decision del negocio fue dejar el filtro como esta (el problema real es que a esos proyectos les falta el dato, no que el filtro este mal), ver nota en seccion 3.4. (4) **Accion "Copiar"** en el menu de acciones de la bandeja: abre el mismo modal de alta prellenado con Proyecto/Tipo/Prioridad/Titulo ("Copia de ...")/Descripcion/Asignado del elemento original -- hace `GET /api/v1/workitems/{folio}` para traer Descripcion e IdPrioridad numerico (la fila de la bandeja no los trae); NO copia Estatus/Folio/Fecha compromiso, siempre nacen limpios como en una alta normal. (5) **Mi Dia** (`GET /api/v1/mi-dia`) ahora tambien trae `TicketsAsignados` (agente, no Cerrado, reutiliza `ITicketQueryService.ObtenerBandejaAsync` tal cual sin tocarlo), `IncidentesRelevantes` (proyectos donde el usuario es responsable, no Cerrado -- `IIncidenteQueryService.ObtenerRelevantesAsync` nuevo, ya que `TblIncidente` no tiene asignacion directa a un usuario), `SolicitudesPendientes` (las que el usuario levanto, en Enviada/EnAnalisis/Aprobada, reutiliza `ISolicitudQueryService.ObtenerMiasAsync`) y `TriagePendientes` (contador GLOBAL de solicitudes esperando revision en todo el sistema, solo si el usuario tiene `SOL.Triage` -- no existe hoy forma de personalizarlo por proyecto/equipo, es un aviso con link a Triage, no una lista propia). Cada seccion nueva de Mi Dia solo se muestra si tiene contenido, a diferencia de Vencidas/Para hoy/Proximas que siempre se muestran con "(0)". (6) **Edicion de Proyecto** en Administracion: el backend YA tenia todo listo desde antes (`PUT /api/v1/proyectos/{id}`, `ActualizarProyectoCommand`, `actualizarProyecto` en `administracion.ts`) pero `ProyectosTab.tsx` nunca lo exponia en la UI (documentado por error como resuelto en una fila vieja de esta seccion) -- se agrego boton "Editar" + modal, mismo patron `proyectoEditar`/`abrirEditar`/`guardarEdicion` que ya usa `UsuariosTab.tsx`. (7) **RN-PRY-02 (nueva)**: un proyecto en estatus Cerrado o Cancelado ya no admite WorkItems nuevos -- `CrearWorkItemHandler` valida `IdEstatusProyecto` (campo agregado a `ProyectoResumen`/`WorkItemRepository.ObtenerProyectoAsync`, mismo query existente, sin round-trip extra) y rechaza con 400 "El proyecto esta cerrado; no admite elementos nuevos.". Verificado en vivo contra la API real (no solo `tsc`/`dotnet build`) con `aviramontes`: Mi Dia mostro 2 tickets reales asignados; Copiar trajo Descripcion+Asignado reales de un WorkItem migrado; edicion de Proyecto persistio un cambio de Responsable via `PUT` directo (confirmado y revertido); bloqueo de proyecto cerrado probado creando un proyecto de prueba (`TESTCERR`, autorizado y cancelado via el motor, queda en LocalDB a proposito, ver seccion 3.4) y confirmando el 400 al intentar crear un WorkItem ahi. Ver seccion 2, filas "Bandeja de trabajo (ajustes 2026-08-03)", "Mi Dia: Tickets/Incidentes/Solicitudes/Triage" y "Administracion: edicion de Proyecto + bloqueo de proyecto cerrado")
+> **Actualización anterior 8:** 2026-08-03 (Buscador tipo LIKE en todos los combos de catalogo dinamico de la SPA: nuevo componente compartido `ComboBuscable`/`ComboBuscableMultiple` (`frontend/gte-web/src/shared/components/ComboBuscable.tsx`), wrapper de MUI Autocomplete con un tipo normalizado `{valor, etiqueta}` que desacopla el componente de la forma real de cada catalogo -- se uso en los ~70 combos que vienen de un catalogo dinamico del backend, en los 22 archivos de `src/features/` que antes usaban `Select`+`MenuItem` (admin, trabajo, workitem, triage, operacion, soporte, portafolio, planeacion, calidad, entregas, solicitudes). El filtro "contiene, insensible a mayusculas" es el default nativo de Autocomplete, sin `filterOptions` custom. **Quedaron deliberadamente fuera** (decision explicita del negocio) unos 10 `Select` de listas cortas y fijas escritas en el JSX, sin catalogo de backend (dia de la semana en Horarios, Alcance global/horario en Horarios, Aplica a proyecto/equipo y Trimestre Q1-Q4 en OKRs, Destino de cierre de sprint en Backlog, Tipo de artefacto y Tipo despliegue/rollback en Releases, Resultado de ejecucion en QA) -- buscar entre 2-7 opciones fijas no aporta. El caso multiple (Estatus en BarraFiltros/BandejaTickets con sentinel `-1`="Todos", y "Elementos" en ReleasesPage con resumen "N seleccionado(s)" via prop `resumenSimple`) se cubre con `ComboBuscableMultiple`. Verificado en vivo con `npm run dev`: `tsc --noEmit` en 0 errores (con `noUnusedLocals`/`noUnusedParameters`, confirma que no quedaron imports de `Select`/`MenuItem`/`FormControl`/`InputLabel` sueltos) y prueba interactiva real en el navegador -- filtro Proyecto de la Bandeja de trabajo filtra en vivo al escribir "GTE", y el multiple de Estatus filtra opciones y pinta el chip "En Proceso" seleccionado, sin regresion visible. Ver seccion 2, fila "Combos con buscador")
+> **Actualización anterior 7:** 2026-08-03 (Notificacion al convertir una Solicitud, segunda pasada: ademas de avisar al solicitante (ver abajo), `ConvertirSolicitudHandler` ahora notifica tambien al **usuario asignado** de cada item del desglose que traiga `IdAsignado` -- "Se te asigno el elemento de trabajo {folio}" con el titulo del item, ligado a la entidad `WorkItem`/ruta `/wi/{folio}` (no todos los items traen asignado, el triage puede dejarlos sin asignar). Verificado en vivo en LocalDB con dos cuentas reales: convertida una Solicitud con Asignado=Luis Garcia, la notificacion aparece de inmediato en la campana de `lgarcia`. Ver seccion 2)
 > **Actualización anterior 6:** 2026-08-03 (**Falta la notificacion al convertir una Solicitud.** `CambiarEstatusSolicitudCommand` ya notifica al solicitante en Aprobar/Rechazar/Devolver, pero Convertir tiene su propio comando (`ConvertirSolicitudCommand`, por el desglose de items) y nunca quedo con su propia notificacion -- gap real, no regresion de esta sesion. Se agrego `IServicioNotificaciones` a `ConvertirSolicitudHandler`: notifica al `IdSolicitante` original con "Tu solicitud {Titulo} fue convertida en trabajo" + el/los folio(s) generados, mismo patron y ruta (`/solicitudes`) que las otras transiciones. Verificado en vivo en LocalDB: aparece en la campana de notificaciones de inmediato tras convertir. Ver seccion 2)
 > **Actualización anterior 5:** 2026-08-03 (**Bug de produccion: "Convertir en trabajo" no abria el modal, `crypto.randomUUID is not a function` en consola.** Causa: `crypto.randomUUID()` (usado en `TriagePage.tsx` para generar el `uiId` de cada fila del desglose) solo existe en contexto seguro (HTTPS o `localhost`); produccion sirve por HTTP plano sobre un hostname real (no localhost, no HTTPS), asi que el navegador ni siquiera expone la funcion -- nunca fallaba en pruebas locales porque `localhost` siempre cuenta como contexto seguro. Se reemplazo por un generador simple sin dependencia de Web Crypto (`generarUiId`, timestamp+random en base36) -- el uiId es solo correlacion cliente-servidor de esta pantalla, no necesita ser criptografico. Verificado en vivo en LocalDB: Solicitud -> Triage (Tomar/Aprobar/Convertir) completa sin error. **Mismo tipo de trampa que la cookie de sesion de mas abajo: algo que solo se prueba bien en `localhost` y se rompe en el hostname real de produccion -- revisar el resto del codigo por usos de APIs de contexto seguro (`crypto.subtle`, `crypto.randomUUID`, Clipboard API, etc.) que puedan tener el mismo problema.** Ver seccion 2)
 > **Actualización anterior 4:** 2026-08-03 (Solicitud/WorkItem: mismo patron de "Usuario solicitante" (catalogo tblUsuarioSolicitante) extendido de Tickets a Solicitudes -- se captura opcionalmente al crear la solicitud, SOLO si quien la registra tiene `SOL.Triage` (un Lider/analista levantandola a nombre de otra persona), y se copia automaticamente al WorkItem cuando `ConvertirSolicitudHandler` lo convierte (mismo mecanismo con que ya se copian `IdSolicitante`/`IdSolicitud` hoy). Columnas nuevas: `tblSolicitud.IdUsuarioSolicitante` y `tblWorkItem.IdUsuarioSolicitante` (script 21). **Misma trampa de nombre de FK que en Tickets** (ver Actualizacion anterior 2): `tblWorkItem` ya tenia un FK llamado `FK_tblWorkItem_tblUsuarioSolicitante` para `IdSolicitante->tblUsuario` (por el ROL, no la tabla) -- se verifico ANTES de escribir el script y el FK nuevo usa el sufijo "Catalogo" en ambas tablas. Verificado en vivo end-to-end en LocalDB con datos reales migrados: Solicitud SOL-2026-0040 creada con Usuario solicitante=Maria Garcia -> Triage (Tomar/Aprobar a proyecto GTE)-> Convertida en WorkItem GTE-0009, que muestra "Usuario solicitante: Maria Garcia" en su Detalle junto al "Solicitante" interno (Ana Viramontes); confirmado que lgarcia (sin SOL.Triage) no ve el campo al crear una solicitud. Tambien se agrego un indicador "*" con tooltip en la columna Solicitante de la bandeja de Triage cuando hay Usuario solicitante capturado. Ver seccion 2)
@@ -69,7 +443,8 @@ dotnet test GTE.sln    # 45 pruebas; las de integración se omiten si no hay Loc
 | **Entregas** | Releases con contenido validado, artefactos con rollback pareado, cadena de firmas, despliegues, rollback, notas de versión | Releases |
 | **Motor de estatus** | 11 procesos por datos en `tblProceso`/`tblTransicion` + `spCambiarEstatus` con guard de concurrencia | — |
 | **Calendario laboral** | `fnMinutosLaborales` con turnos partidos y festivos; motor único de tiempo | — |
-| **Administracion** | Proyectos (alta/edicion + cambio de estatus por el motor, folio al autorizar, RN-PRY-01 bloquea el cierre con WorkItems abiertos), equipos con miembros y % dedicacion, usuarios (alta/edicion/baja logica, RN-ADM-01 valida ciclos de jerarquia con CTE recursivo), roles (asignar/retirar con alcance global o por proyecto, matriz rol-permiso guardada en lote), horarios (tramos con turnos partidos, dias festivos) y ambientes (por proyecto o globales) | Administracion (6 pestañas) |
+| **Indicadores ejecutivos (P18)** | Lead/Cycle Time, DORA (Deployment Frequency/Change Failure Rate/MTTR reales, Lead Time for Changes sin datos), Entrega a tiempo, Eficiencia, Retrabajo, Productividad, SLA/CSAT, semáforo de proyectos con costo, OKR, KPIs personalizados (snapshot nocturno via Hangfire), top riesgos, burndown de sprint activo; widgets ocultables y reordenables persistidos por usuario | Indicadores ejecutivos |
+| **Administracion** | Proyectos (alta/edicion + cambio de estatus por el motor, folio al autorizar, RN-PRY-01 bloquea el cierre con WorkItems abiertos), equipos con miembros y % dedicacion, usuarios (alta/edicion/baja logica, RN-ADM-01 valida ciclos de jerarquia con CTE recursivo), roles (asignar/retirar con alcance global o por proyecto, matriz rol-permiso guardada en lote), horarios (tramos con turnos partidos, dias festivos) ambientes (por proyecto o globales), y **areas/puestos (2026-08-04, catalogos nuevos con CRUD)** | Administracion (8 pestañas) |
 | **Comentarios y adjuntos** | Hilos de comentarios sobre WorkItem con formato basico (negritas, listas, etc.), @menciones con autocompletado (TipTap + catalogo de usuarios) y pegado de imagenes desde el portapapeles; adjuntos con subida/descarga por streaming autenticado (`IAlmacenArchivos` en disco, GUID + SHA-256), validacion de extension/tamano, baja logica solo por el propio autor. HTML sanitizado en el backend (`HtmlSanitizer`) antes de guardarse | franja de Comentarios bajo el detalle + pestaña Adjuntos, en Detalle de WorkItem |
 | **Rich text en Descripcion y Hallazgos (2026-08-02)** | El mismo tratamiento de Comentarios (TipTap + pegado de imagenes + sanitizado backend) se extendio a la Descripcion del WorkItem (solo en edicion/detalle, ver nota de alcance abajo) y a la captura de Hallazgos (`PanelRevisiones`, campo "Que se encontro"). Piezas compartidas extraidas a `frontend/gte-web/src/shared/editor/` (`ImagenProtegida`, `ContenidoEnriquecido`, `EditorEnriquecido`, `textoPlano.ts`) para no duplicar el patron entre Comentarios/Descripcion/Hallazgos; `EditorComentario`/`PanelComentarios` se refactorizaron para consumir las mismas piezas en vez de mantener su propia copia. Backend: `CrearWorkItemCommand`/`ActualizarWorkItemCommand`/`CrearRevisionCommand` ahora sanitizan con `ISanitizadorHtml` igual que Comentarios (`SanitizadorHtmlGanss` ya soportaba el mismo set de tags, no necesito cambios ahi). Compatibilidad con datos legado (Descripcion/Comentarios de Hallazgo eran texto plano antes de esto): `normalizarHtmlLegado` detecta si el valor YA es HTML (contiene una etiqueta) y si no, escapa y convierte saltos de linea a `<br>` antes de mostrarlo/editarlo -- transparente, no requiere migracion de datos. **Fuera de alcance deliberado**: el modal de ALTA (`NuevoItemModal.tsx`) sigue con Descripcion en texto plano -- el WorkItem no existe todavia en ese punto, no hay a que adjuntar imagenes pegadas (mismo motivo por el que no se puede comentar antes de crear); se vuelve rich text recien en la edicion. `CriteriosAceptacion` y el "Motivo" de reapertura de hallazgo quedan como texto plano (no se pidio ampliarlos) | Modal editar WorkItem + pestaña Descripcion del Detalle; modal "Reportar hallazgo" + listado de Revisiones |
 | **Notificaciones y tiempo real** | Campana con notificaciones In-App (`tblNotificacion`) que llegan en vivo por SignalR (`NotificacionesHub`, un solo hub para notificaciones + refresco de tablero); disparadores: Solicitud aprobada/rechazada/devuelta/**convertida (2026-08-03, notifica al solicitante Y a cada usuario asignado de los items generados)** y @mencion en un comentario (notifica al mencionado). El tablero Kanban se refresca solo cuando cualquier WorkItem cambia de estatus, sin importar quien lo haya movido | campana en la barra superior (todas las pantallas) |
@@ -79,13 +454,26 @@ dotnet test GTE.sln    # 45 pruebas; las de integración se omiten si no hay Loc
 | **Solicitud/WorkItem: Usuario solicitante (2026-08-03)** | Mismo patrón que en Tickets, extendido a Solicitudes: `tblSolicitud.IdUsuarioSolicitante` (capturado opcionalmente al crear, SOLO visible para quien tiene `SOL.Triage` — un Líder registrando a nombre de otra persona) y `tblWorkItem.IdUsuarioSolicitante` (copiado automáticamente por `ConvertirSolicitudHandler` al convertir, mismo mecanismo con que ya se copian `IdSolicitante`/`IdSolicitud`) — script 21, mismo cuidado de nombrar el FK nuevo `FK_tblSolicitud_tblUsuarioSolicitanteCatalogo`/`FK_tblWorkItem_tblUsuarioSolicitanteCatalogo` para no chocar con el FK ya existente por rol (`FK_tblWorkItem_tblUsuarioSolicitante` es `IdSolicitante->tblUsuario`, verificado ANTES de escribir el script esta vez). Indicador "*" con tooltip en la bandeja de Triage cuando hay Usuario solicitante. Verificado en vivo extremo a extremo en LocalDB con datos reales migrados: Solicitud → Triage (Tomar/Aprobar a proyecto GTE) → Convertida en WorkItem, visible en su Detalle junto al Solicitante interno; confirmado que un usuario sin `SOL.Triage` no ve el campo. **Pendiente**: correr el script 21 en producción | Mis solicitudes (`/solicitudes`), Revisión de solicitudes (`/triage`), Detalle de WorkItem (`/wi/:folio`) |
 | **Incidentes** | Segundo módulo de Fase 4, construido 2026-08-02, verificado extremo a extremo en LocalDB (no solo compilado): alta de incidente (folio INC-año, estatus inicial Detectado) dentro de un proyecto con severidad S1-S4, bandeja + detalle con las 5 transiciones del proceso `Incidente` (atender, mitigar, resolver, cerrar -- sin reapertura, un incidente siempre concluye en Cerrado) vía el motor de workflow existente, RN-OPS-02 (cerrar con severidad S1/S2 exige causa raíz capturada, validado y probado en vivo: el cierre se rechaza sin causa raíz y procede tras capturarla), RN-OPS-03 (cambio de severidad como acción de negocio aparte -- no es una transición de `tblTransicion` -- con motivo obligatorio), vincular WorkItem correctivo (crea un WorkItem tipo Corrección igual patrón que el escalamiento de Tickets, probado: creó `HELPDESK-3395`), y vincular un release ya existente como causante (reutiliza `GET /api/v1/releases?idProyecto=X`, insumo futuro de DORA Change Failure Rate). El esquema de BD (`tblIncidente`, `tblEstatusIncidente`, `tblSeveridad`, el proceso `Incidente` en `tblProceso`/`tblTransicion`, el permiso `INC.Gestionar`, `tblProyecto.IdResponsable`) ya existía desde el despliegue inicial; esta sesión sembró `tblTransicionConfig` (script 13) y construyó las 4 capas de código + 2 pantallas nuevas. **Fuera de alcance de esta pasada**: RN-OPS-01 completo (notificación a "todos los canales" -- solo existe InApp -- y escalamiento automático a 30 min sin atención, necesita Hangfire/A4; tampoco se notifica "al líder" por falta de una consulta usuarios-por-rol ya establecida) -- sí se implementó la notificación InApp inmediata al responsable del proyecto en incidentes S1; disponibilidad/% uptime mensual (reporte, Fase 5); monitoreo con health checks (Hangfire + catálogo de sistemas, no existe); `tblBitacoraCambio` ("qué cambió ayer") sigue sin UI, es bitácora general de PROD no específica de Incidentes; sin pruebas automatizadas nuevas | Incidentes (`/operacion/incidentes`, bandeja), Detalle de incidente (`/operacion/incidentes/:folio`) |
 | **Portafolio: Costeo real y OKRs (A5, parcial)** | Construido 2026-08-02, verificado extremo a extremo en LocalDB: catálogo de tarifas por nivel con vigencia por fecha (alta/edición/baja lógica), presupuesto por proyecto/año, y reporte de costo real (`tblRegistroTiempo` × tarifa vigente del nivel del usuario a la fecha del registro, resuelta con `OUTER APPLY` en la vista `vwCostoRegistroTiempo` — nuevo patrón de vigencia, no existía uno previo en el código) comparado contra el presupuesto, con desglose por usuario. Probado en vivo contra datos históricos migrados reales del GT (proyecto PLANTILLA ANGULAR, usuario con 20h registradas × tarifa Junior $150/h = $3,000 exacto). OKRs: objetivos trimestrales por proyecto o equipo con resultados clave (meta/valor actual editado a mano, vínculo opcional a `ClaveKpi` para cuando exista el job de snapshot). Dos permisos nuevos sembrados (`POR.GestionarCosteo`, `POR.GestionarOkr`, módulo "Portafolio" en `tblPermiso`, script 14) — a diferencia de Tickets/Incidentes, este submódulo no tenía permiso previo. **Refinamiento 2026-08-02 (mismo día): ver tarifas/presupuesto/costo real ahora exige permiso aparte de administrarlos.** En vez de sembrar un tercer permiso redundante, se reutilizó `RPT.Costos` (ya sembrado en script 02, módulo "Indicadores", reservado para el futuro Dashboard Ejecutivo — su descripción "Ver reportes de costos y rentabilidad" calzaba exacto). Las 3 consultas de lectura (`ObtenerTarifasNivelQuery`, `ObtenerPresupuestosProyectoQuery`, `ObtenerCostoProyectoQuery`) exigen `RPT.Costos` **o** `POR.GestionarCosteo` (quien administra el catálogo también puede verlo); los Commands de alta/edición/baja siguen exigiendo solo `POR.GestionarCosteo` — ver no habilita editar. En el frontend, la pestaña Costeo se oculta completa si el usuario no tiene ninguno de los dos permisos (`PortafolioPage.tsx`, con mensaje "No tienes permiso para ver esta sección" en vez de dejar caer en una pestaña oculta al navegar directo a la URL — bug encontrado y corregido en el mismo repaso), y los botones de alta/edición/baja de tarifas y presupuesto se ocultan si falta específicamente `POR.GestionarCosteo` (`CosteoTab.tsx`, prop `puedeGestionar`). Verificado en vivo con dos cuentas reales: `aviramontes` (Administrador, tiene ambos permisos) ve y edita todo sin regresión; `lgarcia` (rol Desarrollador, sin ninguno de los dos) ve "No tienes permiso..." en la pantalla, el ítem "Portafolio" ni aparece en el menú lateral, y una llamada directa a `GET /api/v1/costeo/tarifas` con su token responde `403 FORBIDDEN`. **Fuera de alcance de esta pasada**: Riesgos (matriz probabilidad×impacto, ya tiene workflow sembrado en el motor) y la jerarquía Portafolio/Programa quedan para otra sesión (ver A5 en 3.2); "avance automático" de OKR ligado a KPIs depende del job nocturno de `tblKpiValor` (Hangfire/A4); sin pruebas automatizadas nuevas | Portafolio (`/portafolio`, pestañas Costeo/OKR) |
-| **Manual de usuario (Ayuda)** | Pagina de ayuda estatica dentro de la SPA, en espanol simple para usuarios sin conocimiento tecnico: secciones en acordeon (login, menu, Mi Dia, bandeja, detalle de WorkItem, Solicitudes, el flujo completo de una solicitud hasta su cierre con diagrama SVG -- incluye las ramas de Rechazada/Devuelta y Hallazgos de QA --, otras secciones segun rol, contacto de soporte). Sin permiso (disponible para cualquier usuario autenticado); contenido fijo en el codigo, no hay editor -- actualizarlo requiere tocar `ManualUsuarioPage.tsx` | Ayuda (visible para todos en el menu) |
+| **Manual de usuario (Ayuda) (actualizado 2026-08-04)** | Pagina de ayuda dentro de la SPA: `ManualUsuarioPage.tsx` ahora es un `<iframe>` que incrusta `Doctos/ManualUsuarioGTE.html` (el manual real y completo, HTML autocontenido con su propio sidebar/buscador/estilos, 27 secciones incluyendo Proximamente y Glosario), servido como `/manual-usuario.html` desde `public/` de Vite. `frontend/gte-web/scripts/sync-manual.mjs` copia el HTML de `Doctos/` a `public/` en cada `predev`/`prebuild` -- se edita SOLO `Doctos/ManualUsuarioGTE.html` (a mano o con IA) y el build/publish siempre lo refleja, sin tocar codigo. Sin permiso (disponible para cualquier usuario autenticado). El acordeon viejo (contenido fijo en el componente) se reemplazo por completo; `DiagramaFlujoSolicitud.tsx` quedo sin referencias, no se borro (ver nota arriba) | Ayuda (visible para todos en el menu) |
 | **Menu lateral (2026-08-02)** | La navegacion se movio de una barra horizontal arriba a un panel lateral fijo del lado izquierdo (`Drawer` de MUI, `variant="permanent"`, `anchor="left"`), con la opcion activa resaltada segun la ruta actual. En pantallas chicas se colapsa a un boton de menu al inicio de la barra superior (junto al logo) que abre un cajon deslizable (`variant="temporary"`) que se cierra solo al navegar. La barra superior conservo el logo, la campana de notificaciones y el chip de usuario (con el nombre truncado en pantallas chicas para no empujar el boton de menu fuera de la vista). Se probo primero con `anchor="right"` (pedido inicial) y se corrigio a `anchor="left"` (decision final) -- ver leccion tecnica en la seccion 5 sobre por que el lado derecho encimaba el menu con el contenido | Panel lateral izquierdo (todas las pantallas) |
+| **Combos con buscador (2026-08-03)** | Todo `Select`+`MenuItem` de MUI que representa un catalogo dinamico del backend (proyecto, usuario, estatus, prioridad, severidad, release, ambiente, etc.) se reemplazo por dos componentes nuevos y reutilizables en `frontend/gte-web/src/shared/components/ComboBuscable.tsx`: `ComboBuscable` (single) y `ComboBuscableMultiple` (multiple), ambos wrapper de MUI Autocomplete con el catalogo normalizado a `{valor, etiqueta}` -- el filtro "contiene" insensible a mayusculas es el default nativo de Autocomplete, sin `filterOptions` custom. Cubre ~70 combos en 22 archivos de `src/features/`. Las opciones "Todos"/"Sin asignar"/"Sin especificar" viven como una entrada mas del arreglo con `valor: ""`, igual que el `MenuItem value=""` que reemplazan. El multiple con chips (Estatus en BarraFiltros/BandejaTickets, sentinel `-1`="Todos") y el multiple con resumen de texto (prop `resumenSimple`, "Elementos" en ReleasesPage) usan el mismo `ComboBuscableMultiple`. **Fuera de alcance por decision explicita**: unos 10 `Select` de listas cortas y fijas escritas en el JSX sin catalogo de backend (dia de semana y Alcance en Horarios, Aplica-a y Trimestre en OKRs, Destino de cierre de sprint en Backlog, Tipo de artefacto y Tipo despliegue/rollback en Releases, Resultado de ejecucion en QA) quedan como `Select` simple -- pocas opciones fijas, buscar no aporta. Verificado con `tsc --noEmit` (0 errores, `noUnusedLocals`/`noUnusedParameters` activos) y probado en vivo en el navegador (filtro Proyecto y Estatus multiple de la Bandeja de trabajo) | Todos los combos de catalogo en toda la SPA |
+| **Bandeja de trabajo: ajustes de filtro/columna/menu (2026-08-03)** | Tres ajustes puntuales sobre el modulo WorkItems ya existente: Asignado se inicializa con el usuario firmado al entrar (`BandejaPage.tsx`, no pisa una eleccion posterior a "Todos" mientras la pantalla siga montada); columna Presupuesto retirada de la tabla (`TablaBandeja.tsx`); "Registrar tiempo" de vuelta en el menu de acciones de cada fila (`MenuAcciones.tsx`, reutilizando `ModalTiempo` ya existente). Mismo archivo `MenuAcciones.tsx` gano la accion **"Copiar"**: abre `NuevoItemModal` (nueva prop `copiaDe`) prellenado con Proyecto/Tipo/Prioridad/Titulo ("Copia de ...")/Descripcion/Asignado del original -- hace `GET /workitems/{folio}` porque la fila de la bandeja no trae Descripcion ni IdPrioridad numerico; Estatus/Folio/Fecha compromiso siempre nacen limpios. `NuevoItemModal` tambien gano defaults propios sin copiaDe: Prioridad en Media (id 3) y Asignado en el usuario firmado; y si el Proyecto es categoria "TI", Fecha compromiso se precarga con hoy (solo si sigue vacia) -- requirio agregar `CategoriaProyecto` a `ProyectoItemResponse`/`CatalogosQueryService`. Ademas, los 9 combos de Proyecto que salen de `/catalogos/bandeja` (bandeja, nuevo elemento, triage, incidentes, tickets, backlog, QA, releases) ahora solo listan proyectos donde el usuario es Responsable o es de su equipo (join contra `TblEquipoMiembro`, resuelto en el Handler via `IProveedorUsuarioActual`) -- deliberadamente NO aplica a Ambientes/Costeo/OKR, que siguen viendo todos los proyectos via `/api/v1/proyectos` sin filtro. Verificado en vivo contra la API real con `aviramontes`: filtro Asignado, ausencia de columna Presupuesto, menu con Registrar tiempo/Copiar, Copiar trayendo Descripcion+Asignado reales, y Prioridad/Asignado por default confirmados en el DOM | Trabajo (bandeja + menu de acciones + Nuevo/Copiar) |
+| **Mi Dia: Tickets, Incidentes, Solicitudes y Triage (2026-08-03)** | Extiende la fila "Mi Dia" de arriba: ademas de WorkItems, `GET /api/v1/mi-dia` ahora trae `TicketsAsignados` (agente, no Cerrado -- reutiliza `ITicketQueryService.ObtenerBandejaAsync` sin tocarlo), `IncidentesRelevantes` (proyectos donde el usuario es Responsable, no Cerrado -- `IIncidenteQueryService.ObtenerRelevantesAsync` nuevo, ya que `TblIncidente` no tiene asignacion directa a un usuario), `SolicitudesPendientes` (las que el usuario levanto, en Enviada/EnAnalisis/Aprobada -- reutiliza `ISolicitudQueryService.ObtenerMiasAsync`) y `TriagePendientes` (contador GLOBAL de solicitudes esperando revision en todo el sistema, solo si el usuario tiene `SOL.Triage` -- no existe forma de personalizarlo por proyecto/equipo hoy, es un aviso con link a `/triage`, no una lista propia). Cada seccion nueva solo se muestra si tiene contenido (a diferencia de Vencidas/Para hoy/Proximas que siempre muestran "(0)"), para no ensuciarle la pantalla a quien no le aplica. Verificado en vivo contra la API real: `aviramontes` vio "Tickets asignados (2)" con datos y links reales a `/tickets/{folio}`; Incidentes/Solicitudes/Triage no aparecieron por no tener datos, confirmando el comportamiento de seccion oculta | Mi Dia |
+| **Administracion: edicion de Proyecto + bloqueo de proyecto cerrado (2026-08-03)** | El backend de edicion de Proyecto (`PUT /api/v1/proyectos/{id}`, `ActualizarProyectoCommand`, `actualizarProyecto` en `administracion.ts`) ya existia completo desde antes pero `ProyectosTab.tsx` nunca lo exponia en la UI -- se agrego boton "Editar" + modal (Nombre/Categoria/Equipo/Responsable/fechas/Mantenimiento; Clave e IdPrograma quedan de solo lectura por diseno del backend), mismo patron `entidadEditar`/`abrirEditar`/`guardarEdicion` que ya usa `UsuariosTab.tsx`. **RN-PRY-02 (nueva)**: un proyecto en estatus Cerrado o Cancelado ya no admite WorkItems nuevos -- `CrearWorkItemHandler` valida `IdEstatusProyecto` (campo agregado a `ProyectoResumen`/`WorkItemRepository.ObtenerProyectoAsync`, mismo query existente, sin round-trip extra) contra `EstatusProyecto.Cerrado`/`.Cancelado` (ya existian como constantes) y rechaza con 400 "El proyecto esta cerrado; no admite elementos nuevos." (mismo estilo `BusinessException` que la validacion de proyecto inactivo ya existente). Verificado en vivo contra la API real: `PUT` de edicion persistio un cambio de Responsable (confirmado y revertido); bloqueo probado de punta a punta creando un proyecto de prueba, autorizandolo y cancelandolo via el motor de workflow, y confirmando el 400 al intentar crear un WorkItem ahi | Administracion > Proyectos |
+| **Proyectos administrados y QA obligatorio por categoria (2026-08-04)** | `tblProyecto.Administrado` (BIT, script 22) marcable desde Administracion > Proyectos: en un proyecto administrado, crear un WorkItem exige `WI.CrearEnAdministrado` y cancelarlo (accion CANCELAR desde Pendiente, el "eliminar" real del sistema -- no hay borrado fisico) exige ademas `WI.EliminarEnAdministrado`; el resto de usuarios solo cambia estatus. RN-QA-06 nueva: en proyectos categoria Desarrollo, terminar un WorkItem directo desde En Proceso (sin pasar por En Pruebas) exige `WI.SaltarPruebas`; TI y Mantenimiento siguen libres. RN-REQ-04 ampliado: cualquier cambio a una fecha compromiso YA capturada exige `WI.ModificarCompromiso` (antes solo se bloqueaba moverla al pasado); fijarla la primera vez sigue libre. Los tres permisos nuevos (script 23) solo se sembraron para Administrador -- el equipo asigna a otros roles desde Administracion > Roles si lo decide. Verificado: 53/53 pruebas backend en verde tras correr los scripts 22/23 en LocalDB (una prueba existente se ajusto a categoria TI porque probaba una regla distinta, RN-REQ-03) | Administracion > Proyectos, cualquier WorkItem |
+| **Buscadores y orden en catalogos y bandejas (2026-08-04)** | Hook `useOrdenTabla` + componente `EncabezadoOrdenable` (`frontend/gte-web/src/shared/hooks`, `.../shared/components`) para orden client-side en tablas sin paginacion server-side: Administracion (Proyectos, Equipos, Usuarios, Ambientes, Horarios/festivos, Areas, Puestos), QA y Releases; buscador de texto en memoria donde faltaba. Para Tickets/Incidentes/Triage (paginados) se agrego `ordenarPor`/`ordenDescendente` al filtro y un switch `OrderBy`/`OrderByDescending` en el QueryService, mismo patron server-side que ya tenia la Bandeja de trabajo. Solo `tsc`/`vite build`, sin pruebas automatizadas nuevas | Administracion, QA, Releases, Mesa de ayuda, Incidentes, Revision de solicitudes |
+| **Mesa de ayuda: filtro por Agente (2026-08-04)** | `BandejaTicketsPage.tsx` inicializa el filtro Agente (`idAsignado`) con el usuario firmado al entrar, sin pisar una eleccion posterior a "Todos" -- mismo patron que ya tenia el filtro Asignado de la Bandeja de trabajo. El backend ya soportaba `idAsignado` en el filtro, solo faltaba exponerlo. Verificado en vivo: el querystring real trae `idAsignado=<idDelUsuarioFirmado>` sin tocar nada | Mesa de ayuda (`/soporte`) |
+| **Nueva Solicitud con editor enriquecido + ver detalle en Revision (2026-08-04)** | Descripcion de `PortalPage.tsx` (antes texto plano) ahora usa `EditorEnriquecido` (mismo TipTap de Descripcion de WorkItem/Comentarios/Hallazgos); `CrearSolicitudHandler` sanitiza con `ISanitizadorHtml` (gap real, antes guardaba tal cual). Pegar imagenes antes de guardar (alta) sigue bloqueado, igual que WorkItem (no existe `idSolicitud` todavia) -- **ya no es un callejon sin salida**, ver fila "Edicion de Solicitud + adjuntos" mas abajo: guardar primero y editar despues si resuelve. En Revision de solicitudes (`TriagePage.tsx`), icono nuevo "Ver detalle" por fila abre un dialogo de solo lectura con los datos que la bandeja ya trae (sin round-trip nuevo), renderizando Descripcion con `ContenidoEnriquecido`; el tooltip del titulo se corrigio para no mostrar tags HTML crudos (`htmlATextoPlano` nuevo en `shared/editor/textoPlano.ts`). Verificado en vivo end-to-end: una Solicitud creada con texto en negritas confirma `<strong>` en la respuesta real del POST (sanitizado, no escapado) y se ve en negritas en el dialogo de Ver detalle | Solicitudes (`/solicitudes`), Revision de solicitudes (`/triage`) |
+| **Edicion de Solicitud + adjuntos genericos + buscador en Mis solicitudes (2026-08-04)** | `PUT /api/v1/solicitudes/{id}` (`ActualizarSolicitudCommand`) edita Titulo/Descripcion/Tipo/Prioridad/FechaDeseada/JustificacionNegocio/UsuarioSolicitante mientras el estatus siga en Enviada/EnAnalisis/Aprobada; el propio solicitante siempre puede, cualquier otro necesita `SOL.Triage` (mismo gate "ajeno" que el resto del sistema). El mecanismo de adjuntos ya era generico por diseno (`ArchivoNuevo(Entidad, IdEntidad, ...)`, tabla de vinculo polimorfica) pero solo WorkItem lo consumia -- se agrego el par `SubirArchivoSolicitudCommand`/`ObtenerArchivosSolicitudQuery` + rutas `POST/GET /api/v1/solicitudes/{id}/archivos`, mismo patron exacto que WorkItem. `EditorEnriquecido` gano el prop generico `onSubirImagen` (prioridad sobre `idWorkItemParaAdjuntos`) para no acoplarlo a una sola entidad -- callers de WorkItem sin cambios. `SolicitudResponse` ahora expone `idTipoSolicitud`/`idPrioridad`/`idUsuarioSolicitante` (antes solo el nombre resuelto) para poder precargar el formulario de edicion sin adivinar el id buscando por nombre. `PortalPage.tsx` (Mis solicitudes) gano buscador y orden por columna (`useOrdenTabla`/`EncabezadoOrdenable`, mismo patron que el resto de catalogos) -- se habia quedado fuera del lote general de la sesion anterior. Verificado en vivo con un `paste` sintetico de una imagen real sobre una Solicitud Aprobada ya guardada: `POST /solicitudes/{id}/archivos` 200, `PUT /solicitudes/{id}` 200 con `descripcion` conteniendo `<img data-guid="...">` | Mis solicitudes (`/solicitudes`) |
+| **Dialogo "Convertir en elementos de trabajo" mas ancho (2026-08-04)** | Los 5 controles (Tipo/Titulo/Prioridad/Asignado/Compromiso) + icono de borrar vivian en una sola fila dentro de un dialogo de 900px (`maxWidth="md"`), dejando Titulo con el espacio sobrante (a veces <150px) y el resto en 120-150px cada uno -- ilegible con titulos largos. Rediseñado en `TriagePage.tsx`: dialogo `maxWidth="lg"` (~1100px), cada item en su propia tarjeta (`Paper`) con Titulo en fila propia a ancho completo y el resto de campos envolviendo con `flexWrap` a ~200px cada uno. Verificado en vivo: dialogo real midio 1095px con Titulo en ~975px (antes competia por espacio con otros 4 controles) | Revision de solicitudes (`/triage`), dialogo Convertir |
+| **Registrar tiempo: total (2026-08-04)** | Suma client-side (el endpoint `/tiempo` ya traia todo, sin cambios de backend) mostrada como fila "Total" al pie de la pestaña Tiempo del Detalle de WorkItem, y como "Total ya registrado: Xh Ym" dentro del propio `ModalTiempo` (mismo query de React Query, sin round-trip extra si ya esta en cache) | pestaña Tiempo del Detalle de WorkItem, modal Registrar tiempo |
+| **Editor de Workflows (P21, 2026-08-04)** | Pantalla nueva en `/admin/workflows` (ruta aparte, no pestaña de Administracion), permiso `ADM.Workflows` (sembrado desde el script 02, sin ningun consumidor hasta ahora). Backend nuevo completo (`GTE.Domain/Workflow`, `GTE.Application/Workflow`, `WorkflowQueryService`, `WorkflowRepository`, `WorkflowController`): lista de procesos (`tblProceso`) -> grafo completo de un proceso (`tblTransicion` + metadatos de `tblTransicionConfig`, unidos en memoria por no tener FK real) -> edicion en lote de etiqueta/permiso/motivo/accion principal/orden. **Deliberadamente NO crea ni elimina transiciones** (el grafo estructural sigue siendo por script SQL, "no tocar CambiarST" de la seccion 9.3 del InterfloClaude.md) -- solo edita los metadatos de UI de transiciones que ya existen en el grafo; para los 6 procesos sin fila de config todavia (Release, Ausencia, Riesgo, Sprint, Aprobacion, Proyecto) el editor muestra defaults (etiqueta = la accion tal cual) y crea la fila al guardar. Sin forma de leer dinamicamente el catalogo de estatus de un proceso sin SQL interpolado (`tblProceso.TablaEstatus` es solo texto descriptivo) -- se opto por un mapeo explicito de 11 casos en codigo en vez de reflection o SQL dinamico. Verificado en vivo: edicion de etiqueta/permiso en la transicion APROBAR de Solicitud, guardado, recargado y confirmado persistido, despues revertido | Workflows (`/admin/workflows`) |
+| **Catalogos Area y Puesto (2026-08-04)** | `tblArea`/`tblPuesto` existian y se leian para los combos de Usuarios, pero sin CRUD ni pantalla propia (gap documentado en la seccion 3.4 de este archivo, ahora resuelto). Se clono el patron de Ambientes (Domain/Application/Infrastructure/WebApi + `AreasTab.tsx`/`PuestosTab.tsx`) para alta/edicion/baja logica completas, con buscador+orden desde el dia 1 (`useOrdenTabla`). Sin script SQL de esquema (las tablas ya existian). Verificado en vivo: alta de un Area y un Puesto vinculado a esa Area, ambos visibles de inmediato en su tabla | Administracion > Areas, Administracion > Puestos |
 
-**Inventario:** 141 endpoints en 18 controladores + 1 hub de SignalR · 18 pantallas ·
-16 scripts SQL (mínimo; recuento aproximado entre sesiones paralelas) · ~100 tablas
-(+1, `tblRefreshToken`) · 53 pruebas (sin pruebas nuevas para Tickets, Incidentes ni
-Portafolio, ver filas correspondientes abajo).
+**Inventario:** 156 endpoints en 19 controladores + 1 hub de SignalR · 20 pantallas ·
+18 scripts SQL (mínimo; recuento aproximado entre sesiones paralelas) · ~100 tablas
+(+1, `tblRefreshToken`) · 53 pruebas (sin pruebas nuevas para Tickets, Incidentes,
+Portafolio ni el lote de pendientes de 2026-08-04, ver filas correspondientes arriba).
 
 ---
 
@@ -134,19 +522,44 @@ transiciones automáticas configurables.
   conceptualmente pero no hay job que recalcule la fecha límite al reanudar), alertas
   80%/100% y cierre automático (RN-SUP-02/03, necesitan Hangfire/A4).
 - Base de conocimiento (`tblArticuloConocimiento`, `tblArticuloVersion`): incluye la
-  migración del Glosario Interflo del GT con sus imágenes y tags de redirección.
+  migración del Glosario del GT con sus imágenes y tags de redirección.
 
 **Fase 5 — Ejecutivo, automatizaciones e IA**
-- Dashboard ejecutivo: KPIs, OKRs, DORA metrics, costo y rentabilidad por proyecto,
-  retrabajo, CSAT. `tblKpiDefinicion`/`tblKpiValor` y `spSnapshotKpi` ya existen.
-- 14 reportes del catálogo (§13 del diseño) y vistas `vwBI*` para Power BI.
+- ~~Dashboard ejecutivo: KPIs, OKRs, DORA metrics, costo y rentabilidad por proyecto,
+  retrabajo, CSAT. `tblKpiDefinicion`/`tblKpiValor` y `spSnapshotKpi` ya existen.~~
+  **Resuelto 2026-08-13** ("Indicadores ejecutivos", P18). Ver detalle de sesión arriba.
+  Pendiente real dentro de este sub-alcance: pruebas automatizadas, DORA "Lead Time for
+  Changes" (necesita integración Git, resto de Fase 3), y verificar el arrastre de widgets
+  con mouse real (no se pudo automatizar en esta sesión, mismo tipo de limitación ya
+  documentada para el kanban).
+- ~~14 reportes del catálogo (§13 del diseño) y vistas `vwBI*` para Power BI.~~
+  **Resuelto 2026-08-13.** Ver detalle de sesión arriba. Pendiente real dentro de este
+  sub-alcance: pruebas automatizadas, y R06 Riesgos/R11 KPIs normalmente vacíos hasta que
+  exista captura real (A5 sin CRUD de riesgos; KPIs personalizados sin más definiciones que
+  las 2 semilla de `spSnapshotKpi`).
 - 23 automatizaciones de fábrica (§7.2) sobre `tblReglaAutomatizacion` con constructor
-  visual de reglas.
+  visual de reglas. Hangfire ya instalado (adelantado desde este bloque por el Dashboard
+  P18, ver detalle de sesión arriba) -- reusar la misma infraestructura, no duplicarla.
 - 11 funciones de IA (§14), empezando por IA-01: sugerir el desglose en historias al
   aprobar una solicitud.
 
 ### 3.4 Detalles menores conocidos
 
+- **Proyectos migrados sin Responsable ni Equipo (dato faltante, no bug de codigo):**
+  detectado al probar el filtro "solo mis proyectos" (2026-08-03) -- la mayoria de
+  proyectos migrados del GT no tienen `IdResponsable` ni `IdEquipo` capturados en BD
+  (los 8 proyectos de categoria "TI" probados los tienen ambos en `NULL`). Efecto real:
+  ningun usuario los ve en los combos de Proyecto de Nuevo elemento/Copiar/filtros
+  (`/catalogos/bandeja`), aunque sigan teniendo WorkItems activos asignados a personas
+  concretas (la asignacion de trabajo es por tarea, no por proyecto, ver hallazgo de
+  checksums de la migracion en B3 arriba). Decision del negocio: el filtro se queda
+  como esta: el pendiente real es capturar Responsable/Equipo en esos proyectos
+  (via el nuevo boton Editar de Administracion > Proyectos), no relajar el filtro.
+- **Dato de prueba en LocalDB:** proyecto `TESTCERR` ("Proyecto prueba cierre"),
+  llevado a Cancelado a proposito para probar RN-PRY-02, con un WorkItem
+  `TESTCERR-0001` creado antes de cerrar el proyecto -- queda como esta en LocalDB,
+  no en produccion, mismo criterio que otros registros de prueba ya mencionados en
+  este documento (ej. `REESTRUCTURACION TI-0097` en B3).
 - **Autenticación propia, fuera de alcance deliberado de esta entrega:** "olvidé mi
   contraseña" por correo (no hay SMTP configurado todavía), MFA (el diseño original lo
   delegaba a Entra ID; sin Entra queda pendiente, ej. TOTP si se quiere más adelante), y el
@@ -158,11 +571,12 @@ transiciones automáticas configurables.
   desarrollo + cambio propio, si el ambiente lo permite).
 - **Administracion, fuera de alcance deliberado de esta entrega:** CRUD de roles nuevos (los 8
   roles semilla ya cubren los perfiles del sistema; `EsSistema` sugiere que no se crean desde
-  UI), CRUD de Areas/Puestos (catalogos simples, sin pantalla propia), gestion de
-  Ausencias/vacaciones (mencionada en el Documento Maestro §3.1 pero no en el alcance de esta
-  sesion), Repositorios Git (tabla `tblRepositorio` lista, sin API), y "Version del sistema".
-  Los catalogos de Area/Puesto/Nivel/Horario ya se leen para los selects de Usuarios, solo
-  falta un alta propia si se necesita crear valores nuevos desde la UI en vez de por SQL.
+  UI), gestion de Ausencias/vacaciones (mencionada en el Documento Maestro §3.1 pero no en el
+  alcance de esta sesion), Repositorios Git (tabla `tblRepositorio` lista, sin API), y "Version
+  del sistema". ~~CRUD de Areas/Puestos (catalogos simples, sin pantalla propia)~~ **Resuelto
+  2026-08-04**, ver fila "Catalogos Area y Puesto" en la seccion 2. El catalogo de
+  Nivel/Horario sigue solo de lectura para los selects de Usuarios, falta un alta propia si se
+  necesita crear valores nuevos desde la UI en vez de por SQL.
 - `QaPage`: el alta de caso solo captura **un paso**; falta editar casos para agregar más.
 - `tblEtiqueta` sin uso (etiquetas libres para WorkItems).
 - Cadena de aprobación de releases fija (`QA`, `Líder`, `Negocio`); el diseño la quiere
@@ -214,7 +628,7 @@ transiciones automáticas configurables.
 
 | ADR | Decisión |
 |---|---|
-| 02 | .NET 8 (retargeteado desde .NET 9 el 2026-08-01, ver detalle abajo) + React. React **sigue divergiendo** del estándar del Frente B (Angular): pendiente ratificar y actualizar `InterfloClaude.md`. El backend en .NET 8 ya **no** diverge -- se alinea con el estándar |
+| 02 | .NET 8 (retargeteado desde .NET 9 el 2026-08-01) + React. Stack ya validado. El backend en .NET 8 alineado a estándares |
 | 03 | **`bdsGTE` es la única base.** Motor de estatus y folios propios; cero dependencia de `bdsCentral` u otra base |
 | 04 | El workflow vive en datos (`tblProceso`/`tblTransicion`). Alta de procesos = filas, nunca tocar `spCambiarEstatus` |
 | 06 | Integración Git tras `IProveedorGit` (conviven Gitea y GitHub) |
@@ -503,6 +917,9 @@ transiciones automáticas configurables.
 - **Auditoría completa de ownership en Adjuntos/Comentarios/Revisiones (2026-08-02, a pedido del usuario tras el hueco de `RegistrarTiempoCommand`)**: se revisaron los 6 comandos restantes que escriben sobre estas 3 entidades. Resultado: `SubirArchivoCommand` (subir adjunto) y `CrearComentarioCommand` (comentar) **no tienen gate de ownership, y es intencional** — son mecanismos de colaboración donde CUALQUIERA con acceso al WorkItem participa (QA, líder, otros devs), no una modificación del registro propio del WorkItem; restringirlos a solo el asignado rompería el flujo real. `EliminarArchivoVinculoCommand`/`EliminarComentarioCommand` (borrar) ya usan el modelo correcto para ese caso: solo el propio autor del adjunto/comentario, no el asignado del WorkItem (documentado como "sin admin-override en esta entrega"). `CrearRevisionCommand` (reportar hallazgo) tampoco tiene gate, también intencional: el rol de quien reporta es justamente ser alguien más revisando el trabajo. **Sí se encontró un hueco real**: `CorregirRevisionCommand`, camino "marcar corregido" (`Corregido=true`), no validaba NADA — cualquier usuario (ni el asignado del WorkItem, ni quien reportó el hallazgo) podía cerrar el hallazgo de otra persona, lo cual permite saltarse el gate de cierre RN-REQ-03 sin haber arreglado nada. Reproducido en vivo antes de codear (`Jose.Hernandez`, un tercero sin relación con el WorkItem ni el hallazgo, marcó corregido con 200 OK). Arreglo: mismo patrón `esAjeno` + `WI.ModificarAjeno`, aplicado solo al camino de "corregido" (el camino "reabrir" ya estaba bien protegido por `REV.Reabrir`, RN-QA-02). Prueba de regresión: `CorregirRevision_MarcarCorregidoEnItemAjenoSeBloqueaSinPermiso`.
 - **"Ajeno" (RN-REQ-05) también significa SIN asignar, no solo "asignado a otra persona"** — hueco encontrado en la MISMA ronda de reportes en vivo del usuario: la condición original `estado.IdAsignado.HasValue && estado.IdAsignado != yo` dejaba `esAjeno = false` para cualquier WorkItem con `IdAsignado = NULL`, así que **cualquiera** podía iniciar, registrar tiempo, editar o marcar corregido un hallazgo en una tarea del backlog sin asignar. Reproducido en vivo (`Antonio.Ochoa` iniciando y registrando tiempo en `GTE-0003`, sin asignar, ambos con `200 OK`). El equipo decidió explícitamente (no asumido) que sin asignar SE TRATA como ajeno: nadie "toma" trabajo libremente, un Líder/Admin con `WI.ModificarAjeno` debe asignarlo primero (vía editar). Arreglo: se simplificó la condición a `estado.IdAsignado != usuarioActual?.IdUsuario` (sin el `.HasValue &&`) en los 4 comandos (`ActualizarWorkItemCommand`, `CambiarEstatusWorkItemCommand`, `RegistrarTiempoCommand`, `CorregirRevisionCommand`) — comparar contra `null` ya da `true` correctamente. Prueba de regresión: `ItemSinAsignar_SeTrataComoAjenoParaIniciarYRegistrarTiempo`. **Lección**: al validar "ownership" contra un campo nullable, probar explícitamente el caso NULL además de "pertenece a alguien más" — son dos huecos distintos, no el mismo.
 - **RTF crudo en `tblWorkItem.Descripcion` migrado (B3): se puede parsear con alta fidelidad usando `System.Windows.Forms.RichTextBox`, el MISMO control que genero el RTF originalmente** (el GT es WinForms, usa Riched20 vía RichTextBox — parsearlo con esa misma clase es un round-trip simetrico, no una reimplementacion aproximada del spec RTF). Herramienta: `ConversorRtf` (proyecto de consola desechable, `net8.0-windows` + `UseWindowsForms=true` + `Microsoft.Data.SqlClient`, **nunca commiteado al repo**, mismo patron que el proyecto de consola del bootstrap del primer Administrador). Logica: `SELECT Descripcion FROM tblWorkItem WHERE Descripcion LIKE '%conversion visual pendiente%'` -> extraer el RTF de dentro del `<pre>` (des-escapando `&amp;`/`&lt;`/`&gt;`) -> en un hilo STA, `richTextBox.Rtf = rtf; texto = richTextBox.Text;` -> reconstruir HTML (`<p>` + líneas unidas con `<br>`, escapando `&`/`<`/`>`) -> `UPDATE`. Corrido con `--aplicar` (sin el flag, solo hace preview sin tocar la BD). Resultado en LocalDB: **1264/1264 convertidas, 0 fallidas**, verificado contra el ejemplo reportado por el usuario (folio `EDM-0017`) tanto por SQL como en el navegador real. **Trampa encontrada**: `\line` (salto de linea suave dentro de un parrafo) se traduce a `\v` (vertical tab, char 11) en `RichTextBox.Text`, NO a `\n`/`\r\n` como `\par` (parrafo) — si no se reemplaza `\v` por salto de linea antes de partir el texto, dos lineas separadas por `\line` quedan pegadas sin separador visible (invisible en un editor de texto, se nota solo comparando el HTML resultante). **Falta correr esta misma herramienta contra dev/preprod/prod** cuando se haga el corte real de cada ambiente (el codigo fuente no vive en el repo por ser desechable; si se necesita para otro ambiente, reconstruir desde esta receta o pedir que se regenere).
+- **No hay forma segura de leer "la tabla de catalogo de estatus de este proceso" dinamicamente** (2026-08-04, construyendo el editor de Workflows): `tblProceso.TablaEstatus` guarda el nombre como texto (ej. `"dbo.tblEstatusTicket"`), pero armar el SELECT con ese texto es SQL interpolado (`FromSqlRaw($"SELECT ... FROM {tabla}")`), prohibido por regla dura del proyecto aunque el texto venga de una fila propia (no de un usuario) -- el riesgo no es solo inyeccion, es que EF no puede validar tipos/columnas contra una tabla desconocida en tiempo de compilacion. Solucion: mapeo explicito en codigo (switch de un caso por proceso, 11 en total) contra los DbSets ya scaffoldeados (`TblEstatusWorkItem`, `TblEstatusTicket`, etc.), ver `WorkflowQueryService.ObtenerCatalogoEstatusAsync`. Mas repetitivo que reflection/SQL dinamico, pero tipado y sin riesgo.
+- **Un permiso nuevo insertado ANTES del gate de una regla de negocio existente puede tapar el 400/403 que una prueba esperaba** (2026-08-04): al agregar RN-QA-06 (WI.SaltarPruebas) en `CambiarEstatusWorkItemHandler`, se coloco el chequeo antes de `ValidarCierreAsync` (donde vive RN-REQ-03, "sin avance registrado"). Una prueba existente (`VerticalCompleto_CrearIniciarSuspenderRegistrarTerminar`) esperaba `400 BadRequest` de RN-REQ-03 pero recibio `403 Forbidden` de la regla nueva, porque su proyecto de prueba era categoria Desarrollo y el usuario (`lgarcia`, sin `WI.SaltarPruebas`) nunca llegaba al segundo chequeo. No era un bug del codigo nuevo -- la regla nueva SI debia bloquear ese escenario -- sino un fixture de prueba que ahora colisionaba con una regla que no existia cuando se escribio. Arreglo: cambiar la categoria del proyecto de prueba a TI (la prueba no busca cubrir RN-QA-06, busca RN-REQ-03). **Leccion**: al agregar un gate nuevo en un flujo con multiples validaciones encadenadas, correr toda la suite de pruebas de ese modulo (no solo compilar) para encontrar este tipo de colision de orden.
+- **Después de correr `dotnet test` recién agregado un ALTER de columna, si el error es `Invalid column name` en LocalDB: correr el script SQL contra LocalDB antes de asumir que el código está mal** — las pruebas de integración (`GTE.Api.Tests`) apuntan a la misma `bdsGTE` de LocalDB que usa `dotnet run`, pero el `dotnet build`/`dotnet test` NO corre los scripts de `DataBase/Scripts` (no hay migraciones EF en este proyecto, es deliberado — ver sección 4). `sqlcmd`/`Invoke-Sqlcmd` desde una ruta con `:` en Git Bash falla con "Acceso denegado" (interpreta `C:` como un flag) — usar PowerShell para invocar `sqlcmd` con rutas Windows.
 
 ---
 

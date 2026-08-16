@@ -5,12 +5,12 @@
 | Campo | Valor |
 |---|---|
 | Proyecto | GTE — Plataforma Integral de Gestión del Departamento de Desarrollo de Software |
-| Cliente | Interflo |
+| Cliente | Departamento de Desarrollo |
 | Versión del documento | 1.0 |
 | Fecha | 2026-07-29 |
 | Estado | Propuesta de diseño — pendiente de validación del equipo |
 | Sucesor de | Gestor de Proyectos (GT, WinForms + bdsInfo) |
-| Autores | Equipo de desarrollo Interflo + asistencia IA |
+| Autores | Equipo de desarrollo + asistencia IA |
 
 ---
 
@@ -45,7 +45,7 @@ indicadores ejecutivos.
 
 No es un gestor de tareas: es un sistema de gestión del **ciclo de vida completo del
 software** (ALM), comparable a Jira + Azure DevOps + Monday, pero adaptado a los procesos,
-horarios, niveles de ingeniero y reglas de negocio reales de Interflo.
+horarios, niveles de ingeniero y reglas de negocio de la organización.
 
 ### 0.1 Principios rectores
 
@@ -53,7 +53,7 @@ horarios, niveles de ingeniero y reglas de negocio reales de Interflo.
    contadores desnormalizados sin trigger, ni cuatro motores de cálculo de tiempo.
 2. **Los workflows son datos, no código.** Un motor único de máquina de estados
    (clon del mecanismo transversal `tblProceso`/`tblTransicion`/`CambiarST` ya
-   probado en el ecosistema Interflo) gobierna el ciclo de vida de toda entidad.
+   probado en el ecosistema del proyecto) gobierna el ciclo de vida de toda entidad.
 3. **El backend es la fuente de verdad.** El frontend manda acciones, nunca estatus
    destino; el estatus inicial lo fija el backend; los flags calculados se consumen directo.
 4. **Seguridad por diseño.** RBAC real (no bitmaps posicionales), cero SQL interpolado,
@@ -89,13 +89,13 @@ Este diseño corrige explícitamente la deuda documentada del sistema actual:
 |---|---|---|---|
 | ADR-01 | **Monolito modular** desplegado como una sola Web API, con módulos DDD aislados | Microservicios | Equipo de 2 desarrolladores; microservicios multiplican costo operativo sin beneficio a esta escala. Las fronteras de módulo permiten extraer servicios después |
 | ADR-02 | **.NET 8 + React** (retargeteado desde .NET 9 el 2026-08-01, ver PENDIENTES.md §4-5: el servidor real de despliegue no tenía el runtime 9.0, y .NET 8 es LTS mientras 9 es STS) | .NET 8 + Angular (estándar Frente B vigente) | Decisión explícita del producto. El backend (.NET 8) ya **no** contradice InterfloClaude.md §6-8; el frontend (React vs Angular) **sigue divergiendo** -- pendiente ratificar o documentar GTE como Frente C solo por esa parte |
-| ADR-03 | **Independencia total: todo vive en `bdsGTE`** — folios (`tblFolio` + `spGenerarFolio`) y motor de estatus (`tblProceso`/`tblTransicion`/`spCambiarEstatus`) propios, clonando el patrón transversal probado del ecosistema | Reutilizar `bdsCentral` (usp_GenerarFolio y CambiarST) | Decisión del equipo 2026-07-30: GTE no debe depender de ninguna otra base de datos; se replica el patrón §9, no se comparte la infraestructura |
+| ADR-03 | **Independencia total: todo vive en `bdsGTE`** — folios (`tblFolio` + `spGenerarFolio`) y motor de estatus (`tblProceso`/`tblTransicion`/`spCambiarEstatus`) propios | Reutilizar bases compartidas | Decisión del equipo 2026-07-30: GTE no debe depender de ninguna otra base de datos |
 | ADR-04 | Motor de workflow por datos (generalización de `CambiarST`) | Workflow en código, librería externa (Elsa, Camunda) | Ya existe, ya está probado, es genérico y auditable; las librerías externas agregan complejidad que 2 devs no deben operar |
 | ADR-05 | CQRS ligero: Commands/Queries con MediatR, **sin** event sourcing ni bases separadas de lectura | Event sourcing completo | El historial de estatus ya da la dimensión temporal necesaria; ES completo es sobreingeniería |
-| ADR-06 | Integración Git por **webhooks + API del proveedor**, tras la abstracción `IProveedorGit` (no hospedar Git propio) | Acoplarse solo a Gitea; repos embebidos | GTE referencia repositorios, no los reemplaza. La abstracción es necesaria porque conviven dos proveedores: Gitea self-hosted para los proyectos internos y GitHub para el propio GTE (ADR-09) |
+| ADR-06 | Integración Git por **webhooks + API del proveedor**, tras la abstracción `IProveedorGit` (no hospedar Git propio) | Acoplarse a un solo proveedor; repos embebidos | GTE referencia repositorios, no los reemplaza. La abstracción es necesaria porque conviven dos proveedores: GitHub (ADR-09) |
 | ADR-07 | Archivos adjuntos en filesystem/objeto con GUID + metadatos en BD | VARBINARY en BD (patrón Glosario actual) | Evita crecer la BD con binarios; el GUID de archivo es el patrón de la API central del ecosistema |
 | ADR-08 | Tiempo real con SignalR (tableros, notificaciones) | Polling | El GT actual hace polling de 100 ms por bug; SignalR elimina la clase completa de problema |
-| ADR-09 | **El código fuente de GTE vive en GitHub** (`github.com/Ocegueda23/GP-GTE`), de forma definitiva | Gitea self-hosted, que es el estándar del resto del ecosistema Interflo | Decisión del equipo (2026-07-30). Excepción explícita al estándar: aplica solo a este proyecto. Implicación registrada: para que GTE pueda trazar sus propios commits, la integración del módulo Desarrollo debe soportar GitHub además de Gitea (por eso ADR-06 abstrae el proveedor) |
+| ADR-09 | **El código fuente de GTE vive en GitHub** (`github.com/Ocegueda23/GP-GTE`), de forma definitiva | Gitea self-hosted | Decisión del equipo (2026-07-30). La integración del módulo Desarrollo debe soportar GitHub |
 
 ### 0.4 Alcance funcional (mapa de capacidades)
 
@@ -1177,6 +1177,19 @@ departamento.
 | KPIs personalizados | Definiciones en `tblKpiDefinicion` (nombre, meta, dirección) + snapshots calculados por job nocturno en `tblKpiValor` — series históricas estables (corrige el no determinismo de vw_WorkDaily) |
 
 **OKRs:** objetivos trimestrales con resultados clave ligados a KPIs; avance automático.
+
+**Nota 2026-08-07 -- Dashboard Ejecutivo de Metricas (colaborador individual):** ademas del P18
+descrito arriba (equipo/proyecto: DORA, costo, OKR), se implementó un dashboard complementario
+enfocado en el **desempeño de cada colaborador**: empleado del mes (automático, mayor puntaje),
+evaluación mensual de 6 dimensiones calculada 100% a partir de datos existentes (sin captura
+manual), carga de trabajo, rankings top/bottom 10, comparativos y tendencias. No sustituye este
+P18 -- son dos vistas distintas del mismo concepto "dashboard ejecutivo". Alcance por rol vía
+`DASH.Ejecutivo` (global, ya sembrado) y `DASH.VerDepartamento` (área propia, nuevo); sin
+ninguno de los dos, el alcance se resuelve por jerarquía real (`tblEquipo.IdLider` /
+`tblUsuario.IdJefe`). Fórmulas, decisiones y simplificaciones deliberadas documentadas en el
+detalle de sesión de `Doctos/PENDIENTES.md` (2026-08-07). Sigue pendiente de este modulo:
+pruebas automatizadas y, si el negocio lo pide, mover a captura manual las 2 dimensiones que
+hoy son proxies más débiles (Trabajo en equipo, Comunicación).
 
 ---
 

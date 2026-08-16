@@ -1,10 +1,10 @@
 # Manual de instalacion - GTE (Gestor Tecnologico Empresarial)
 
-> Sigue el mismo patron real que ya usa `Interflo.ServiceHealth` en produccion: Kestrel
+> Kestrel corriendo como servicio de Windows en el servidor de destino:
 > corriendo directo como Windows Service, sin IIS, sin reverse proxy, sin Docker, sin
 > pipeline de CI/CD. La API sirve tambien la SPA compilada (React) en el mismo proceso
 > (topologia minima fase 1 del Documento Maestro, seccion 1.1). Publicacion y despliegue
-> son manuales, igual que el resto del ecosistema Interflo.
+> son manuales.
 
 ## 1. Requisitos previos
 
@@ -89,7 +89,7 @@ Copiar la carpeta publicada completa al servidor de destino (por ejemplo a
 En el servidor de destino, con una consola como administrador:
 
 ```bash
-sc create GTE binPath= "C:\Servicios\GTE\GTE.WebApi.exe" start=auto DisplayName= "Interflo GTE"
+sc create GTE binPath= "C:\Servicios\GTE\GTE.WebApi.exe" start=auto DisplayName= "GTE - Gestor Tecnologico Empresarial"
 ```
 
 Importante: dejar el espacio despues de `binPath=`, `start=` y `DisplayName=` (sintaxis de
@@ -181,7 +181,7 @@ sc query GTE
 1. Si el servidor tiene firewall de Windows activo, abrir el puerto configurado (5090 por
    default):
    ```bash
-   netsh advfirewall firewall add rule name="Interflo GTE" dir=in action=allow protocol=TCP localport=5090
+   netsh advfirewall firewall add rule name="GTE" dir=in action=allow protocol=TCP localport=5090
    ```
 2. Desde un navegador (en el servidor o en la red interna), entrar a
    `http://NOMBRE_SERVIDOR:5090/health`. Debe responder

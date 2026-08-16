@@ -7,8 +7,7 @@ Copiar el bloque de abajo tal cual en el chat nuevo. Sustituir la sección
 
 ## Prompt (listo para copiar)
 
-Trabajo en **GTE (Gestor Tecnológico Empresarial)**, la plataforma que sustituye al
-Gestor de Proyectos WinForms de Interflo. El repositorio es `C:\CODE\GTE`
+Trabajo en **GTE (Gestor Tecnológico Empresarial)**, la plataforma integral de gestión del departamento de desarrollo. El repositorio es `C:\CODE\GTE`
 (GitHub: `Ocegueda23/GP-GTE`, rama `main`).
 
 **Antes de escribir código, lee en este orden:**
@@ -96,4 +95,4 @@ Si se prefiere otro frente, sustituir la sección **Objetivo** por uno de estos
 | **Hangfire** (A4) | Vigilancia de SLA, snapshot de KPIs (`spSnapshotKpi` ya existe), recordatorios de compromiso, despacho del outbox `tblEventoDominio`; complementa las notificaciones ya resueltas |
 | **Portafolio** (A5) | Riesgos, hitos, OKRs, presupuesto/costo real por proyecto — módulo nuevo sin dependencias pendientes |
 | **Integración Git** (resto de Fase 3) | Traza commits y PRs contra los WorkItems, tras la abstracción `IProveedorGit` |
-| **Fase 4 (Operación y Soporte)** | Incidentes, Mesa de ayuda, Base de conocimiento (incluye migrar el Glosario Interflo del GT) |
+| **Fase 4 (Operación y Soporte)** | Incidentes, Mesa de ayuda, Base de conocimiento (incluye migrar el Glosario del GT) |
