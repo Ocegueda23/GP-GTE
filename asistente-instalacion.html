@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Asistente de instalacion GTE</title>
+<style>
+  :root {
+    --slate-50:#f8fafc; --slate-100:#f1f5f9; --slate-200:#e2e8f0; --slate-300:#cbd5e1;
+    --slate-400:#94a3b8; --slate-500:#64748b; --slate-600:#475569; --slate-700:#334155;
+    --slate-800:#1e293b; --slate-900:#0f172a;
+    --red-700:#b91c1c; --red-50:#fef2f2; --red-200:#fecaca;
+    --emerald-700:#047857; --emerald-50:#ecfdf5; --emerald-200:#a7f3d0;
+    --orange-700:#c2410c; --orange-50:#fff7ed; --orange-200:#fed7aa;
+    --blue-700:#1d4ed8; --blue-50:#eff6ff; --blue-200:#bfdbfe;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin:0; background:var(--slate-100); color:var(--slate-800);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif; font-size:14px; line-height:1.5;
+  }
+  header {
+    background:var(--slate-800); color:#fff; padding:20px 24px;
+  }
+  header h1 { margin:0; font-size:20px; font-weight:700; }
+  header p { margin:6px 0 0; font-size:13px; color:var(--slate-300); max-width:900px; }
+  .aviso-local {
+    margin-top:10px; display:inline-block; background:var(--slate-700); color:var(--slate-100);
+    border-radius:6px; padding:6px 10px; font-size:12px;
+  }
+  main { max-width:1500px; margin:0 auto; padding:20px; display:grid; grid-template-columns:1fr; gap:20px; }
+  @media (min-width:1180px) { main { grid-template-columns: minmax(0,1fr) minmax(0,1fr); align-items:start; } }
+  section.tarjeta {
+    background:#fff; border:1px solid var(--slate-200); border-radius:12px; padding:18px; margin-bottom:16px;
+  }
+  section.tarjeta > h2 {
+    margin:0 0 4px; font-size:15px; font-weight:700; color:var(--slate-800);
+    display:flex; align-items:center; gap:8px;
+  }
+  .paso {
+    background:var(--slate-800); color:#fff; width:22px; height:22px; border-radius:999px;
+    display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; flex:none;
+  }
+  section.tarjeta > p.ayuda { margin:0 0 14px; font-size:12px; color:var(--slate-500); }
+  .campos { display:grid; grid-template-columns:1fr; gap:12px; }
+  @media (min-width:640px) { .campos.dos { grid-template-columns:1fr 1fr; } }
+  label { display:block; font-size:12px; font-weight:600; color:var(--slate-600); margin-bottom:4px; }
+  label .req { color:var(--red-700); }
+  input[type=text], input[type=password], input[type=number], select {
+    width:100%; background:var(--slate-200); border:1px solid var(--slate-300); border-radius:6px;
+    padding:8px 10px; font-size:13px; color:var(--slate-900); font-family:inherit;
+  }
+  input:focus, select:focus { outline:2px solid var(--slate-400); outline-offset:-1px; }
+  input.error { border-color:var(--red-700); background:var(--red-50); }
+  .pista { font-size:11px; color:var(--slate-500); margin-top:4px; }
+  .msg-error { font-size:11px; color:var(--red-700); margin-top:4px; font-weight:600; display:none; }
+  .msg-error.visible { display:block; }
+  .check { display:flex; gap:8px; align-items:flex-start; background:var(--slate-50); border:1px solid var(--slate-200); border-radius:6px; padding:10px; }
+  .check input { margin-top:2px; flex:none; width:16px; height:16px; }
+  .check label { margin:0; font-weight:600; color:var(--slate-700); font-size:12px; }
+  .check .pista { margin-top:2px; }
+  .grupo-condicional { margin-top:12px; }
+  .grupo-condicional[hidden] { display:none; }
+  fieldset { border:1px solid var(--slate-200); border-radius:8px; padding:12px; margin:0; }
+  legend { font-size:12px; font-weight:700; color:var(--slate-600); padding:0 6px; }
+  .radios { display:flex; flex-wrap:wrap; gap:14px; }
+  .radios label { display:flex; align-items:center; gap:6px; font-weight:600; color:var(--slate-700); margin:0; font-size:12px; }
+  .nota { border-radius:8px; padding:10px 12px; font-size:12px; margin-top:12px; }
+  .nota.info { background:var(--blue-50); border:1px solid var(--blue-200); color:var(--blue-700); }
+  .nota.warn { background:var(--orange-50); border:1px solid var(--orange-200); color:var(--orange-700); }
+  .nota.peligro { background:var(--red-50); border:1px solid var(--red-200); color:var(--red-700); }
+  .nota strong { font-weight:700; }
+  .panel-salida { position:sticky; top:20px; }
+  .barra-acciones { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+  button {
+    border:none; border-radius:6px; padding:9px 14px; font-size:13px; font-weight:600;
+    cursor:pointer; font-family:inherit; transition:transform .05s;
+  }
+  button:active { transform:scale(.97); }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .btn-primario { background:var(--slate-800); color:#fff; }
+  .btn-primario:hover:not(:disabled) { background:var(--slate-700); }
+  .btn-secundario { background:var(--slate-200); color:var(--slate-800); }
+  .btn-secundario:hover:not(:disabled) { background:var(--slate-300); }
+  #estadoValidacion { font-size:12px; font-weight:600; padding:8px 12px; border-radius:6px; margin-bottom:12px; }
+  #estadoValidacion.ok { background:var(--emerald-50); border:1px solid var(--emerald-200); color:var(--emerald-700); }
+  #estadoValidacion.mal { background:var(--red-50); border:1px solid var(--red-200); color:var(--red-700); }
+  #estadoValidacion ul { margin:6px 0 0; padding-left:18px; font-weight:500; }
+  pre#vistaPrevia {
+    background:var(--slate-900); color:#e2e8f0; border-radius:8px; padding:14px; overflow:auto;
+    max-height:640px; font-family:Consolas, "Courier New", monospace; font-size:11.5px; line-height:1.45;
+    margin:0; white-space:pre; tab-size:4;
+  }
+  ol.pasos-script { margin:0; padding-left:20px; font-size:12px; color:var(--slate-600); }
+  ol.pasos-script li { margin-bottom:3px; }
+  ol.pasos-script li.apagado { color:var(--slate-400); text-decoration:line-through; }
+  code {
+    background:var(--slate-200); border-radius:4px; padding:1px 5px;
+    font-family:Consolas, "Courier New", monospace; font-size:11.5px; color:var(--slate-800);
+  }
+  .toast {
+    position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+    background:var(--slate-800); color:#fff; padding:10px 18px; border-radius:8px; font-size:13px;
+    opacity:0; pointer-events:none; transition:opacity .2s;
+  }
+  .toast.visible { opacity:1; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Asistente de instalacion de GTE</h1>
+  <p>
+    Captura aqui los datos de la computadora nueva. Al final se genera <strong>instalar-gte.ps1</strong>,
+    un instalador que se corre como administrador en esa maquina y deja GTE funcionando:
+    scripts de base de datos, servicio de Windows, variables de entorno, puerto, firewall y el
+    usuario administrador con el que se entra la primera vez.
+  </p>
+  <span class="aviso-local">Todo se procesa en esta pagina. No se envia nada por red ni queda guardado en ningun lado.</span>
+</header>
+
+<main>
+
+  <!-- ============================= COLUMNA IZQUIERDA: CAPTURA ============================= -->
+  <div>
+
+    <section class="tarjeta">
+      <h2><span class="paso">1</span> Equipo, servicio y aplicacion</h2>
+      <p class="ayuda">Datos de la computadora donde va a quedar corriendo GTE permanentemente.</p>
+
+      <div class="campos dos">
+        <div>
+          <label for="nombreServicio">Nombre del servicio de Windows <span class="req">*</span></label>
+          <input type="text" id="nombreServicio" value="GTE" data-obligatorio>
+          <div class="pista">Sin espacios. Es el nombre con el que se controla: <code>sc stop GTE</code>.</div>
+          <div class="msg-error" id="err-nombreServicio"></div>
+        </div>
+        <div>
+          <label for="displayName">Nombre para mostrar <span class="req">*</span></label>
+          <input type="text" id="displayName" value="GTE - Gestor Tecnologico Empresarial" data-obligatorio>
+          <div class="pista">Como se ve en la consola de Servicios de Windows.</div>
+          <div class="msg-error" id="err-displayName"></div>
+        </div>
+        <div>
+          <label for="rutaInstalacion">Carpeta de instalacion <span class="req">*</span></label>
+          <input type="text" id="rutaInstalacion" value="C:\Servicios\GTE" data-obligatorio>
+          <div class="pista">Donde vive el ejecutable en la maquina nueva.</div>
+          <div class="msg-error" id="err-rutaInstalacion"></div>
+        </div>
+        <div>
+          <label for="puerto">Puerto HTTP de Kestrel <span class="req">*</span></label>
+          <input type="number" id="puerto" value="5090" min="1" max="65535" data-obligatorio>
+          <div class="pista">Cambialo si el 5090 ya esta ocupado en esa maquina.</div>
+          <div class="msg-error" id="err-puerto"></div>
+        </div>
+      </div>
+
+      <div class="grupo-condicional">
+        <div class="check">
+          <input type="checkbox" id="copiarPublish" checked>
+          <div>
+            <label for="copiarPublish">Copiar la aplicacion publicada a la carpeta de instalacion</label>
+            <div class="pista">
+              El instalador limpia la carpeta destino antes de copiar (obligatorio: mezclar un publish
+              viejo con uno nuevo rompe la instalacion).
+            </div>
+          </div>
+        </div>
+        <div id="grupoOrigenPublish" style="margin-top:12px">
+          <label for="rutaOrigenPublish">Carpeta de origen del publish <span class="req">*</span></label>
+          <input type="text" id="rutaOrigenPublish" value="D:\GTE\publicado" data-obligatorio-si="copiarPublish">
+          <div class="pista">La carpeta que genero <code>publicar.bat</code>, ya copiada a la maquina nueva (USB o red).</div>
+          <div class="msg-error" id="err-rutaOrigenPublish"></div>
+        </div>
+      </div>
+
+      <div class="grupo-condicional">
+        <div class="check">
+          <input type="checkbox" id="abrirFirewall" checked>
+          <div>
+            <label for="abrirFirewall">Abrir el puerto en el Firewall de Windows</label>
+            <div class="pista">Necesario para entrar a GTE desde otras computadoras de la red.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grupo-condicional">
+        <div class="check">
+          <input type="checkbox" id="usarAlmacen">
+          <div>
+            <label for="usarAlmacen">Los archivos adjuntos van a un share de red</label>
+            <div class="pista">Si no lo marcas, se usa la carpeta local junto al ejecutable.</div>
+          </div>
+        </div>
+        <div id="grupoAlmacen" hidden style="margin-top:12px">
+          <label for="rutaAlmacen">Ruta del almacen de archivos <span class="req">*</span></label>
+          <input type="text" id="rutaAlmacen" value="\\servidor\GTE\Archivos" data-obligatorio-si="usarAlmacen">
+          <div class="pista">
+            La cuenta del servicio (LocalSystem por defecto) necesita permiso de lectura y escritura ahi.
+          </div>
+          <div class="msg-error" id="err-rutaAlmacen"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="tarjeta">
+      <h2><span class="paso">2</span> Base de datos bdsGTE</h2>
+      <p class="ayuda">
+        GTE usa una sola base. El SQL Server destino debe tener habilitado el modo mixto
+        (SQL Server and Windows Authentication mode).
+      </p>
+
+      <div class="campos dos">
+        <div>
+          <label for="servidorSql">Servidor SQL <span class="req">*</span></label>
+          <input type="text" id="servidorSql" placeholder="SRVPROD\NASA" data-obligatorio>
+          <div class="pista">Nombre de instancia, o <code>servidor,1433</code> si usa otro puerto.</div>
+          <div class="msg-error" id="err-servidorSql"></div>
+        </div>
+        <div>
+          <label for="usuarioSql">Login de servicio de SQL <span class="req">*</span></label>
+          <input type="text" id="usuarioSql" value="svc_gte" data-obligatorio>
+          <div class="pista">Login de minimo privilegio con el que la API se conecta.</div>
+          <div class="msg-error" id="err-usuarioSql"></div>
+        </div>
+        <div>
+          <label for="passwordSql">Contrasena del login de servicio <span class="req">*</span></label>
+          <input type="password" id="passwordSql" data-obligatorio>
+          <div class="pista">
+            Se crea con CHECK_POLICY ON: cumple la politica de Windows (8+ caracteres, mayusculas,
+            minusculas y numeros). Guardala en el gestor de contrasenas del equipo.
+          </div>
+          <div class="msg-error" id="err-passwordSql"></div>
+        </div>
+        <div>
+          <label for="passwordSql2">Confirmar contrasena <span class="req">*</span></label>
+          <input type="password" id="passwordSql2" data-obligatorio>
+          <div class="msg-error" id="err-passwordSql2"></div>
+        </div>
+      </div>
+
+      <div class="grupo-condicional">
+        <div class="check">
+          <input type="checkbox" id="ejecutarScripts" checked>
+          <div>
+            <label for="ejecutarScripts">Ejecutar los scripts de esquema (base nueva)</label>
+            <div class="pista">
+              Desmarcalo solo si esta bdsGTE ya existe y esta al dia. Los scripts son idempotentes:
+              volver a correrlos solo imprime SKIP.
+            </div>
+          </div>
+        </div>
+
+        <div id="grupoScripts" style="margin-top:12px">
+          <div class="campos">
+            <div>
+              <label for="rutaScripts">Carpeta DataBase\Scripts <span class="req">*</span></label>
+              <input type="text" id="rutaScripts" value="D:\GTE\DataBase\Scripts" data-obligatorio-si="ejecutarScripts">
+              <div class="pista">
+                Debe contener las subcarpetas <code>01_Libera</code> y <code>02_Libera</code>. Se ejecutan
+                en orden con sqlcmd.
+              </div>
+              <div class="msg-error" id="err-rutaScripts"></div>
+            </div>
+          </div>
+
+          <fieldset style="margin-top:12px">
+            <legend>Con que cuenta se ejecutan los scripts</legend>
+            <p class="pista" style="margin:0 0 8px">
+              Crear la base y el login exige permisos altos: usa una cuenta administradora de SQL,
+              distinta del login de servicio de arriba.
+            </p>
+            <div class="radios">
+              <label><input type="radio" name="authAdminSql" value="windows" checked> Autenticacion de Windows (la sesion actual)</label>
+              <label><input type="radio" name="authAdminSql" value="sql"> Usuario de SQL Server</label>
+            </div>
+            <div id="grupoAdminSql" hidden style="margin-top:12px">
+              <div class="campos dos">
+                <div>
+                  <label for="usuarioAdminSql">Usuario administrador de SQL <span class="req">*</span></label>
+                  <input type="text" id="usuarioAdminSql" placeholder="sa">
+                  <div class="msg-error" id="err-usuarioAdminSql"></div>
+                </div>
+                <div>
+                  <label for="passwordAdminSql">Contrasena <span class="req">*</span></label>
+                  <input type="password" id="passwordAdminSql">
+                  <div class="msg-error" id="err-passwordAdminSql"></div>
+                </div>
+              </div>
+            </div>
+          </fieldset>
+        </div>
+      </div>
+    </section>
+
+    <section class="tarjeta">
+      <h2><span class="paso">3</span> Usuario administrador de GTE</h2>
+      <p class="ayuda">
+        Con esta cuenta se entra la primera vez. En una base nueva tblUsuario nace vacia: sin este paso
+        nadie puede iniciar sesion.
+      </p>
+
+      <div class="campos dos">
+        <div>
+          <label for="adminDominio">Usuario <span class="req">*</span></label>
+          <input type="text" id="adminDominio" value="Administrador" data-obligatorio>
+          <div class="pista">Es lo que se escribe en la pantalla de login (columna Dominio).</div>
+          <div class="msg-error" id="err-adminDominio"></div>
+        </div>
+        <div>
+          <label for="adminNombre">Nombre para mostrar <span class="req">*</span></label>
+          <input type="text" id="adminNombre" value="Administrador" data-obligatorio>
+          <div class="msg-error" id="err-adminNombre"></div>
+        </div>
+        <div>
+          <label for="adminPassword">Contrasena <span class="req">*</span></label>
+          <input type="password" id="adminPassword" data-obligatorio>
+          <div class="pista">Minimo 8 caracteres (misma regla que valida la API).</div>
+          <div class="msg-error" id="err-adminPassword"></div>
+        </div>
+        <div>
+          <label for="adminPassword2">Confirmar contrasena <span class="req">*</span></label>
+          <input type="password" id="adminPassword2" data-obligatorio>
+          <div class="msg-error" id="err-adminPassword2"></div>
+        </div>
+      </div>
+
+      <div class="grupo-condicional">
+        <div class="check">
+          <input type="checkbox" id="forzarCambio">
+          <div>
+            <label for="forzarCambio">Obligar a cambiar la contrasena en el primer inicio de sesion</label>
+            <div class="pista">
+              Util si vas a entregarle la contrasena a otra persona: GTE le exige cambiarla al entrar.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="nota info">
+        <strong>Como queda hasheada:</strong> el instalador da de alta la cuenta con la contrasena temporal
+        del repositorio y despues, ya con el servicio arriba, entra a la API y la cambia por la que
+        capturaste aqui. Asi la contrasena se hashea con la misma version de BCrypt que usa GTE,
+        sin instalar el SDK de .NET en la maquina nueva.
+      </div>
+    </section>
+
+    <section class="tarjeta">
+      <h2><span class="paso">4</span> Manejo de las contrasenas en el script</h2>
+      <p class="ayuda">Decide si el archivo .ps1 lleva las contrasenas escritas o las pide al ejecutarse.</p>
+      <div class="radios" style="flex-direction:column; gap:10px">
+        <label>
+          <input type="radio" name="modoSecretos" value="preguntar" checked>
+          Pedirlas al ejecutar (recomendado)
+        </label>
+        <div class="pista" style="margin:-4px 0 0 24px">
+          El .ps1 no contiene ninguna contrasena: las pide en consola al arrancar. Puedes guardarlo o
+          mandarlo por correo sin riesgo.
+        </div>
+        <label>
+          <input type="radio" name="modoSecretos" value="incrustar">
+          Escribirlas dentro del script
+        </label>
+        <div class="pista" style="margin:-4px 0 0 24px">
+          Corre sin intervencion, pero el archivo queda con las contrasenas en texto plano.
+        </div>
+      </div>
+      <div class="nota peligro" id="avisoSecretos" hidden>
+        <strong>Cuidado:</strong> el archivo generado va a contener la contrasena de SQL y la del
+        administrador en texto plano. Borralo de la maquina en cuanto termine la instalacion y no lo
+        subas al repositorio ni lo mandes por correo o chat.
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ============================= COLUMNA DERECHA: SALIDA ============================= -->
+  <div class="panel-salida">
+    <section class="tarjeta">
+      <h2><span class="paso">5</span> Instalador generado</h2>
+      <p class="ayuda">Se actualiza solo conforme llenas los datos.</p>
+
+      <div id="estadoValidacion" class="mal">Faltan datos por capturar.</div>
+
+      <div class="barra-acciones">
+        <button class="btn-primario" id="btnDescargar" disabled>Descargar instalar-gte.ps1</button>
+        <button class="btn-secundario" id="btnCopiar" disabled>Copiar script</button>
+      </div>
+
+      <p class="ayuda" style="margin-bottom:8px"><strong>Que va a hacer en la maquina nueva:</strong></p>
+      <ol class="pasos-script" id="listaPasos">
+        <li id="p-req">Verificar permisos de administrador y el runtime de .NET 8</li>
+        <li id="p-sql">Ejecutar los scripts de bdsGTE (esquema, catalogos, motor de estatus) y crear el login de servicio</li>
+        <li id="p-admin-sql">Dar de alta el usuario administrador con rol Administrador</li>
+        <li id="p-copiar">Copiar la aplicacion publicada a la carpeta de instalacion</li>
+        <li id="p-puerto">Fijar el puerto en appsettings.Production.json</li>
+        <li id="p-servicio">Crear el servicio de Windows</li>
+        <li id="p-vars">Registrar las variables de entorno (ambiente, cadena de conexion y clave JWT nueva)</li>
+        <li id="p-fw">Abrir el puerto en el firewall</li>
+        <li id="p-arranque">Arrancar el servicio y verificar /health</li>
+        <li id="p-password">Fijar la contrasena real del administrador contra la API</li>
+      </ol>
+
+      <div class="nota warn" style="margin-top:14px">
+        <strong>Para correrlo</strong> en la maquina nueva, en PowerShell <strong>como administrador</strong>:
+        <div style="margin-top:6px"><code>powershell -ExecutionPolicy Bypass -File .\instalar-gte.ps1</code></div>
+      </div>
+    </section>
+
+    <section class="tarjeta">
+      <h2>Vista previa</h2>
+      <pre id="vistaPrevia">Captura los datos para generar el script.</pre>
+    </section>
+  </div>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+
+var HASH_TEMPORAL = "$2a$11$9n7CIpHbdKd6FcHBlX3gquevz1q88g8.p3sJSnKFu2i8EslvLgu/6";
+var PASSWORD_TEMPORAL = "YouCanDoIt.2026";
+
+var $ = function (id) { return document.getElementById(id); };
+
+function psLiteral(valor) {
+  return "'" + String(valor === undefined || valor === null ? "" : valor).replace(/'/g, "''") + "'";
+}
+
+function sqlLiteral(valor) {
+  return "N'" + String(valor === undefined || valor === null ? "" : valor).replace(/'/g, "''") + "'";
+}
+
+function leerDatos() {
+  var authAdmin = document.querySelector('input[name="authAdminSql"]:checked').value;
+  var modoSecretos = document.querySelector('input[name="modoSecretos"]:checked').value;
+  return {
+    nombreServicio: $("nombreServicio").value.trim(),
+    displayName: $("displayName").value.trim(),
+    rutaInstalacion: $("rutaInstalacion").value.trim().replace(/[\\/]+$/, ""),
+    puerto: $("puerto").value.trim(),
+    copiarPublish: $("copiarPublish").checked,
+    rutaOrigenPublish: $("rutaOrigenPublish").value.trim().replace(/[\\/]+$/, ""),
+    abrirFirewall: $("abrirFirewall").checked,
+    usarAlmacen: $("usarAlmacen").checked,
+    rutaAlmacen: $("rutaAlmacen").value.trim(),
+    servidorSql: $("servidorSql").value.trim(),
+    usuarioSql: $("usuarioSql").value.trim(),
+    passwordSql: $("passwordSql").value,
+    passwordSql2: $("passwordSql2").value,
+    ejecutarScripts: $("ejecutarScripts").checked,
+    rutaScripts: $("rutaScripts").value.trim().replace(/[\\/]+$/, ""),
+    authAdminSql: authAdmin,
+    usuarioAdminSql: $("usuarioAdminSql").value.trim(),
+    passwordAdminSql: $("passwordAdminSql").value,
+    adminDominio: $("adminDominio").value.trim(),
+    adminNombre: $("adminNombre").value.trim(),
+    adminPassword: $("adminPassword").value,
+    adminPassword2: $("adminPassword2").value,
+    forzarCambio: $("forzarCambio").checked,
+    modoSecretos: modoSecretos
+  };
+}
+
+function validar(d) {
+  var errores = {};
+  if (!d.nombreServicio) errores.nombreServicio = "Obligatorio.";
+  else if (/\s/.test(d.nombreServicio)) errores.nombreServicio = "No puede llevar espacios.";
+  if (!d.displayName) errores.displayName = "Obligatorio.";
+  if (!d.rutaInstalacion) errores.rutaInstalacion = "Obligatorio.";
+  else if (!/^[a-zA-Z]:\\|^\\\\/.test(d.rutaInstalacion)) errores.rutaInstalacion = "Debe ser una ruta completa (C:\\... o \\\\servidor\\...).";
+  var puerto = parseInt(d.puerto, 10);
+  if (!d.puerto) errores.puerto = "Obligatorio.";
+  else if (isNaN(puerto) || puerto < 1 || puerto > 65535) errores.puerto = "Debe ser un numero entre 1 y 65535.";
+  if (d.copiarPublish) {
+    if (!d.rutaOrigenPublish) errores.rutaOrigenPublish = "Obligatorio si se copia el publish.";
+    else if (d.rutaOrigenPublish.toLowerCase() === d.rutaInstalacion.toLowerCase()) {
+      errores.rutaOrigenPublish = "El origen no puede ser la misma carpeta de instalacion.";
+    }
+  }
+  if (d.usarAlmacen && !d.rutaAlmacen) errores.rutaAlmacen = "Obligatorio.";
+  if (!d.servidorSql) errores.servidorSql = "Obligatorio.";
+  if (!d.usuarioSql) errores.usuarioSql = "Obligatorio.";
+  if (!d.passwordSql) errores.passwordSql = "Obligatorio.";
+  else if (d.passwordSql.length < 8) errores.passwordSql = "Minimo 8 caracteres (CHECK_POLICY ON).";
+  else if (d.passwordSql === "CAMBIAR-ESTA-CONTRASENA") errores.passwordSql = "No uses el valor de ejemplo del script.";
+  if (d.passwordSql && d.passwordSql2 !== d.passwordSql) errores.passwordSql2 = "Las contrasenas no coinciden.";
+  if (d.ejecutarScripts) {
+    if (!d.rutaScripts) errores.rutaScripts = "Obligatorio.";
+    if (d.authAdminSql === "sql") {
+      if (!d.usuarioAdminSql) errores.usuarioAdminSql = "Obligatorio.";
+      if (!d.passwordAdminSql) errores.passwordAdminSql = "Obligatorio.";
+    }
+  }
+  if (!d.adminDominio) errores.adminDominio = "Obligatorio.";
+  if (!d.adminNombre) errores.adminNombre = "Obligatorio.";
+  if (!d.adminPassword) errores.adminPassword = "Obligatorio.";
+  else if (d.adminPassword.length < 8) errores.adminPassword = "Minimo 8 caracteres.";
+  else if (d.adminPassword === PASSWORD_TEMPORAL) errores.adminPassword = "No uses la contrasena temporal del repositorio.";
+  if (d.adminPassword && d.adminPassword2 !== d.adminPassword) errores.adminPassword2 = "Las contrasenas no coinciden.";
+  return errores;
+}
+
+function generarScript(d) {
+  var pedir = d.modoSecretos === "preguntar";
+  var L = [];
+  var add = function (linea) { L.push(linea === undefined ? "" : linea); };
+  var urlBase = "http://localhost:" + d.puerto;
+  add("<#");
+  add("    Instalador de GTE (Gestor Tecnologico Empresarial)");
+  add("    Generado con asistente-instalacion.html el " + new Date().toLocaleString("es-MX"));
+  add("    Equipo destino  : servicio " + d.nombreServicio + " en " + d.rutaInstalacion);
+  add("    Servidor SQL    : " + d.servidorSql + " / bdsGTE");
+  add("    Puerto          : " + d.puerto);
+  add("#>");
+  add();
+  add("$ErrorActionPreference = 'Stop'");
+  add("$ProgressPreference = 'SilentlyContinue'");
+  return L.join("\r\n");
+}
+
+function totalPasos(d) {
+  var total = 8;
+  if (d.ejecutarScripts) total++;
+  if (d.abrirFirewall) total++;
+  return total;
+}
+
+var scriptActual = "";
+
+function pintarPasos(d) {
+  var mapa = {
+    "p-sql": d.ejecutarScripts,
+    "p-copiar": d.copiarPublish,
+    "p-fw": d.abrirFirewall
+  };
+  Object.keys(mapa).forEach(function (id) {
+    $(id).classList.toggle("apagado", !mapa[id]);
+  });
+}
+
+function refrescar() {
+  var d = leerDatos();
+  $("grupoOrigenPublish").hidden = !d.copiarPublish;
+  $("grupoAlmacen").hidden = !d.usarAlmacen;
+  $("grupoScripts").hidden = !d.ejecutarScripts;
+  $("grupoAdminSql").hidden = !(d.ejecutarScripts && d.authAdminSql === "sql");
+  $("avisoSecretos").hidden = d.modoSecretos !== "incrustar";
+  var errores = validar(d);
+  ["nombreServicio","displayName","rutaInstalacion","puerto","rutaOrigenPublish","rutaAlmacen",
+   "servidorSql","usuarioSql","passwordSql","passwordSql2","rutaScripts","usuarioAdminSql",
+   "passwordAdminSql","adminDominio","adminNombre","adminPassword","adminPassword2"].forEach(function (campo) {
+    var input = $(campo);
+    var caja = $("err-" + campo);
+    if (!input || !caja) return;
+    var mensaje = errores[campo];
+    caja.textContent = mensaje || "";
+    caja.classList.toggle("visible", !!mensaje);
+    input.classList.toggle("error", !!mensaje);
+  });
+  var listaErrores = Object.keys(errores);
+  var estado = $("estadoValidacion");
+  if (listaErrores.length) {
+    estado.className = "mal";
+    estado.innerHTML = "Faltan " + listaErrores.length + " dato(s) por corregir:<ul>" +
+      listaErrores.slice(0, 6).map(function (k) {
+        var etiqueta = document.querySelector('label[for="' + k + '"]');
+        var nombre = etiqueta ? etiqueta.textContent.replace("*", "").trim() : k;
+        return "<li>" + nombre + ": " + errores[k] + "</li>";
+      }).join("") + "</ul>";
+    $("btnDescargar").disabled = true;
+    $("btnCopiar").disabled = true;
+    $("vistaPrevia").textContent = "Corrige los datos marcados para generar el instalador.";
+    scriptActual = "";
+  } else {
+    estado.className = "ok";
+    estado.textContent = "Datos completos. El instalador esta listo para descargar.";
+    $("btnDescargar").disabled = false;
+    $("btnCopiar").disabled = false;
+    scriptActual = generarScript(d);
+    $("vistaPrevia").textContent = scriptActual;
+  }
+  pintarPasos(d);
+}
+
+function avisar(texto) {
+  var toast = $("toast");
+  toast.textContent = texto;
+  toast.classList.add("visible");
+  setTimeout(function () { toast.classList.remove("visible"); }, 2200);
+}
+
+$("btnDescargar").addEventListener("click", function () {
+  if (!scriptActual) return;
+  var blob = new Blob(["\ufeff" + scriptActual], { type: "text/plain;charset=utf-8" });
+  var url = URL.createObjectURL(blob);
+  var enlace = document.createElement("a");
+  enlace.href = url;
+  enlace.download = "instalar-gte.ps1";
+  document.body.appendChild(enlace);
+  enlace.click();
+  document.body.removeChild(enlace);
+  setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  avisar("instalar-gte.ps1 descargado");
+});
+
+$("btnCopiar").addEventListener("click", function () {
+  if (!scriptActual) return;
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(scriptActual).then(function () { avisar("Script copiado"); });
+    return;
+  }
+  var area = document.createElement("textarea");
+  area.value = scriptActual;
+  area.style.position = "fixed";
+  area.style.opacity = "0";
+  document.body.appendChild(area);
+  area.select();
+  try { document.execCommand("copy"); avisar("Script copiado"); }
+  catch (e) { avisar("No se pudo copiar: selecciona el texto de la vista previa"); }
+  document.body.removeChild(area);
+});
+
+document.addEventListener("input", refrescar);
+document.addEventListener("change", refrescar);
+refrescar();
+</script>
+
+</body>
+</html>
