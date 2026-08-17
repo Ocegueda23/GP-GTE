@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manual de usuario — GTE (Gestor Tecnológico Empresarial)</title>
+<meta name="description" content="Manual de usuario de GTE, la plataforma de gestión del departamento de desarrollo de Interflo.">
+<style>
+:root{
+  --primary:#334155;
+  --primary-dark:#1e293b;
+  --secondary:#0f766e;
+  --secondary-light:#ccfbf1;
+  --bg:#f8fafc;
+  --panel:#ffffff;
+  --border:#e2e8f0;
+  --text:#1e293b;
+  --text-muted:#64748b;
+  --ok-bg:#dcfce7; --ok-text:#166534;
+  --warn-bg:#fef3c7; --warn-text:#92400e;
+  --plan-bg:#e2e8f0; --plan-text:#475569;
+  --radius:10px;
+  --maxw:880px;
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  margin:0;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  color:var(--text);
+  background:var(--bg);
+  line-height:1.55;
+}
+a{color:var(--secondary);text-decoration:none;}
+a:hover{text-decoration:underline;}
+
+/* ---------- Header ---------- */
+.topbar{
+  position:sticky;top:0;z-index:30;
+  background:var(--primary);
+  color:#fff;
+  display:flex;align-items:center;gap:12px;
+  padding:10px 16px;
+  box-shadow:0 1px 3px rgba(0,0,0,.15);
+}
+.topbar .brand{display:flex;align-items:center;gap:10px;flex:1;min-width:0;}
+.topbar .brand-badge{
+  width:34px;height:34px;border-radius:8px;background:var(--secondary);
+  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;
+}
+.topbar .brand-text{min-width:0;}
+.topbar .brand-text strong{display:block;font-size:15px;line-height:1.2;}
+.topbar .brand-text span{display:block;font-size:12px;color:#cbd5e1;}
+.topbar button.menu-toggle{
+  display:none;background:none;border:1px solid rgba(255,255,255,.3);color:#fff;
+  border-radius:6px;padding:6px 10px;cursor:pointer;font-size:14px;
+}
+.topbar .search-box{
+  flex-shrink:0;width:220px;
+}
+.topbar .search-box input{
+  width:100%;padding:7px 10px;border-radius:8px;border:1px solid transparent;
+  font-size:13px;background:rgba(255,255,255,.15);color:#fff;
+}
+.topbar .search-box input::placeholder{color:#cbd5e1;}
+.topbar .search-box input:focus{outline:2px solid var(--secondary-light);background:#fff;color:var(--text);}
+.topbar .print-btn{
+  background:var(--secondary);color:#fff;border:none;border-radius:8px;
+  padding:7px 12px;font-size:13px;cursor:pointer;flex-shrink:0;
+}
+.topbar .print-btn:hover{background:#0d5f58;}
+
+/* ---------- Layout ---------- */
+.layout{display:flex;max-width:1280px;margin:0 auto;}
+.sidebar{
+  width:270px;flex-shrink:0;
+  padding:20px 12px 60px;
+  position:sticky;top:53px;
+  align-self:flex-start;
+  height:calc(100vh - 53px);
+  overflow-y:auto;
+}
+.sidebar h4{
+  font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);
+  margin:18px 8px 6px;
+}
+.sidebar h4:first-child{margin-top:4px;}
+.sidebar ul{list-style:none;margin:0;padding:0;}
+.sidebar li a{
+  display:block;padding:6px 10px;border-radius:7px;font-size:13.5px;color:var(--text);
+}
+.sidebar li a:hover{background:var(--border);text-decoration:none;}
+.sidebar li a.active{background:var(--secondary-light);color:var(--secondary);font-weight:600;}
+.sidebar li.hidden{display:none;}
+
+.content{flex:1;min-width:0;padding:24px 28px 80px;max-width:calc(100% - 270px);}
+.content .inner{max-width:var(--maxw);}
+
+/* ---------- Portada ---------- */
+.portada{
+  background:linear-gradient(135deg,var(--primary) 0%, var(--primary-dark) 100%);
+  color:#fff;border-radius:var(--radius);padding:32px 28px;margin-bottom:28px;
+}
+.portada h1{margin:0 0 6px;font-size:26px;}
+.portada p.lead{margin:0 0 18px;color:#dbe3ea;font-size:14.5px;max-width:640px;}
+.meta-table{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;
+  background:rgba(255,255,255,.08);border-radius:8px;padding:14px 16px;
+}
+.meta-table div span.k{display:block;font-size:11px;color:#cbd5e1;text-transform:uppercase;letter-spacing:.04em;}
+.meta-table div span.v{display:block;font-size:13.5px;font-weight:600;}
+
+/* ---------- Secciones ---------- */
+section.doc-section{margin-bottom:38px;padding-top:6px;}
+section.doc-section h2{
+  font-size:21px;border-bottom:2px solid var(--border);padding-bottom:8px;margin:0 0 14px;
+  scroll-margin-top:70px;
+}
+section.doc-section h3{font-size:16.5px;margin:26px 0 10px;scroll-margin-top:70px;}
+section.doc-section h4{font-size:14.5px;margin:18px 0 8px;color:var(--primary);}
+p{margin:0 0 10px;font-size:14.5px;}
+ul,ol{margin:0 0 12px;padding-left:22px;font-size:14.5px;}
+li{margin-bottom:5px;}
+strong{color:var(--primary-dark);}
+code{background:#eef2f6;padding:1px 6px;border-radius:4px;font-size:13px;}
+
+/* ---------- Componentes ---------- */
+.badge{
+  display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;
+  padding:2px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:.02em;
+  vertical-align:middle;
+}
+.badge-ok{background:var(--ok-bg);color:var(--ok-text);}
+.badge-warn{background:var(--warn-bg);color:var(--warn-text);}
+.badge-plan{background:var(--plan-bg);color:var(--plan-text);}
+
+.card{
+  background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
+  padding:16px 18px;margin:14px 0;
+}
+.card h4{margin-top:0;}
+.role-tag{
+  display:inline-block;font-size:11.5px;font-weight:600;color:var(--secondary);
+  background:var(--secondary-light);padding:2px 9px;border-radius:6px;margin-bottom:8px;
+}
+.note{
+  border-left:4px solid var(--secondary);background:#f0fdfa;border-radius:0 8px 8px 0;
+  padding:10px 14px;margin:12px 0;font-size:13.5px;
+}
+.note.warn{border-left-color:#d97706;background:#fffbeb;}
+.steps{counter-reset:step;list-style:none;padding-left:0;margin:12px 0;}
+.steps li{
+  position:relative;padding:2px 0 10px 34px;font-size:14.5px;
+}
+.steps li::before{
+  counter-increment:step;content:counter(step);
+  position:absolute;left:0;top:0;width:24px;height:24px;border-radius:50%;
+  background:var(--primary);color:#fff;font-size:12px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+}
+table.ref-table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13.5px;}
+table.ref-table th,table.ref-table td{border:1px solid var(--border);padding:7px 10px;text-align:left;vertical-align:top;}
+table.ref-table th{background:#f1f5f9;font-weight:700;}
+table.ref-table tr:nth-child(even) td{background:#fafbfc;}
+
+.faq details{
+  border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:var(--panel);
+}
+.faq summary{padding:11px 14px;cursor:pointer;font-weight:600;font-size:14px;}
+.faq details[open] summary{color:var(--secondary);}
+.faq .faq-a{padding:0 14px 12px;font-size:13.5px;color:var(--text);}
+
+.status-legend{display:flex;gap:14px;flex-wrap:wrap;margin:10px 0 20px;font-size:12.5px;}
+.status-legend span{display:flex;align-items:center;gap:6px;}
+
+.top-link{
+  position:fixed;right:22px;bottom:22px;background:var(--primary);color:#fff;
+  border-radius:50%;width:42px;height:42px;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 2px 8px rgba(0,0,0,.25);font-size:18px;z-index:20;
+}
+.no-results{padding:8px 10px;font-size:12.5px;color:var(--text-muted);display:none;}
+
+/* ---------- Responsive ---------- */
+@media (max-width:900px){
+  .topbar .search-box{display:none;}
+  .topbar button.menu-toggle{display:inline-block;}
+  .sidebar{
+    position:fixed;top:53px;left:0;bottom:0;background:var(--bg);
+    transform:translateX(-100%);transition:transform .2s ease;width:80%;max-width:300px;
+    box-shadow:2px 0 10px rgba(0,0,0,.15);z-index:25;height:calc(100vh - 53px);
+  }
+  .sidebar.open{transform:translateX(0);}
+  .content{max-width:100%;padding:20px 16px 80px;}
+  .layout{position:relative;}
+}
+
+/* ---------- Print ---------- */
+@media print{
+  .topbar,.sidebar,.top-link{display:none !important;}
+  .content{max-width:100%;padding:0;}
+  .portada{background:none;color:#000;border:1px solid #999;}
+  a{color:#000;text-decoration:underline;}
+  section.doc-section{page-break-inside:avoid;}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <button class="menu-toggle" id="menuToggle" aria-label="Abrir menú">☰</button>
+  <div class="brand">
+    <div class="brand-badge">GTE</div>
+    <div class="brand-text">
+      <strong>Manual de usuario</strong>
+      <span>GTE — Gestor Tecnológico Empresarial · Interflo</span>
+    </div>
+  </div>
+  <div class="search-box">
+    <input type="text" id="searchInput" placeholder="Buscar en el índice...">
+  </div>
+  <button class="print-btn" onclick="window.print()">Imprimir / PDF</button>
+</div>
+
+<div class="layout">
+  <nav class="sidebar" id="sidebar">
+    <h4>Introducción</h4>
+    <ul>
+      <li><a href="#acerca">Acerca de este manual</a></li>
+      <li><a href="#convenciones">Convenciones y símbolos</a></li>
+      <li><a href="#requisitos">Requisitos y acceso</a></li>
+    </ul>
+    <h4>Primeros pasos</h4>
+    <ul>
+      <li><a href="#login">Iniciar sesión</a></li>
+      <li><a href="#menu-principal">El menú principal</a></li>
+      <li><a href="#notificaciones">Notificaciones</a></li>
+    </ul>
+    <h4>Para todos los usuarios</h4>
+    <ul>
+      <li><a href="#mi-dia">Mi Día</a></li>
+      <li><a href="#trabajo">Trabajo y detalle de un elemento</a></li>
+      <li><a href="#subtareas">Subtareas</a></li>
+      <li><a href="#comentarios">Comentarios y adjuntos</a></li>
+      <li><a href="#solicitudes">Solicitudes</a></li>
+      <li><a href="#flujo-completo">El flujo completo de una solicitud</a></li>
+      <li><a href="#mesa-ayuda">Mesa de ayuda (Tickets)</a></li>
+    </ul>
+    <h4>Para líderes y gestión de proyectos</h4>
+    <ul>
+      <li><a href="#revision-solicitudes">Revisión de solicitudes</a></li>
+      <li><a href="#planeacion">Planeación (backlog, sprints, tablero)</a></li>
+      <li><a href="#calidad">Calidad (QA) y revisiones</a></li>
+      <li><a href="#entregas">Entregas (Releases)</a></li>
+      <li><a href="#portafolio">Portafolio: costos y OKR</a></li>
+      <li><a href="#incidentes">Incidentes</a></li>
+    </ul>
+    <h4>Indicadores y reportes</h4>
+    <ul>
+      <li><a href="#dashboard-individual">Dashboard ejecutivo de métricas</a></li>
+      <li><a href="#indicadores-ejecutivos">Indicadores ejecutivos (P18)</a></li>
+      <li><a href="#reportes">Reportes</a></li>
+    </ul>
+    <h4>Para administradores</h4>
+    <ul>
+      <li><a href="#admin-proyectos">Proyectos</a></li>
+      <li><a href="#admin-equipos">Equipos</a></li>
+      <li><a href="#admin-usuarios">Usuarios y roles</a></li>
+      <li><a href="#admin-horarios">Horarios, ambientes, áreas y puestos</a></li>
+      <li><a href="#admin-workflows">Workflows</a></li>
+    </ul>
+    <h4>Referencia</h4>
+    <ul>
+      <li><a href="#glosario">Glosario de términos</a></li>
+      <li><a href="#faq">Preguntas frecuentes</a></li>
+    </ul>
+    <h4>Próximamente</h4>
+    <ul>
+      <li><a href="#proximamente">Funcionalidades planeadas</a></li>
+    </ul>
+    <h4>Control del documento</h4>
+    <ul>
+      <li><a href="#control-versiones">Versión y contacto</a></li>
+    </ul>
+    <div class="no-results" id="noResults">Sin resultados</div>
+  </nav>
+
+  <main class="content">
+    <div class="inner">
+
+      <div class="portada">
+        <h1>Manual de usuario de GTE</h1>
+        <p class="lead">Gestor Tecnológico Empresarial — la plataforma donde el departamento de
+          desarrollo de Interflo registra, da seguimiento y cierra solicitudes, tareas, proyectos,
+          pruebas, versiones y soporte. Esta guía explica cómo usarla, paso a paso, sin necesidad
+          de conocimientos técnicos.</p>
+        <div class="meta-table">
+          <div><span class="k">Producto</span><span class="v">GTE (sucesor del Gestor de Proyectos)</span></div>
+          <div><span class="k">Versión del manual</span><span class="v">1.3</span></div>
+          <div><span class="k">Fecha de emisión</span><span class="v">13 de agosto de 2026</span></div>
+          <div><span class="k">Audiencia</span><span class="v">Usuarios generales, líderes y administradores</span></div>
+          <div><span class="k">Estado</span><span class="v">Documento vivo — se actualiza junto con el sistema</span></div>
+        </div>
+      </div>
+
+      <!-- ===================== INTRODUCCIÓN ===================== -->
+      <section class="doc-section" id="acerca">
+        <h2>1. Acerca de este manual</h2>
+        <p>GTE sustituye al antiguo "Gestor de Proyectos" y se convierte en el sistema único para
+          administrar el ciclo de vida completo del trabajo del departamento de desarrollo: desde
+          que un compañero de otra área pide algo, hasta que ese trabajo queda entregado y en
+          producción.</p>
+        <p>Este manual está escrito para cualquier persona que use GTE, sin importar su rol. Está
+          organizado en tres niveles:</p>
+        <ul>
+          <li><strong>Para todos los usuarios:</strong> lo que cualquier persona con una cuenta en
+            GTE puede hacer (ver su trabajo, registrar tiempo, comentar, pedir algo nuevo, abrir un
+            ticket de soporte).</li>
+          <li><strong>Para líderes y gestión de proyectos:</strong> además de lo anterior, revisar
+            solicitudes, planear sprints, aprobar pruebas y versiones, dar seguimiento a costos e
+            incidentes.</li>
+          <li><strong>Para administradores:</strong> configuración de proyectos, equipos, usuarios,
+            roles, horarios, ambientes, áreas, puestos y los flujos de trabajo (workflows).</li>
+        </ul>
+        <div class="note">
+          GTE sigue creciendo: se siguen agregando funcionalidades. Este manual describe tanto lo
+          que ya puedes usar hoy como lo que está planeado, para que tengas una idea completa del
+          producto final. Cada sección indica su estado con una etiqueta de color — ver la sección
+          de <a href="#convenciones">convenciones</a>.
+        </div>
+      </section>
+
+      <section class="doc-section" id="convenciones">
+        <h2>2. Convenciones y símbolos</h2>
+        <p>A lo largo del manual, cada funcionalidad muestra una etiqueta de estado:</p>
+        <div class="status-legend">
+          <span><span class="badge badge-ok">Disponible</span> ya la puedes usar hoy en GTE.</span>
+          <span><span class="badge badge-warn">Parcial / en desarrollo</span> la parte principal ya funciona; algunos detalles siguen construyéndose.</span>
+          <span><span class="badge badge-plan">Planeada</span> todavía no está construida; forma parte del alcance futuro del proyecto.</span>
+        </div>
+        <p>Además:</p>
+        <ul>
+          <li>Los pasos a seguir se numeran en círculos, en orden.</li>
+          <li>Los recuadros con fondo verde claro (<span class="note" style="display:inline;padding:2px 8px;">como este</span>) son notas útiles; los de fondo amarillo son advertencias.</li>
+          <li>Los nombres de botones, pantallas y campos aparecen en <strong>negritas</strong>; los códigos o folios en <code>este formato</code>.</li>
+        </ul>
+      </section>
+
+      <section class="doc-section" id="requisitos">
+        <h2>3. Requisitos y acceso</h2>
+        <p>GTE es una aplicación web: no requiere instalar nada. Solo necesitas:</p>
+        <ul>
+          <li>Un navegador moderno (Chrome, Edge o Firefox actualizados).</li>
+          <li>Conexión a la red interna de Interflo (o VPN, si trabajas fuera de oficina).</li>
+          <li>Una cuenta creada por tu administrador, con usuario y contraseña.</li>
+        </ul>
+        <p>La dirección exacta te la proporciona el equipo que administra GTE en tu organización.</p>
+      </section>
+
+      <!-- ===================== PRIMEROS PASOS ===================== -->
+      <section class="doc-section" id="login">
+        <h2>4. Iniciar sesión <span class="badge badge-ok">Disponible</span></h2>
+        <span class="role-tag">Todos los usuarios</span>
+        <p>GTE tiene su propio sistema de acceso — no depende de ningún proveedor externo. Tu
+          usuario y contraseña se validan directamente dentro de GTE.</p>
+        <ol class="steps">
+          <li>Abre GTE en tu navegador. Verás la pantalla de inicio de sesión.</li>
+          <li>Escribe tu usuario y contraseña, y presiona <strong>Entrar</strong>.</li>
+          <li>Si es la primera vez que entras con una contraseña temporal, el sistema te pedirá
+            cambiarla antes de continuar.</li>
+        </ol>
+        <div class="note">
+          Si no tienes contraseña, la olvidaste, o tu cuenta quedó bloqueada tras varios intentos
+          fallidos, un administrador de GTE puede restablecerla por ti. Todavía no existe un
+          flujo automático de "olvidé mi contraseña" por correo.
+        </div>
+        <div class="note warn">
+          Por seguridad, tu sesión se cierra sola después de un tiempo de inactividad. Vuelve a
+          entrar con tu usuario y contraseña cuando eso ocurra; no perderás información que ya
+          hayas guardado.
+        </div>
+      </section>
+
+      <section class="doc-section" id="menu-principal">
+        <h2>5. El menú principal <span class="badge badge-ok">Disponible</span></h2>
+        <span class="role-tag">Todos los usuarios</span>
+        <p>La navegación vive en un panel fijo del lado izquierdo de la pantalla. Ahí encuentras
+          únicamente las secciones a las que tienes acceso según tu rol — si crees que te falta
+          alguna, pide a un administrador que revise tus permisos.</p>
+        <p>En la barra superior, además del panel de navegación (que en pantallas pequeñas se
+          colapsa en un botón de menú), encuentras:</p>
+        <ul>
+          <li>La <strong>campana de notificaciones</strong>.</li>
+          <li>Tu nombre y rol, con la opción para <strong>cerrar sesión</strong>.</li>
+        </ul>
+      </section>
+
+      <section class="doc-section" id="notificaciones">
+        <h2>6. Notificaciones <span class="badge badge-ok">Disponible</span></h2>
+        <span class="role-tag">Todos los usuarios</span>
+        <p>La campana de la barra superior te avisa en tiempo real (sin recargar la página)
+          cuando:</p>
+        <ul>
+          <li>Alguien te menciona con <code>@tu-usuario</code> en un comentario.</li>
+          <li>Una solicitud que enviaste se aprueba, se rechaza o se devuelve.</li>
+        </ul>
+        <p>Haz clic en una notificación para ir directo a lo que la generó. Puedes marcar cada
+          una como leída, o todas de un jalón.</p>
+        <div class="note">
+          Hoy las notificaciones solo llegan dentro de GTE (in-app). El envío por correo, Teams o
+          WhatsApp está <span class="badge badge-plan">planeado</span> — ver
+          <a href="#proximamente">Próximamente</a>.
+        </div>
+      </section>
+
+      <!-- ===================== TODOS LOS USUARIOS ===================== -->
+      <section class="doc-section" id="mi-dia">
+        <h2>7. Mi Día <span class="badge badge-ok">Disponible</span></h2>
+        <span class="role-tag">Todos los usuarios</span>
+        <p>Es la pantalla que ves al entrar. Resume de un vistazo tu carga de trabajo actual:</p>
+        <ul>
+          <li>El elemento que tienes <strong>en proceso</strong> ahora mismo — solo puede haber
+            uno; si inicias otro, el anterior se suspende automáticamente.</li>
+          <li>Elementos <strong>vencidos</strong>, los que se vencen <strong>hoy</strong>, y los de
+            los <strong>próximos 7 días</strong>.</li>
+          <li>El tiempo que llevas registrado en el día.</li>
+        </ul>
+        <p>Desde aquí puedes iniciar cualquier elemento de la lista o registrar tiempo en el que
+          ya tienes en proceso, sin tener que buscarlo en la bandeja.</p>
+      </section>
+
+      <section class="doc-section" id="trabajo">
+        <h2>8. Trabajo (bandeja) y detalle de un elemento <span class="badge badge-ok">Disponible</span></h2>
+        <span class="role-tag">Todos los usuarios</span>
+        <p>En <strong>Trabajo</strong> ves todos los elementos asignados a ti (o a tu equipo, según
+          los filtros que apliques), con su estatus, prioridad y fecha compromiso.</p>
+        <h3>Abrir y trabajar un elemento</h3>
+        <ol class="steps">
+          <li>Haz clic en el folio (por ejemplo <code>GTE-0042</code>) para abrir el detalle
+            completo.</li>
+          <li>Revisa la descripción, criterios de aceptación y comentarios previos.</li>
+          <li>Usa los botones de acción para avanzar el estatus — por ejemplo <strong>Iniciar</strong>,
+            <strong>Enviar a pruebas</strong> o <strong>Terminar</strong>. Solo se muestran las
+            acciones válidas para el estatus actual; el sistema no te deja "saltarte" pasos.</li>
+          <li>Registra el tiempo que invertiste desde la pestaña <strong>Tiempo</strong> — ahí ves,
+            al pie de la lista, el <strong>total de horas ya registradas</strong> en ese elemento; el
+            mismo total aparece también dentro del cuadro para registrar un tiempo nuevo.</li>
+        </ol>
+        <div class="note">
+          Antes de poder <strong>Iniciar</strong> un elemento debes capturar una fecha compromiso.
+          Antes de poder <strong>Terminar</strong>lo necesitas al menos un registro de tiempo (o
+          una subtarea ya terminada) y cero hallazgos de revisión pendientes. En proyectos de
+          categoría <strong>Desarrollo</strong>, además, terminar sin haber pasado por la fase de
+          pruebas requiere un permiso especial — lo normal es enviarlo a <strong>Pruebas</strong>
+          primero. Los proyectos de categoría TI y Mantenimiento pueden saltarse esa fase.
+        </div>
+        <div class="note">
+          Solo puedes tener un elemento <strong>En proceso</strong> a la vez. Si inicias uno nuevo
+          mientras otro ya estaba en proceso, el anterior se suspende solo — no se pierde nada, solo
+          queda en pausa hasta que lo reanudes.
+        </div>
+        <h3>Editar un elemento</h3>
+        <p>El botón <strong>Editar</strong> solo aparece si de verdad puedes cambiar algo: se oculta
+          si el elemento ya está Terminado, o si está asignado a otra persona y no tienes el permiso
+          para modificar trabajo ajeno.</p>
+        <div class="note">
+          Puedes capturar la fecha compromiso libremente la primera vez. Una vez guardada, moverla
+          a otra fecha (o borrarla) ya requiere un permiso especial — normalmente reservado a
+          Líderes/Administradores. Si no tienes ese permiso y necesitas correr la fecha, pídele a tu
+          líder que la ajuste.
+        </div>
+      </section>
+
+      <section class="doc-section" id="subtareas">
+        <h2>9. Subtareas <span class="badge badge-ok">Disponible</span></h2>
+        <span class="role-tag">Todos los usuarios</span>
+        <p>Dentro del detalle de un elemento, la pestaña <strong>Subtareas</strong> lista los
+          elementos hijos que dependen de él: folio, título, estatus, persona asignada y tiempo
+          registrado en cada uno.</p>
+        <ol class="steps">
+          <li>Abre la pestaña <strong>Subtareas</strong> en el detalle del elemento padre.</li>
+          <li>Da clic en <strong>Agregar subtarea</strong> para crear una nueva — queda ligada
+            automáticamente al mismo proyecto del elemento padre.</li>
+          <li>Haz clic en cualquier subtarea de la lista para entrar a su propio detalle.</li>
+        </ol>
+        <div class="note">
+          El tiempo registrado en las subtareas no se suma todavía al indicador "Invertido" del
+          elemento padre; hay que revisarlo directamente en cada subtarea.
+        </div>
+      </section>
+
+      <section class="doc-section" id="comentarios">
+        <h2>10. Comentarios y adjuntos <span class="badge badge-ok">Disponible</span></h2>
+        <span class="role-tag">Todos los usuarios</span>
+        <p>En el detalle de cualquier elemento de trabajo puedes:</p>
+        <ul>
+          <li>Escribir comentarios con formato básico (negritas, listas).</li>
+          <li>Mencionar a alguien con <code>@usuario</code> — le llega una notificación.</li>
+          <li>Pegar imágenes directamente desde el portapapeles.</li>
+          <li>Subir y descargar archivos adjuntos.</li>
+        </ul>
+        <div class="note">
+          Solo el propio autor puede borrar sus comentarios o adjuntos; no hay edición posterior
+          de un comentario ya publicado, solo alta y baja.
+        </div>
+      </section>
+
+      <section class="doc-section" id="solicitudes">
+        <h2>11. Solicitudes <span class="badge badge-ok">Disponible</span></h2>
+        <span class="role-tag">Todos los usuarios</span>
+        <p>Si necesitas pedir algo nuevo — un requerimiento, una mejora, reportar un error — usa
+          <strong>Solicitudes</strong> en vez de contactar directamente al equipo de desarrollo.</p>
+        <ol class="steps">
+          <li>Entra a <strong>Solicitudes</strong> y llena el formulario: título, descripción, tipo,
+            justificación de negocio y fecha en que la necesitas. La descripción admite formato
+            básico (negritas, listas) con la misma barra de herramientas que usas en comentarios.</li>
+          <li>Adjunta archivos o capturas si ayudan a explicar la petición.</li>
+          <li>Envíala. Recibe un folio con formato <code>SOL-2026-0001</code> para darle
+            seguimiento.</li>
+        </ol>
+        <p>Un responsable la revisa y decide: <strong>aprobarla</strong>, <strong>rechazarla</strong>
+          (con motivo) o <strong>devolverla</strong> pidiendo más información. Te llega una
+          notificación con la decisión en cualquiera de los tres casos.</p>
+        <p>En <strong>Mis solicitudes</strong> puedes buscar por folio o título, ordenar la lista
+          por columna, y editar una solicitud (ícono de lápiz) mientras siga en revisión — deja de
+          poder editarse en cuanto se convierte, se rechaza o se cancela.</p>
+        <div class="note">
+          Pegar imágenes directamente en la descripción todavía no funciona en el formulario de
+          <strong>nueva</strong> solicitud (la solicitud no existe todavía en ese momento, así que
+          no hay dónde guardarlas). Una vez enviada, mientras siga en revisión (Enviada, En
+          análisis o Aprobada) puedes editarla — el ícono de lápiz en <strong>Mis
+          solicitudes</strong> — y ahí sí puedes pegar imágenes en la descripción, igual que en
+          comentarios y en elementos de trabajo.
+        </div>
+      </section>
+
+      <section class="doc-section" id="flujo-completo">
+        <h2>12. El flujo completo: de una solicitud a su cierre <span class="badge badge-ok">Disponible</span></h2>
+        <span class="role-tag">Todos los usuarios</span>
+        <p>Así se ve, de principio a fin, el recorrido de una petición dentro de GTE:</p>
+        <ol class="steps">
+          <li><strong>Solicitud enviada</strong> — llenas el formulario en Solicitudes con lo que
+            necesitas.</li>
+          <li><strong>Revisión de solicitudes</strong> — un responsable la revisa y decide:
+            aprobarla (sigue el flujo normal), rechazarla (termina ahí) o devolverla pidiendo más
+            información.</li>
+          <li><strong>Se crean una o más tareas</strong> — si se aprueba, la solicitud se convierte
+            en uno o más elementos de trabajo, ya ligados a ella.</li>
+          <li><strong>En trabajo</strong> — la tarea avanza de Pendiente a En proceso (con su
+            tiempo registrado) hasta quedar Terminada por quien la trabaja.</li>
+          <li><strong>Revisión de calidad</strong> — en los proyectos que la usan, alguien revisa
+            el resultado; si encuentra algo, la tarea vuelve a corrección; si no, sigue adelante.</li>
+          <li><strong>Terminada (cierre)</strong> — la tarea queda cerrada, y se avisa al
+            solicitante original que ya está lista.</li>
+        </ol>
+        <div class="note">
+          Si el proyecto lo requiere, el trabajo terminado se agrupa además en una versión
+          (<strong>Release</strong>) que se aprueba y se despliega antes de considerarse
+          entregado en producción — ver <a href="#entregas">Entregas</a>.
+        </div>
+      </section>
+
+      <section class="doc-section" id="mesa-ayuda">
+        <h2>13. Mesa de ayuda (Tickets) <span class="badge badge-ok">Disponible</span></h2>
+        <span class="role-tag">Todos los usuarios · Agentes de soporte</span>
+        <p>Para pedir ayuda o reportar un problema puntual (distinto de una solicitud de
+          requerimiento), usa un <strong>ticket</strong>:</p>
+        <ol class="steps">
+          <li>Entra a <strong>Mis tickets</strong> y crea uno nuevo: categoría, prioridad y
+            descripción. Recibe un folio <code>TKT-2026-0001</code>.</li>
+          <li>Un agente lo atiende: cada prioridad tiene un tiempo límite de respuesta y de
+            resolución (SLA).</li>
+          <li>Si el ticket necesita desarrollo, el agente lo <strong>escala</strong>: se crea un
+            elemento de trabajo vinculado y el ticket sigue vivo hasta que ese trabajo se libera.</li>
+          <li>Al resolverse, califica el servicio con una encuesta de 1 a 5.</li>
+        </ol>
+        <p>Los agentes de soporte trabajan desde la bandeja <strong>Mesa de ayuda</strong>, con las
+          transiciones: asignar, iniciar atención, esperar al usuario (pausa el SLA), reanudar,
+          resolver, cerrar y reabrir. El filtro <strong>Agente</strong> de esa bandeja se abre ya
+          filtrado por ti mismo al entrar (así ves de una vez tus propios tickets); cámbialo a
+          "Todos" u otro agente cuando lo necesites — la elección se respeta mientras sigas en la
+          pantalla.</p>
+        <div class="note warn">
+          Las alertas automáticas cuando un ticket va a vencer (80% y 100% del tiempo de SLA
+          consumido) y el cierre automático de tickets resueltos sin respuesta son
+          <span class="badge badge-plan">planeadas</span> — hoy el semáforo de SLA se ve en
+          pantalla, pero la alerta no se envía sola todavía.
+        </div>
+      </section>
+
+      <!-- ===================== LÍDERES ===================== -->
+      <section class="doc-section" id="revision-solicitudes">
+        <h2>14. Revisión de solicitudes <span class="badge badge-ok">Disponible</span></h2>
+        <span class="role-tag">Líderes</span>
+        <p>Toda solicitud nueva llega a la bandeja <strong>Revisión de solicitudes</strong>. Desde
+          ahí puedes:</p>
+        <ul>
+          <li><strong>Ver detalle</strong>: el ícono de ojo junto a cada fila abre la solicitud
+            completa (descripción con su formato, justificación, solicitante y fecha deseada) sin
+            salir de la bandeja.</li>
+          <li><strong>Aprobar</strong>: eliges el proyecto destino y la conviertes en uno o más
+            elementos de trabajo, ya trazados hacia la solicitud original.</li>
+          <li><strong>Rechazar</strong>: con motivo obligatorio; se notifica al solicitante.</li>
+          <li><strong>Devolver</strong>: pides más información; el solicitante puede volver a
+            enviarla.</li>
+        </ul>
+        <div class="note">
+          La generación automática del desglose en historias con inteligencia artificial (a partir
+          de la solicitud) está <span class="badge badge-plan">planeada</span> — hoy el desglose se
+          hace a mano.
+        </div>
+      </section>
+
+      <section class="doc-section" id="planeacion">
+        <h2>15. Planeación (backlog, sprints, tablero) <span class="badge badge-ok">Disponible</span></h2>
+        <span class="role-tag">Líderes</span>
+        <h3>Backlog</h3>
+        <p>Lista priorizada de trabajo pendiente por proyecto o equipo. El orden se ajusta
+          arrastrando los elementos; también puedes hacer una estimación rápida ahí mismo.</p>
+        <h3>Sprints</h3>
+        <ol class="steps">
+          <li>Crea un sprint con objetivo y fechas.</li>
+          <li>Asigna a cada integrante su capacidad (horas por día), calculada automáticamente
+            según su horario real y sus ausencias aprobadas.</li>
+          <li>Arrastra elementos del backlog al sprint, sin exceder la capacidad disponible.</li>
+          <li><strong>Activa</strong> el sprint. Al <strong>cerrarlo</strong>, decides si lo que no
+            se terminó regresa al backlog o pasa al siguiente sprint.</li>
+        </ol>
+        <h3>Tablero (Kanban)</h3>
+        <p>Columnas que representan los estatus del flujo de trabajo, con límites de trabajo en
+          proceso (WIP) configurables por columna. Arrastra las tarjetas para mover el estatus del
+          elemento — el tablero se actualiza solo, en tiempo real, para todo el equipo.</p>
+        <div class="note">
+          El avance del sprint (burndown/burnup) y la velocidad del equipo se calculan
+          automáticamente del historial real, sin que nadie tenga que capturar avances a mano.
+        </div>
+      </section>
+
+      <section class="doc-section" id="calidad">
+        <h2>16. Calidad (QA) y revisiones <span class="badge badge-ok">Disponible</span></h2>
+        <span class="role-tag">Líderes · Equipo de QA</span>
+        <h3>Planes y casos de prueba</h3>
+        <ul>
+          <li>Un <strong>plan de pruebas</strong> agrupa los casos a ejecutar para un proyecto o
+            versión.</li>
+          <li>Cada <strong>caso de prueba</strong> tiene folio, precondiciones, pasos y resultado
+            esperado, y puede ligarse al requisito que cubre.</li>
+          <li>Los casos se ejecutan en <strong>ciclos</strong> (por ejemplo "Regresión
+            pre-release"), registrando resultado: Pasa, Falla, Bloqueado o No aplica.</li>
+          <li>Si un caso Falla, el botón <strong>Crear bug</strong> abre un elemento de trabajo
+            tipo Bug ya precargado con la evidencia.</li>
+          <li>La <strong>matriz de trazabilidad</strong> muestra qué requisitos no tienen ningún
+            caso que los cubra.</li>
+        </ul>
+        <h3>Revisiones (hallazgos de código o de resultado)</h3>
+        <p>Al revisar el trabajo de alguien más, se registra un <strong>hallazgo</strong>. Mientras
+          exista un hallazgo sin marcar como corregido, el elemento no puede cerrarse: vuelve
+          automáticamente a la fase de corrección. Solo un líder puede reabrir un hallazgo ya
+          corregido.</p>
+        <div class="note">
+          Aprobar o rechazar la fase de pruebas de un elemento no puede hacerlo la misma persona
+          que lo trabajó — evita autoaprobaciones.
+        </div>
+      </section>
+
+      <section class="doc-section" id="entregas">
+        <h2>17. Entregas (Releases) <span class="badge badge-ok">Disponible</span></h2>
+        <span class="role-tag">Líderes · QA · Negocio</span>
+        <ol class="steps">
+          <li>Se crea una versión (release) y se agregan los elementos de trabajo ya Terminados y
+            revisados.</li>
+          <li>Se congela el contenido y se agregan los artefactos (scripts SQL, paquetes,
+            configuración), cada uno con su script de reversión cuando aplica.</li>
+          <li>Se solicita la cadena de aprobaciones configurada (por ejemplo QA → Líder →
+            Negocio); cada aprobación queda firmada.</li>
+          <li>Una vez aprobado, se registra el <strong>despliegue</strong> a cada ambiente, con
+            bitácora.</li>
+          <li>Si algo sale mal, el botón <strong>Rollback</strong> ejecuta los scripts de reversión
+            en orden inverso y deja el release marcado como Revertido.</li>
+        </ol>
+        <p>Las notas de versión se generan automáticamente a partir del contenido incluido, y
+          pueden editarse antes de publicarse.</p>
+        <div class="note">
+          Publicar la generación automática de notas con inteligencia artificial y el aviso al
+          canal de Teams están <span class="badge badge-plan">planeados</span>.
+        </div>
+      </section>
+
+      <section class="doc-section" id="portafolio">
+        <h2>18. Portafolio: costos y objetivos (OKR) <span class="badge badge-warn">Parcial / en desarrollo</span></h2>
+        <span class="role-tag">Líderes · Ejecutivo</span>
+        <h3>Costeo real <span class="badge badge-ok">Disponible</span></h3>
+        <p>Se administra un catálogo de tarifas por nivel de ingeniero (con vigencia por fecha) y
+          un presupuesto por proyecto y año. El costo real se calcula solo, a partir de las horas
+          registradas por cada persona multiplicadas por la tarifa vigente en la fecha del
+          registro — nunca se captura a mano. El reporte compara el costo real contra el
+          presupuesto autorizado, con desglose por usuario.</p>
+        <div class="note">
+          Ver el costeo, el presupuesto y las tarifas requiere un permiso específico; no todas las
+          cuentas lo tienen por diseño (es información sensible).
+        </div>
+        <h3>OKR (objetivos y resultados clave) <span class="badge badge-ok">Disponible</span></h3>
+        <p>Se definen objetivos trimestrales por proyecto o equipo, con resultados clave medibles
+          (meta y valor actual). El avance hoy se actualiza a mano; ligarlo automáticamente a un
+          indicador está planeado.</p>
+        <h3>Pendiente de este módulo <span class="badge badge-plan">Planeado</span></h3>
+        <ul>
+          <li>Jerarquía de Portafolio y Programa por encima de los proyectos.</li>
+          <li>Pantalla para dar de alta y dar seguimiento a un riesgo (probabilidad × impacto) —
+            ya se puede <em>consultar</em> la matriz en <a href="#reportes">Reportes</a> e
+            <a href="#indicadores-ejecutivos">Indicadores ejecutivos</a>, pero todavía no hay
+            dónde capturarlos.</li>
+          <li>Actualización automática del avance de un OKR desde un indicador (KPI).</li>
+        </ul>
+      </section>
+
+      <section class="doc-section" id="incidentes">
+        <h2>19. Incidentes <span class="badge badge-warn">Parcial / en desarrollo</span></h2>
+        <span class="role-tag">Líderes · Operación</span>
+        <p>Un incidente registra una falla real en producción, con severidad de S1 (crítica) a S4
+          (menor):</p>
+        <ol class="steps">
+          <li>Se da de alta el incidente dentro de un proyecto, con severidad.</li>
+          <li>Se avanza por las transiciones: atender, mitigar, resolver, cerrar (un incidente no
+            se reabre; siempre concluye en Cerrado).</li>
+          <li>Cerrar un incidente S1 o S2 exige haber documentado la causa raíz.</li>
+          <li>Puede vincularse el elemento de trabajo correctivo que lo resuelve, y el release que
+            lo haya causado (útil para medir tasa de fallas de despliegue).</li>
+        </ol>
+        <div class="note">
+          Hoy el responsable del proyecto recibe una notificación dentro de GTE cuando se abre un
+          incidente S1. El aviso por todos los canales, el escalamiento automático a los 30 minutos
+          sin atención, el reporte de disponibilidad/% uptime mensual y el monitoreo con apertura
+          automática de incidentes están <span class="badge badge-plan">planeados</span>.
+        </div>
+      </section>
+
+      <!-- ===================== INDICADORES Y REPORTES ===================== -->
+      <section class="doc-section" id="dashboard-individual">
+        <h2>20. Dashboard ejecutivo de métricas <span class="badge badge-ok">Disponible</span></h2>
+        <span class="role-tag">Todos los usuarios</span>
+        <p>Esta pantalla mide el desempeño individual de cada colaborador, calculado 100% a partir
+          de datos que ya existen en el sistema — nadie captura una evaluación a mano. No debe
+          confundirse con <a href="#indicadores-ejecutivos">Indicadores ejecutivos</a>, que mide
+          equipos y proyectos, no personas.</p>
+        <ul>
+          <li><strong>Empleado del mes</strong>: se elige automáticamente a quien tiene el mayor
+            puntaje del mes, entre todos los colaboradores medibles del sistema (no cambia según
+            los filtros que apliques).</li>
+          <li><strong>Resumen ejecutivo</strong>: indicadores generales con su variación contra el
+            mes anterior.</li>
+          <li><strong>Carga de trabajo</strong>: pendientes, en proceso, terminados, retrasos y
+            eficiencia de entrega por colaborador.</li>
+          <li><strong>Indicadores individuales</strong>: al hacer clic sobre una persona (en la
+            carga de trabajo o en un ranking) se abre su detalle — horas estimadas vs. reales,
+            eficiencia, entregas a tiempo, y su <strong>evaluación mensual</strong> en 6
+            dimensiones (Calidad, Productividad, Puntualidad, Trabajo en equipo, Cumplimiento y
+            Comunicación).</li>
+          <li><strong>Rankings</strong> (top y bottom 10) y <strong>comparativos</strong> contra el
+            promedio del equipo, del área y del año anterior.</li>
+          <li><strong>Tendencias</strong>: evolución de una métrica a lo largo del año, bajo
+            demanda.</li>
+        </ul>
+        <p>Los filtros de <strong>Año, Mes, Proyecto, Área y Empleado</strong> aplican a toda la
+          pantalla excepto al Empleado del mes (que siempre es del sistema completo). El alcance de
+          lo que ves —global, tu área, tu equipo o solo tú mismo— depende de tu rol y de si lideras
+          a alguien; no necesitas configurar nada para que aplique.</p>
+        <div class="note">
+          Cuentas de administración del sistema y solicitantes externos no aparecen como sujetos
+          medidos (no tendría sentido evaluarles desempeño), aunque sigan pudiendo usar la
+          pantalla para consultar a otros. Dos de las seis dimensiones de evaluación (Trabajo en
+          equipo y Comunicación) son, por ahora, un cálculo aproximado por falta de un dato mejor
+          en el sistema — se marcan como "sin datos" cuando no hay suficiente información en vez
+          de inventar un número.
+        </div>
+      </section>
+
+      <section class="doc-section" id="indicadores-ejecutivos">
+        <h2>21. Indicadores ejecutivos (P18) <span class="badge badge-ok">Disponible</span></h2>
+        <span class="role-tag">Líderes · Ejecutivo</span>
+        <p>Vista de equipo/proyecto para dirección: salud, velocidad, costo y calidad del
+          departamento en una sola pantalla. Requiere un permiso específico — si no lo tienes, no
+          verás esta opción en el menú.</p>
+        <p>Los widgets disponibles:</p>
+        <ul>
+          <li><strong>Indicadores generales</strong>: Lead Time y Cycle Time, Entrega a tiempo
+            (con semáforo), Eficiencia, Retrabajo, Productividad, SLA y CSAT de soporte.</li>
+          <li><strong>DORA metrics</strong>: frecuencia de despliegues, tasa de fallas de cambio y
+            tiempo promedio de recuperación de incidentes (MTTR).</li>
+          <li><strong>Semáforo de proyectos</strong>: entrega a tiempo y costo real contra
+            presupuesto autorizado, proyecto por proyecto.</li>
+          <li><strong>OKR</strong>: avance de los objetivos trimestrales vigentes.</li>
+          <li><strong>KPIs personalizados</strong>: serie histórica de los indicadores definidos
+            por el equipo, con su meta.</li>
+          <li><strong>Top riesgos</strong>: los riesgos de mayor exposición (probabilidad ×
+            impacto) entre los proyectos que puedes ver.</li>
+          <li><strong>Burndown del sprint activo</strong>: elige un equipo en el filtro para verlo.</li>
+        </ul>
+        <p>Los filtros de <strong>Año, Mes, Proyecto y Equipo</strong> (este último solo necesario
+          para el burndown) aplican a toda la pantalla. Puedes <strong>ocultar</strong> el widget
+          que no te interese con el ícono de ojo, y <strong>reordenarlos</strong> arrastrando el
+          ícono de puntos junto al título — el acomodo que dejes se guarda para tu próxima visita.
+          Los botones <strong>Exportar Excel</strong> y <strong>Exportar PDF</strong> (este último
+          usa la función de imprimir del navegador) están arriba a la derecha.</p>
+        <div class="note warn">
+          La métrica DORA "Tiempo de entrega de cambios" (de un cambio de código hasta que llega a
+          producción) todavía se muestra como <strong>"Sin datos"</strong> — depende de vincular
+          GTE con el control de versiones (Git), que sigue <span class="badge badge-plan">planeado</span>.
+          Las demás métricas DORA sí son reales.
+        </div>
+      </section>
+
+      <section class="doc-section" id="reportes">
+        <h2>22. Reportes <span class="badge badge-ok">Disponible</span></h2>
+        <span class="role-tag">Líderes · Ejecutivo · Administradores</span>
+        <p>Catálogo de 14 reportes de detalle, cada uno con sus propios filtros (periodo,
+          proyecto, equipo, según aplique) y un botón <strong>Exportar Excel</strong> para
+          descargar exactamente lo que ves en pantalla:</p>
+        <table class="ref-table">
+          <tr><th>Reporte</th><th>Qué muestra</th></tr>
+          <tr><td>Productividad</td><td>Elementos terminados, puntos, % a tiempo y eficiencia por persona.</td></tr>
+          <tr><td>Horas registradas</td><td>Detalle de horas por persona y día, marcando los días de ausencia aprobada.</td></tr>
+          <tr><td>Retrabajo</td><td>% de tiempo invertido en correcciones, por persona y proyecto.</td></tr>
+          <tr><td>Bugs y defectos</td><td>Densidad de bugs, antigüedad promedio y tasa de escape a producción, por proyecto.</td></tr>
+          <tr><td>Versiones/Releases</td><td>Historial de releases, tiempos de aprobación y frecuencia de liberación.</td></tr>
+          <tr><td>Riesgos</td><td>Matriz completa de riesgos, con el conteo por estatus (expuestos, en mitigación, materializados, cerrados).</td></tr>
+          <tr><td>Clientes/solicitantes</td><td>Solicitudes por área, con tiempos promedio de revisión y de entrega.</td></tr>
+          <tr><td>Costos</td><td>Costo real (horas × tarifa) por proyecto/mes y por desarrollador.</td></tr>
+          <tr><td>Rentabilidad</td><td>Presupuesto autorizado vs. costo real acumulado por proyecto, con semáforo.</td></tr>
+          <tr><td>SLA</td><td>Cumplimiento de SLA por prioridad y por agente, más el CSAT del periodo.</td></tr>
+          <tr><td>KPIs / DORA</td><td>Serie histórica de los indicadores personalizados, comparando un año contra otro.</td></tr>
+          <tr><td>Carga de trabajo</td><td>Elementos en proceso (WIP) por persona y su % de ocupación contra la capacidad de su sprint.</td></tr>
+          <tr><td>Flujo (CFD)</td><td>Diagrama de flujo acumulado de un proyecto: cuántos elementos había en cada estatus, día por día.</td></tr>
+          <tr><td>Auditoría</td><td>Bitácora de movimientos del sistema, filtrable por usuario, entidad y rango de fechas.</td></tr>
+        </table>
+        <div class="note">
+          Los reportes de <strong>Costos</strong> y <strong>Rentabilidad</strong> requieren un
+          permiso específico (información sensible); <strong>Auditoría</strong> está reservado a
+          administradores. El reporte de <strong>Riesgos</strong> normalmente aparecerá vacío
+          hasta que el equipo capture riesgos reales — hoy no existe todavía una pantalla para
+          darlos de alta.
+        </div>
+        <div class="note">
+          Además de estos reportes, existen vistas de solo lectura preparadas para conectar
+          herramientas de análisis como <strong>Power BI</strong> — pídeselas al equipo que
+          administra GTE si tu área necesita construir sus propios tableros.
+        </div>
+      </section>
+
+      <!-- ===================== ADMINISTRADORES ===================== -->
+      <section class="doc-section" id="admin-proyectos">
+        <h2>23. Administración: Proyectos <span class="badge badge-ok">Disponible</span></h2>
+        <span class="role-tag">Administradores</span>
+        <p>Alta y edición de proyectos, con cambio de estatus a través del flujo correspondiente.
+          Al autorizar un proyecto se genera su folio y la clave que usarán los folios de sus
+          elementos de trabajo (por ejemplo <code>GTE-0001</code>). La lista tiene buscador por
+          clave/nombre y encabezados en los que puedes hacer clic para ordenar.</p>
+        <div class="note">
+          Un proyecto con elementos de trabajo todavía abiertos no puede cerrarse — el sistema
+          muestra la lista de lo que falta.
+        </div>
+        <div class="note">
+          El casillero <strong>Proyecto administrado</strong> restringe quién puede crear o
+          cancelar elementos de trabajo dentro de ese proyecto: solo quien tenga el permiso
+          especial correspondiente; el resto de las personas del equipo sigue pudiendo trabajar
+          normal (cambiar estatus, registrar tiempo, comentar) pero no dar de alta ni cancelar
+          tareas nuevas. Úsalo en proyectos donde el alcance debe controlarse de cerca.
+        </div>
+      </section>
+
+      <section class="doc-section" id="admin-equipos">
+        <h2>24. Administración: Equipos <span class="badge badge-ok">Disponible</span></h2>
+        <span class="role-tag">Administradores</span>
+        <p>Alta de equipos con sus integrantes y el porcentaje de dedicación de cada uno. Una
+          misma persona puede pertenecer a varios equipos. Tanto la lista de equipos como la de
+          integrantes de cada uno tienen buscador y orden por columna.</p>
+      </section>
+
+      <section class="doc-section" id="admin-usuarios">
+        <h2>25. Administración: Usuarios y roles <span class="badge badge-ok">Disponible</span></h2>
+        <span class="role-tag">Administradores</span>
+        <h3>Usuarios</h3>
+        <ul>
+          <li>Alta, edición y baja lógica de cuentas: puesto, nivel (Junior/Senior/Master),
+            horario, jefe directo y correo.</li>
+          <li>La opción <strong>Restablecer contraseña</strong> genera una temporal que el usuario
+            debe cambiar en su primer ingreso.</li>
+          <li>El sistema valida que la jerarquía de jefes no forme ciclos (nadie puede acabar
+            siendo, indirectamente, su propio jefe).</li>
+        </ul>
+        <h3>Roles y permisos</h3>
+        <p>Cada usuario recibe uno o más roles (Administrador, Líder, Coordinador, Desarrollador,
+          QA, Soporte, Solicitante, Ejecutivo), con alcance global, por proyecto o por equipo. La
+          matriz de qué permiso incluye cada rol se edita en lote desde esta pantalla.</p>
+        <div class="note">
+          El rol Administrador no se salta las reglas de negocio automáticamente: solo tiene todos
+          los permisos. Existen dos excepciones puntuales y controladas — cerrar un elemento con
+          hallazgos pendientes, y modificar trabajo asignado a otra persona — reservadas a un
+          permiso especial pensado para casos de excepción, no para uso diario.
+        </div>
+        <div class="note">
+          La creación de roles nuevos (más allá de los ya sembrados) todavía se administra
+          directamente en la base de datos — <span class="badge badge-plan">planeado</span>
+          exponerla en pantalla. Los catálogos de <strong>Áreas y Puestos</strong> ya tienen su
+          propia pantalla — ver <a href="#admin-horarios">Horarios, ambientes, áreas y puestos</a>.
+        </div>
+      </section>
+
+      <section class="doc-section" id="admin-horarios">
+        <h2>26. Administración: Horarios, ambientes, áreas y puestos <span class="badge badge-ok">Disponible</span></h2>
+        <span class="role-tag">Administradores</span>
+        <p>Los <strong>horarios</strong> definen los tramos laborables por día (incluyendo turnos
+          partidos) y los días festivos aplicables — de ahí sale el cálculo de tiempo laborable que
+          usan reportes, SLA y capacidad de sprint en todo el sistema.</p>
+        <p>Los <strong>ambientes</strong> (Desarrollo, QA, Preproducción, Producción) se catalogan
+          por proyecto, para saber en dónde vive cada versión desplegada.</p>
+        <h3>Áreas y puestos</h3>
+        <p>Catálogos de apoyo para el alta de usuarios: cada <strong>puesto</strong> puede
+          pertenecer a un <strong>área</strong> (por ejemplo, el puesto "Desarrollador Backend"
+          dentro del área "Tecnología"). Alta, edición y baja lógica desde sus propias pestañas;
+          ambas listas tienen buscador y orden por columna.</p>
+        <div class="note">
+          La gestión de vacaciones y ausencias, y la administración de repositorios Git desde la
+          pantalla (hoy la relación ya existe en la base de datos pero sin interfaz), están
+          <span class="badge badge-plan">planeadas</span>.
+        </div>
+      </section>
+
+      <section class="doc-section" id="admin-workflows">
+        <h2>27. Administración: Workflows <span class="badge badge-ok">Disponible</span></h2>
+        <span class="role-tag">Administradores</span>
+        <p>Cada proceso de GTE (elementos de trabajo, solicitudes, tickets, releases, incidentes,
+          etc.) avanza por un flujo de estatus fijo — nadie edita ese flujo escribiendo código, vive
+          como datos. La pantalla <strong>Workflows</strong> deja ver y ajustar esos flujos sin
+          tocar la base de datos a mano.</p>
+        <ol class="steps">
+          <li>Elige un <strong>proceso</strong> del selector (por ejemplo, Solicitud o WorkItem).</li>
+          <li>Revisa la tabla: cada fila es un movimiento posible — de qué estatus a cuál, con qué
+            acción.</li>
+          <li>Ajusta, si lo necesitas, la <strong>etiqueta del botón</strong> que ve el usuario, el
+            <strong>permiso</strong> requerido para ejecutar ese movimiento, si exige capturar un
+            <strong>motivo</strong>, si es la <strong>acción principal</strong> del estatus, y su
+            <strong>orden</strong> de aparición.</li>
+          <li>Da clic en <strong>Guardar cambios</strong>.</li>
+        </ol>
+        <div class="note warn">
+          Esta pantalla no crea ni elimina movimientos del flujo (no se puede "inventar" un salto
+          de estatus nuevo desde aquí) — solo ajusta cómo se ve y quién puede usar un movimiento que
+          ya existe. Agregar un movimiento nuevo al flujo de un proceso sigue siendo trabajo del
+          equipo de desarrollo.
+        </div>
+      </section>
+
+      <!-- ===================== GLOSARIO ===================== -->
+      <section class="doc-section" id="glosario">
+        <h2>28. Glosario de términos</h2>
+        <table class="ref-table">
+          <tr><th>Término</th><th>Significado</th></tr>
+          <tr><td>WorkItem (elemento de trabajo)</td><td>Nombre genérico de cualquier unidad de trabajo rastreable: historia, tarea, bug, cambio, mejora o soporte.</td></tr>
+          <tr><td>Folio</td><td>Código único que identifica un registro, por ejemplo <code>GTE-0042</code>, <code>SOL-2026-0001</code>, <code>TKT-2026-0001</code>, <code>INC-2026-0001</code>.</td></tr>
+          <tr><td>Solicitud</td><td>Petición inicial de un cliente interno; puede convertirse en uno o más elementos de trabajo.</td></tr>
+          <tr><td>Complejidad</td><td>Nivel de dificultad de un elemento; junto con el nivel de la persona asignada determina el presupuesto de tiempo.</td></tr>
+          <tr><td>Presupuesto de tiempo</td><td>Minutos estimados para un elemento, calculados de una matriz de complejidad × nivel del ingeniero, y congelados al momento de asignarlo.</td></tr>
+          <tr><td>Sprint</td><td>Ciclo de trabajo con fechas y objetivo, usado para planear qué se hará en ese periodo.</td></tr>
+          <tr><td>Kanban / Tablero</td><td>Vista de columnas por estatus para visualizar el flujo de trabajo del equipo.</td></tr>
+          <tr><td>Release (versión)</td><td>Conjunto de elementos de trabajo terminados que se empaqueta, aprueba y despliega junto.</td></tr>
+          <tr><td>Hallazgo / Revisión</td><td>Observación registrada al revisar el trabajo de alguien; bloquea el cierre hasta que se marque como corregida.</td></tr>
+          <tr><td>SLA</td><td>Tiempo límite de respuesta y resolución comprometido para un ticket, según su prioridad.</td></tr>
+          <tr><td>Ticket</td><td>Solicitud de soporte o ayuda, distinta de una solicitud de requerimiento.</td></tr>
+          <tr><td>Incidente</td><td>Falla real detectada en producción, con severidad de S1 (crítica) a S4 (menor).</td></tr>
+          <tr><td>KPI</td><td>Indicador clave de desempeño, con una meta y un valor medido periódicamente.</td></tr>
+          <tr><td>OKR</td><td>Objetivo con resultados clave medibles que le dan seguimiento.</td></tr>
+          <tr><td>Rol / Permiso</td><td>Los roles agrupan permisos (por ejemplo, "puede aprobar releases"); un usuario puede tener varios roles.</td></tr>
+          <tr><td>DORA</td><td>Cuatro métricas estándar de la industria para medir el desempeño de un equipo de desarrollo: frecuencia de despliegues, tiempo de entrega de cambios, tasa de fallas de cambio y tiempo de recuperación (MTTR).</td></tr>
+          <tr><td>CFD (diagrama de flujo acumulado)</td><td>Gráfica que muestra, día por día, cuántos elementos había en cada estatus de un proyecto — ayuda a detectar cuellos de botella en el flujo de trabajo.</td></tr>
+          <tr><td>WIP (trabajo en proceso)</td><td>Cantidad de elementos que una persona o columna del tablero tiene abiertos al mismo tiempo.</td></tr>
+          <tr><td>CSAT</td><td>Calificación de satisfacción (1 a 5) que da el solicitante al cerrarse un ticket de soporte.</td></tr>
+          <tr><td>Power BI</td><td>Herramienta externa de análisis de datos; GTE expone vistas de solo lectura para que un área pueda construir sus propios tableros sin afectar el sistema.</td></tr>
+        </table>
+      </section>
+
+      <!-- ===================== FAQ ===================== -->
+      <section class="doc-section" id="faq">
+        <h2>29. Preguntas frecuentes</h2>
+        <div class="faq">
+          <details>
+            <summary>No veo una sección del menú que debería ver</summary>
+            <div class="faq-a">El menú solo muestra lo que tu rol tiene permitido. Pide a un
+              administrador que revise tus roles y permisos en Administración › Usuarios.</div>
+          </details>
+          <details>
+            <summary>Olvidé mi contraseña</summary>
+            <div class="faq-a">Todavía no existe un flujo automático por correo. Pide a un
+              administrador que use la opción "Restablecer contraseña" en tu cuenta; te dará una
+              temporal que deberás cambiar al entrar.</div>
+          </details>
+          <details>
+            <summary>No puedo iniciar una tarea</summary>
+            <div class="faq-a">Revisa que hayas capturado una fecha compromiso — es obligatoria
+              para iniciar. Si ya tienes otro elemento en proceso, ese se suspenderá solo al
+              iniciar el nuevo, no es un error.</div>
+          </details>
+          <details>
+            <summary>No puedo terminar una tarea</summary>
+            <div class="faq-a">Necesitas al menos un registro de tiempo (o una subtarea ya
+              terminada) y cero hallazgos de revisión pendientes de corregir sobre ese elemento.</div>
+          </details>
+          <details>
+            <summary>El botón Editar no aparece</summary>
+            <div class="faq-a">Se oculta si el elemento ya está Terminado, o si está asignado a
+              otra persona y no tienes permiso para modificar trabajo ajeno.</div>
+          </details>
+          <details>
+            <summary>Rechazaron o devolvieron mi solicitud, ¿qué hago?</summary>
+            <div class="faq-a">Si la devolvieron, revisa el motivo y vuelve a enviarla con la
+              información que faltaba. Si la rechazaron, el motivo queda registrado en la propia
+              solicitud; contacta al responsable que la revisó si tienes dudas.</div>
+          </details>
+          <details>
+            <summary>¿A quién contacto si algo no funciona?</summary>
+            <div class="faq-a">Contacta al equipo que administra GTE en tu organización — ellos
+              pueden restablecer tu contraseña, ajustar tus permisos o revisar un problema puntual.
+              Ver <a href="#control-versiones">Contacto y soporte</a>.</div>
+          </details>
+        </div>
+      </section>
+
+      <!-- ===================== PRÓXIMAMENTE ===================== -->
+      <section class="doc-section" id="proximamente">
+        <h2>30. Próximamente: funcionalidades planeadas</h2>
+        <p>GTE se sigue construyendo por fases. Estas funcionalidades forman parte del alcance
+          completo del proyecto pero todavía no están disponibles; se agregarán a este manual en
+          cuanto se liberen.</p>
+
+        <h3>Integración con control de versiones (Git) <span class="badge badge-plan">Planeada</span></h3>
+        <p>Vincular automáticamente commits, ramas y solicitudes de cambio (pull requests) a los
+          elementos de trabajo por su folio; botón para crear una rama directamente desde el
+          elemento; registro de ejecuciones de integración/despliegue continuo.</p>
+
+        <h3>Automatizaciones en segundo plano <span class="badge badge-plan">Planeada</span></h3>
+        <p>Vigilancia automática de SLA con alertas, recordatorios de fecha compromiso, cierre
+          automático de tickets sin respuesta, y notificaciones por correo/Teams/WhatsApp además
+          de las que ya llegan dentro de GTE. La actualización nocturna de indicadores
+          personalizados ya corre sola desde el motor de trabajos en segundo plano — lo que falta
+          es el resto del catálogo de automatizaciones de fábrica.</p>
+
+        <h3>Base de conocimiento <span class="badge badge-plan">Planeada</span></h3>
+        <p>Artículos de ayuda con búsqueda, incluyendo la migración completa del Glosario actual
+          de Interflo con sus imágenes; sugerencia automática de artículos al capturar un ticket.</p>
+
+        <h3>Inteligencia artificial asistiva <span class="badge badge-plan">Planeada</span></h3>
+        <p>Siempre como propuesta editable, nunca automática sin confirmación humana:</p>
+        <ul>
+          <li>Generar el desglose en historias a partir de una solicitud.</li>
+          <li>Generar casos de prueba a partir de una historia.</li>
+          <li>Sugerir prioridad y categoría de un ticket nuevo.</li>
+          <li>Sugerir complejidad de un elemento comparándolo con casos históricos similares.</li>
+          <li>Resumir un incidente o ticket y redactar un borrador de causa raíz.</li>
+          <li>Convertir la minuta de una reunión en acuerdos y tareas en borrador.</li>
+          <li>Búsqueda semántica en la base de conocimiento.</li>
+          <li>Detección semanal de riesgos (tareas grandes sin avance, sprints sobrecomprometidos).</li>
+          <li>Sugerencia de a quién asignar un elemento nuevo.</li>
+          <li>Redacción automática de notas de versión.</li>
+          <li>Un asistente conversacional para preguntar en lenguaje natural sobre el estado del
+            proyecto, respetando siempre los permisos de quien pregunta.</li>
+        </ul>
+
+        <h3>Captura de riesgos y ausencias <span class="badge badge-plan">Planeada</span></h3>
+        <p>Ya existen el reporte de <a href="#reportes">Riesgos</a> y el widget de top riesgos en
+          <a href="#indicadores-ejecutivos">Indicadores ejecutivos</a>, listos para mostrar la
+          matriz de un proyecto — lo que falta es la pantalla para darlos de alta y darles
+          seguimiento. Lo mismo para la gestión de vacaciones/ausencias con aprobación del jefe
+          directo (hoy la solicitud de ausencia descuenta capacidad de forma manual).</p>
+      </section>
+
+      <!-- ===================== CONTROL DE VERSIONES ===================== -->
+      <section class="doc-section" id="control-versiones">
+        <h2>31. Control del documento y contacto</h2>
+        <table class="ref-table">
+          <tr><th>Versión</th><th>Fecha</th><th>Descripción</th></tr>
+          <tr><td>1.0</td><td>2026-08-03</td><td>Emisión inicial. Cubre los módulos verificados a
+            esa fecha (Autenticación, Mi Día, Trabajo/WorkItems, Subtareas, Comentarios y adjuntos,
+            Solicitudes, Planeación, Calidad, Entregas, Notificaciones, Mesa de ayuda, Incidentes,
+            Portafolio parcial y Administración) y el alcance funcional planeado del proyecto
+            (integración Git, automatizaciones, base de conocimiento, dashboard ejecutivo, IA,
+            riesgos y ausencias).</td></tr>
+          <tr><td>1.1</td><td>2026-08-04</td><td>Proyectos administrados (restringen quién crea o
+            cancela tareas) y regla de pruebas obligatorias en proyectos Desarrollo; fecha
+            compromiso ya no se puede mover sin permiso una vez capturada; buscador y orden por
+            columna en catálogos y bandejas; filtro Agente en Mesa de ayuda; total de horas
+            registradas en la pestaña Tiempo; descripción con formato en Nueva Solicitud; botón
+            Ver detalle en Revisión de solicitudes; catálogos de Áreas y Puestos; pantalla nueva
+            de Administración de Workflows.</td></tr>
+          <tr><td>1.2</td><td>2026-08-04</td><td>Buscador y orden en Mis solicitudes; edición de
+            una solicitud propia mientras sigue en revisión, incluyendo pegar imágenes en la
+            descripción una vez guardada; controles más grandes y legibles en el formulario de
+            Convertir en elementos de trabajo.</td></tr>
+          <tr><td>1.3</td><td>2026-08-13</td><td>Nueva sección "Indicadores y reportes": Dashboard
+            ejecutivo de métricas (individual, ya disponible desde antes pero sin documentar),
+            Indicadores ejecutivos (P18, vista de equipo/proyecto con DORA, costo y OKR) y el
+            catálogo de 14 Reportes exportables a Excel. Ajustada la sección Próximamente para
+            quitar lo que ya se liberó.</td></tr>
+        </table>
+        <p>Este manual es un documento vivo: se actualizará conforme el sistema evolucione. Para
+          reportar un error en el manual, pedir una aclaración o notificar que una funcionalidad
+          "planeada" ya está disponible, contacta al equipo que administra GTE en tu organización.</p>
+        <div class="note">
+          <strong>Soporte:</strong> ante cualquier duda sobre el uso de GTE, o para reportar un
+          problema del sistema, abre un ticket desde <a href="#mesa-ayuda">Mesa de ayuda</a> o
+          contacta directamente al equipo de GTE.
+        </div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<a href="#" class="top-link" title="Volver arriba" onclick="window.scrollTo({top:0,behavior:'smooth'});return false;">↑</a>
+
+<script>
+// Menú móvil
+const sidebar = document.getElementById('sidebar');
+const menuToggle = document.getElementById('menuToggle');
+menuToggle.addEventListener('click', () => sidebar.classList.toggle('open'));
+document.querySelectorAll('.sidebar a').forEach(a => a.addEventListener('click', () => sidebar.classList.remove('open')));
+
+// Resaltar sección activa al hacer scroll
+const links = Array.from(document.querySelectorAll('.sidebar a[href^="#"]'));
+const sections = links.map(l => document.querySelector(l.getAttribute('href'))).filter(Boolean);
+function onScroll(){
+  let current = sections[0];
+  const y = window.scrollY + 90;
+  for(const s of sections){ if(s.offsetTop <= y) current = s; }
+  links.forEach(l => l.classList.toggle('active', l.getAttribute('href') === '#' + current.id));
+}
+document.addEventListener('scroll', onScroll);
+onScroll();
+
+// Buscador del índice
+const searchInput = document.getElementById('searchInput');
+const noResults = document.getElementById('noResults');
+searchInput.addEventListener('input', () => {
+  const q = searchInput.value.trim().toLowerCase();
+  let visibleCount = 0;
+  document.querySelectorAll('.sidebar li').forEach(li => {
+    if(li.id === 'noResults') return;
+    const text = li.textContent.toLowerCase();
+    const match = q === '' || text.includes(q);
+    li.classList.toggle('hidden', !match);
+    if(match) visibleCount++;
+  });
+  noResults.style.display = (q !== '' && visibleCount === 0) ? 'block' : 'none';
+});
+</script>
+</body>
+</html>

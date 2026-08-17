@@ -1,0 +1,572 @@
+# Prompt  GTE 
+
+Actúa como un **Arquitecto de Software Senior**, **Project Management Office (PMO)**, **UX/UI Designer**, **Product Owner** y **Arquitecto de Soluciones Empresariales** con más de 20 años de experiencia diseñando plataformas para la gestión integral de departamentos de desarrollo de software.
+
+Tu objetivo es diseñar una plataforma empresarial de clase mundial, equivalente o superior a Jira, Azure DevOps y Monday.com, pero orientada a la administración completa de un departamento de desarrollo de software.
+
+No quiero únicamente un gestor de tareas; necesito un sistema que controle el ciclo de vida completo de un proyecto de software, desde la solicitud inicial hasta el mantenimiento en producción.
+
+La solución debe ser modular, escalable y basada en buenas prácticas de arquitectura empresarial.
+
+todo el flujo debe ser amigable con el usuario 
+---
+
+## Objetivos
+
+Diseña un sistema que permita administrar:
+
+* Portafolio de proyectos
+* Requerimientos
+* Análisis funcional
+* Diseño técnico
+* Planeación
+* Desarrollo
+* Pruebas
+* QA
+* Versiones
+* Releases
+* Producción
+* Soporte
+* Incidentes
+* Documentación
+* Indicadores
+* Automatizaciones
+* Auditoría
+* Seguridad
+
+---
+
+## Quiero que desarrolles cada uno de los siguientes puntos con el mayor nivel de detalle posible.
+
+### 1. Arquitectura General
+
+Describe:
+
+* Arquitectura física
+* Arquitectura lógica
+* Arquitectura por capas
+* Arquitectura basada en dominios
+* Comunicación entre componentes
+* Escalabilidad
+* Seguridad
+* Integraciones
+* Diagramas de arquitectura (Mermaid)
+
+---
+
+### 2. Modelo de Datos
+
+Diseña completamente la base de datos.
+
+Incluye:
+
+* Catálogos
+* Tablas principales
+* Relaciones
+* Cardinalidades
+* Índices
+* Llaves primarias
+* Llaves foráneas
+* Campos
+* Tipos de datos
+* Auditoría
+* Historial
+* Soft Delete
+
+Genera el modelo ER.
+
+---
+
+### 3. Módulos
+
+Diseña completamente cada módulo.
+
+Por ejemplo:
+
+## Administración
+
+Usuarios
+
+Roles
+
+Permisos
+
+Equipos
+
+Áreas
+
+Puestos
+
+Calendarios
+
+Horarios
+
+Festivos
+
+Vacaciones
+
+Ambientes
+
+Repositorios
+
+Versiones
+
+---
+
+## Gestión de proyectos
+
+Proyecto
+
+Programa
+
+Portafolio
+
+Objetivos
+
+Presupuesto
+
+Costo
+
+Horas
+
+Recursos
+
+Riesgos
+
+Indicadores
+
+Cronograma
+
+Gantt
+
+Dependencias
+
+---
+
+## Requerimientos
+
+Solicitud
+
+Requerimiento
+
+Historia
+
+Epic
+
+Feature
+
+Bug
+
+Cambio
+
+Mejora
+
+Soporte
+
+Corrección
+
+Adjuntos
+
+Comentarios
+
+Seguimiento
+
+Workflow configurable
+
+---
+
+## Planeación
+
+Backlog
+
+Sprint
+
+Kanban
+
+Scrum
+
+Roadmap
+
+Asignaciones
+
+Estimaciones
+
+Capacidad
+
+Velocidad
+
+Burndown
+
+Burnup
+
+---
+
+## Desarrollo
+
+Repositorios Git
+
+Branches
+
+Commits
+
+Merge Request
+
+Pull Request
+
+Pipelines
+
+CI/CD
+
+Build
+
+Deploy
+
+Artefactos
+
+---
+
+## QA
+
+Casos de prueba
+
+Plan de pruebas
+
+Evidencias
+
+Incidencias
+
+Defectos
+
+Matriz de pruebas
+
+Automatización
+
+Cobertura
+
+---
+
+## Releases
+
+Versiones
+
+Scripts SQL
+
+DLL
+
+Archivos
+
+Rollback
+
+Notas de versión
+
+Ambientes
+
+Aprobaciones
+
+---
+
+## Producción
+
+Incidentes
+
+Disponibilidad
+
+Monitoreo
+
+Logs
+
+Cambios
+
+Bitácoras
+
+---
+
+## Soporte
+
+Tickets
+
+SLA
+
+Mesa de ayuda
+
+Base de conocimiento
+
+Encuestas
+
+---
+
+## Dashboard Ejecutivo
+
+KPIs
+
+OKRs
+
+Lead Time
+
+Cycle Time
+
+DORA Metrics
+
+Costo por proyecto
+
+Costo por desarrollador
+
+Productividad
+
+Retrabajo
+
+Horas
+
+Rentabilidad
+
+---
+
+### 4. Flujo de trabajo
+
+Diseña todos los workflows.
+
+Ejemplo:
+
+Solicitud
+
+↓
+
+Análisis
+
+↓
+
+Aprobación
+
+↓
+
+Diseño
+
+↓
+
+Desarrollo
+
+↓
+
+QA
+
+↓
+
+Liberación
+
+↓
+
+Producción
+
+↓
+
+Mantenimiento
+
+Incluye reglas de negocio y transiciones configurables.
+
+---
+
+### 5. Interfaces de Usuario
+
+Diseña todas las pantallas.
+
+Para cada pantalla describe:
+
+* Objetivo
+* Componentes
+* Botones
+* Acciones
+* Validaciones
+* Menús
+* Filtros
+* Formularios
+* Tablas
+* Gráficas
+* Widgets
+
+Genera wireframes en ASCII o Mermaid cuando sea posible.
+
+---
+
+### 6. Experiencia de Usuario
+
+Define:
+
+* Navegación
+* Menús
+* Breadcrumb
+* Acciones rápidas
+* Dashboard personalizado
+* Tema oscuro
+* Responsive
+* Accesibilidad
+
+---
+
+### 7. Automatizaciones
+
+Diseña automatizaciones para:
+
+* Correos
+* Teams
+* WhatsApp
+* Slack
+* Recordatorios
+* Escalamientos
+* SLA
+* Aprobaciones
+* Notificaciones
+* Generación automática de tareas
+* Creación automática de documentación
+* IA para resumir incidencias
+* IA para priorizar tickets
+
+---
+
+### 8. Seguridad
+
+Implementa:
+
+* RBAC
+* MFA
+* OAuth2
+* OpenID
+* JWT
+* Active Directory
+* Microsoft Entra ID
+* Auditoría
+* Bitácora
+* Versionado
+* Firma electrónica
+
+---
+
+### 9. API
+
+Diseña la API REST completa.
+
+Incluye:
+
+* Endpoints
+* Request
+* Response
+* Swagger
+* Versionado
+* Paginación
+* Filtros
+* Ordenamiento
+
+---
+
+### 10. Base de Datos SQL Server
+
+Genera:
+
+* Scripts
+* Índices
+* Procedimientos almacenados
+* Funciones
+* Triggers
+* Jobs
+* Vistas
+* Optimización
+
+---
+
+### 11. Arquitectura .NET
+
+La solución debe estar diseñada para:
+
+* .NET 9
+* ASP.NET Core
+* Entity Framework Core
+* SQL Server
+* Clean Architecture
+* DDD
+* CQRS
+* MediatR
+* FluentValidation
+* AutoMapper
+* JWT
+* Serilog
+* Hangfire
+* Redis
+* SignalR
+
+---
+
+### 12. Frontend
+
+Diseña la solución utilizando o React.
+
+Incluye:
+
+* Componentes reutilizables
+* Diseño moderno
+* Material Design
+* DevExpress
+* Dashboard interactivo
+* Drag & Drop
+* Gantt
+* Kanban
+* Calendario
+
+---
+
+### 13. Reportes
+
+Diseña todos los reportes.
+
+Incluye:
+
+* Productividad
+* Horas
+* Retrabajo
+* Bugs
+* Versiones
+* Riesgos
+* Clientes
+* Costos
+* Rentabilidad
+* SLA
+* KPIs
+* Power BI
+
+---
+
+### 14. Inteligencia Artificial
+
+Propón funciones de IA como:
+
+* Generación automática de historias de usuario
+* Generación de casos de prueba
+* Priorización inteligente
+* Estimación automática de esfuerzo
+* Resumen de reuniones
+* Búsqueda semántica en documentación
+* Detección de riesgos
+* Recomendación de asignación de recursos
+* Chat interno para consultar información del proyecto
+
+---
+
+### 15. Entregables
+
+Genera el diseño en formato de documentación técnica profesional.
+
+Incluye:
+
+* Índice
+* Diagramas
+* Tablas
+* Wireframes
+* Modelo ER
+* Arquitectura
+* Flujos
+* Casos de uso
+* Historias de usuario
+* Reglas de negocio
+* Catálogo de pantallas
+* Diccionario de datos
+* Roadmap de implementación por fases
+
+El resultado debe ser equivalente a la documentación que elaboraría una consultora como Accenture, Deloitte o Microsoft para iniciar el desarrollo de un sistema empresarial. Debe ser lo suficientemente detallado para que un equipo de desarrollo pueda implementar la plataforma sin ambigüedades.
