@@ -19,6 +19,18 @@ public class AgregarContenidoRequest
     public List<int> IdsWorkItem { get; set; } = [];
 }
 
+/// <summary>
+/// Envio de lo terminado de un sprint a un release: o entra a uno ya En Preparacion
+/// del proyecto (IdReleaseExistente), o se crea uno nuevo con VersionNueva. Exactamente
+/// uno de los dos aplica.
+/// </summary>
+public class EnviarSprintAReleaseRequest
+{
+    public int IdProyecto { get; set; }
+    public int? IdReleaseExistente { get; set; }
+    public string? VersionNueva { get; set; }
+}
+
 public class ArtefactoAgregarRequest
 {
     public string Nombre { get; set; } = string.Empty;

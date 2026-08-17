@@ -54,7 +54,9 @@ public class WorkItemQueryService(FabricaContexto fabrica) : IWorkItemQueryServi
         {
             var texto = filtro.Texto.Trim();
             consulta = consulta.Where(x =>
-                x.v.Folio.Contains(texto) || x.v.Titulo.Contains(texto) || x.v.Proyecto.Contains(texto));
+                x.v.Folio.Contains(texto) || x.v.Titulo.Contains(texto) || x.v.Proyecto.Contains(texto)
+                || (x.v.Sprint != null && x.v.Sprint.Contains(texto))
+                || (x.v.Sprint == null && "Backlog".Contains(texto, StringComparison.OrdinalIgnoreCase)));
         }
         if (filtro.SoloVencidas)
         {
@@ -88,6 +90,9 @@ public class WorkItemQueryService(FabricaContexto fabrica) : IWorkItemQueryServi
             "estatus" => filtro.OrdenDescendente
                 ? consulta.OrderByDescending(x => x.v.IdEstatusWorkItem)
                 : consulta.OrderBy(x => x.v.IdEstatusWorkItem),
+            "sprint" => filtro.OrdenDescendente
+                ? consulta.OrderBy(x => x.v.Sprint == null).ThenByDescending(x => x.v.Sprint)
+                : consulta.OrderBy(x => x.v.Sprint == null).ThenBy(x => x.v.Sprint),
             "prioridad" => filtro.OrdenDescendente
                 ? consulta.OrderByDescending(x => x.v.IdPrioridad)
                 : consulta.OrderBy(x => x.v.IdPrioridad),
@@ -121,8 +126,10 @@ public class WorkItemQueryService(FabricaContexto fabrica) : IWorkItemQueryServi
                 IdEstatus = x.v.IdEstatusWorkItem,
                 Estatus = x.v.Estatus,
                 Prioridad = x.v.Prioridad,
+                Complejidad = x.v.Complejidad,
                 IdAsignado = x.v.IdAsignado,
                 Asignado = x.v.Asignado,
+                Sprint = x.v.Sprint,
                 FechaCompromiso = x.v.FechaCompromiso,
                 EsVencida = x.v.EsVencida == true,
                 PuntosHistoria = x.v.PuntosHistoria,
@@ -155,6 +162,12 @@ public class WorkItemQueryService(FabricaContexto fabrica) : IWorkItemQueryServi
             x => x.Folio == folio, cancellationToken);
     }
 
+    /// <summary>
+    /// Incluye los registros de tiempo de las subtareas (WorkItems con IdPadre = idWorkItem)
+    /// ademas de los del propio elemento: antes solo se veian en la pestana Subtareas
+    /// (WorkItemHijoResponse.MinutosRegistrados), sin reflejarse en la pestana Tiempo del
+    /// padre ni en su "Total" (suma client-side de esta misma lista).
+    /// </summary>
     public async Task<IReadOnlyList<RegistroTiempoResponse>> ObtenerTiemposAsync(
         int idWorkItem, CancellationToken cancellationToken = default)
     {
@@ -162,7 +175,8 @@ public class WorkItemQueryService(FabricaContexto fabrica) : IWorkItemQueryServi
         return await (
             from t in contexto.TblRegistroTiempo.AsNoTracking()
             join u in contexto.TblUsuario.AsNoTracking() on t.IdUsuario equals u.IdUsuario
-            where t.IdWorkItem == idWorkItem && t.Activo
+            join w in contexto.TblWorkItem.AsNoTracking() on t.IdWorkItem equals w.IdWorkItem
+            where (t.IdWorkItem == idWorkItem || w.IdPadre == idWorkItem) && t.Activo
             orderby t.Fecha descending, t.IdRegistroTiempo descending
             select new RegistroTiempoResponse
             {
@@ -171,7 +185,8 @@ public class WorkItemQueryService(FabricaContexto fabrica) : IWorkItemQueryServi
                 Minutos = t.Minutos,
                 Descripcion = t.Descripcion,
                 Usuario = u.Nombre,
-                FechaRegistro = t.FechaRegistro
+                FechaRegistro = t.FechaRegistro,
+                FolioOrigen = w.IdWorkItem == idWorkItem ? null : w.Folio
             }).ToListAsync(cancellationToken);
     }
 
@@ -218,6 +233,7 @@ public class WorkItemQueryService(FabricaContexto fabrica) : IWorkItemQueryServi
                    IdPrioridad = v.IdPrioridad,
                    Prioridad = v.Prioridad,
                    IdComplejidad = w.IdComplejidad,
+                   Complejidad = v.Complejidad,
                    IdAsignado = v.IdAsignado,
                    Asignado = v.Asignado,
                    Solicitante = v.Solicitante,

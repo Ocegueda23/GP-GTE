@@ -7,6 +7,8 @@ import { UsuariosTab } from "./UsuariosTab";
 import { RolesTab } from "./RolesTab";
 import { HorariosTab } from "./HorariosTab";
 import { AmbientesTab } from "./AmbientesTab";
+import { AreasTab } from "./AreasTab";
+import { PuestosTab } from "./PuestosTab";
 
 const PESTANAS = [
   { clave: "proyectos", etiqueta: "Proyectos", permiso: "ADM.Usuarios" },
@@ -15,6 +17,8 @@ const PESTANAS = [
   { clave: "roles", etiqueta: "Roles", permiso: "ADM.Roles" },
   { clave: "horarios", etiqueta: "Horarios", permiso: "ADM.Usuarios" },
   { clave: "ambientes", etiqueta: "Ambientes", permiso: "ADM.Usuarios" },
+  { clave: "areas", etiqueta: "Areas", permiso: "ADM.Usuarios" },
+  { clave: "puestos", etiqueta: "Puestos", permiso: "ADM.Usuarios" },
 ] as const;
 
 /** P20-P22 - Administracion: proyectos, equipos, usuarios, roles, horarios y ambientes. */
@@ -35,6 +39,8 @@ export function AdminPage() {
       {pestana === "roles" && <RolesTab />}
       {pestana === "horarios" && <HorariosTab />}
       {pestana === "ambientes" && <AmbientesTab />}
+      {pestana === "areas" && <AreasTab />}
+      {pestana === "puestos" && <PuestosTab />}
     </Box>
   );
 }

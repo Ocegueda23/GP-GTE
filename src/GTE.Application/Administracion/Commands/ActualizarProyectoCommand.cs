@@ -40,7 +40,8 @@ public class ActualizarProyectoHandler(
         await repositorio.ActualizarProyectoAsync(new ProyectoEdicion(
             command.IdProyecto, command.Datos.Nombre.Trim(), command.Datos.IdCategoriaProyecto,
             command.Datos.IdResponsable, command.Datos.IdEquipo,
-            command.Datos.FechaInicioPlan, command.Datos.FechaFinPlan, command.Datos.EsMantenimiento),
+            command.Datos.FechaInicioPlan, command.Datos.FechaFinPlan, command.Datos.EsMantenimiento,
+            command.Datos.Administrado),
             cancellationToken);
 
         return await consultas.ObtenerProyectoAsync(command.IdProyecto, cancellationToken)

@@ -17,6 +17,12 @@
          Program.cs). Sin esto, el .exe publicado corre como consola normal y sc start
          truena con error 1053 (nunca le avisa a Windows que ya esta RUNNING). -->
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="8.0.*" />
+    <!-- Hangfire (LGPLv3, libre para uso comercial sin licencia de paga): trabajos en
+         segundo plano (A4 del roadmap). Primer consumidor: snapshot nocturno de KPIs
+         personalizados del Dashboard Ejecutivo P18 (dbo.spSnapshotKpi). Storage propio:
+         mismo bdsGTE, schema [HangFire] separado que la libreria crea/migra sola. -->
+    <PackageReference Include="Hangfire.AspNetCore" Version="1.8.14" />
+    <PackageReference Include="Hangfire.SqlServer" Version="1.8.14" />
   </ItemGroup>
 
   <ItemGroup>

@@ -11,16 +11,6 @@ namespace GTE.Infrastructure.Repositories;
 public class PlaneacionRepository(FabricaContexto fabrica, AuditContext auditoria)
     : RepositoryBase(fabrica, auditoria), IPlaneacionRepository
 {
-    /// <summary>Mapeo estandar de columnas de tablero (estatus abiertos + Terminado).</summary>
-    private static readonly (string Nombre, int IdEstatus, int Orden, int? Wip)[] ColumnasEstandar =
-    [
-        ("Pendiente",  EstatusWorkItem.Pendiente,  1, null),
-        ("En proceso", EstatusWorkItem.EnProceso,  2, 5),
-        ("En pruebas", EstatusWorkItem.EnPruebas,  3, 5),
-        ("Correccion", EstatusWorkItem.Correccion, 4, null),
-        ("Terminado",  EstatusWorkItem.Terminado,  5, null)
-    ];
-
     public async Task<int> CrearSprintAsync(SprintNuevo datos, CancellationToken cancellationToken = default)
     {
         await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
@@ -226,7 +216,7 @@ public class PlaneacionRepository(FabricaContexto fabrica, AuditContext auditori
 
         if (columnas.Count == 0)
         {
-            foreach (var (nombre, idEstatus, orden, wip) in ColumnasEstandar)
+            foreach (var (nombre, idEstatus, orden, wip) in ColumnasTableroEstandar.Columnas)
             {
                 contexto.TblTableroColumna.Add(new TblTableroColumna
                 {

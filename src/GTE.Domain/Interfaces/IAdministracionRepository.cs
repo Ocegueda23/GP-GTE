@@ -53,4 +53,14 @@ public interface IAdministracionRepository
     Task<int> CrearAmbienteAsync(AmbienteNuevo datos, CancellationToken cancellationToken = default);
     Task ActualizarAmbienteAsync(AmbienteEdicion datos, CancellationToken cancellationToken = default);
     Task RetirarAmbienteAsync(int idAmbiente, CancellationToken cancellationToken = default);
+
+    /* ---------- Areas ---------- */
+    Task<int> CrearAreaAsync(AreaNueva datos, CancellationToken cancellationToken = default);
+    Task ActualizarAreaAsync(AreaEdicion datos, CancellationToken cancellationToken = default);
+    Task RetirarAreaAsync(int idArea, CancellationToken cancellationToken = default);
+
+    /* ---------- Puestos ---------- */
+    Task<int> CrearPuestoAsync(PuestoNuevo datos, CancellationToken cancellationToken = default);
+    Task ActualizarPuestoAsync(PuestoEdicion datos, CancellationToken cancellationToken = default);
+    Task RetirarPuestoAsync(int idPuesto, CancellationToken cancellationToken = default);
 }

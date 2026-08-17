@@ -7,7 +7,7 @@ import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import { useQueryClient } from "@tanstack/react-query";
-import { subirArchivo } from "../api/archivos";
+import { subirArchivo, type Archivo } from "../api/archivos";
 import { ImagenProtegida } from "./ImagenProtegida";
 import { normalizarHtmlLegado } from "./textoPlano";
 
@@ -17,8 +17,14 @@ interface Props {
   label?: string;
   placeholder?: string;
   minHeight?: number;
-  /** Si no se da, pegar una imagen se rechaza (no hay a que WorkItem adjuntarla todavia). */
+  /** Si no se da (ni onSubirImagen), pegar una imagen se rechaza (no hay a que WorkItem adjuntarla todavia). */
   idWorkItemParaAdjuntos?: number;
+  /**
+   * Subida de imagen generica para entidades distintas a WorkItem (ej. Solicitud): recibe el
+   * archivo pegado y devuelve el GUID ya adjuntado. Tiene prioridad sobre idWorkItemParaAdjuntos
+   * si ambos se pasan.
+   */
+  onSubirImagen?: (archivo: File) => Promise<{ dato: Archivo; mensaje: string } | undefined>;
   onError?: (mensaje: string) => void;
   /** Util para deshabilitar un boton de envio: un editor "vacio" sigue siendo HTML no-vacio (ej. "<p></p>"). */
   onVacioChange?: (vacio: boolean) => void;
@@ -31,9 +37,11 @@ interface Props {
  * boton de enviar (es un input controlado, no un formulario de comentario).
  */
 export function EditorEnriquecido({
-  value, onChange, label, placeholder, minHeight = 80, idWorkItemParaAdjuntos, onError, onVacioChange,
+  value, onChange, label, placeholder, minHeight = 80, idWorkItemParaAdjuntos, onSubirImagen, onError, onVacioChange,
 }: Props) {
   const clienteQuery = useQueryClient();
+  const subir = onSubirImagen
+    ?? (idWorkItemParaAdjuntos ? (archivo: File) => subirArchivo(idWorkItemParaAdjuntos, archivo) : null);
 
   const editor = useEditor({
     extensions: [
@@ -51,16 +59,18 @@ export function EditorEnriquecido({
         if (!archivo) return false;
 
         event.preventDefault();
-        if (!idWorkItemParaAdjuntos) {
+        if (!subir) {
           onError?.("Guarda el elemento antes de poder pegar imagenes aqui.");
           return true;
         }
-        subirArchivo(idWorkItemParaAdjuntos, archivo)
+        subir(archivo)
           .then((resultado) => {
             if (!resultado) return;
             const nodo = view.state.schema.nodes.imagenProtegida.create({ guid: resultado.dato.guidArchivo });
             view.dispatch(view.state.tr.replaceSelectionWith(nodo));
-            void clienteQuery.invalidateQueries({ queryKey: ["archivos", idWorkItemParaAdjuntos] });
+            if (idWorkItemParaAdjuntos) {
+              void clienteQuery.invalidateQueries({ queryKey: ["archivos", idWorkItemParaAdjuntos] });
+            }
           })
           .catch((error: unknown) => {
             onError?.(error instanceof Error ? error.message : "No se pudo subir la imagen pegada.");
@@ -70,7 +80,7 @@ export function EditorEnriquecido({
     },
     onUpdate: ({ editor: instancia }) => onChange(instancia.getHTML()),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idWorkItemParaAdjuntos]);
+  }, [idWorkItemParaAdjuntos, onSubirImagen]);
 
   // Sincroniza resets externos (ej. reabrir el modal con otro item); las
   // ediciones propias no disparan esto porque `value` ya coincide con

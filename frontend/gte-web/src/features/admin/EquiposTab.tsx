@@ -1,13 +1,16 @@
 import { useState } from "react";
 import {
-  Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControl,
-  IconButton, InputLabel, LinearProgress, MenuItem, Paper, Select, Snackbar, Stack, Table,
+  Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle,
+  IconButton, LinearProgress, Paper, Snackbar, Stack, Table,
   TableBody, TableCell, TableHead, TableRow, TextField, Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
+import { ComboBuscable } from "../../shared/components/ComboBuscable";
+import { EncabezadoOrdenable } from "../../shared/components/EncabezadoOrdenable";
+import { useOrdenTabla } from "../../shared/hooks/useOrdenTabla";
 import {
   agregarMiembroEquipo, crearEquipo, obtenerCatalogosAdministracion, obtenerEquipo, obtenerEquipos,
   retirarMiembroEquipo,
@@ -24,18 +27,25 @@ export function EquiposTab() {
   const [idUsuarioNuevo, setIdUsuarioNuevo] = useState<number | "">("");
   const [porcentaje, setPorcentaje] = useState(100);
   const [aviso, setAviso] = useState<{ tipo: "success" | "error"; mensaje: string } | null>(null);
+  const [busqueda, setBusqueda] = useState("");
   const clienteQuery = useQueryClient();
 
   const catalogos = useQuery({
     queryKey: ["catalogos-admin"], queryFn: obtenerCatalogosAdministracion, staleTime: 5 * 60_000,
   });
   const equipos = useQuery({ queryKey: ["equipos-admin"], queryFn: obtenerEquipos });
+  const equiposFiltrados = (equipos.data ?? []).filter((eq) => {
+    const texto = busqueda.trim().toLowerCase();
+    if (!texto) return true;
+    return eq.nombre.toLowerCase().includes(texto) || (eq.lider ?? "").toLowerCase().includes(texto);
+  });
   const equipoActual = idEquipo === "" ? equipos.data?.[0]?.idEquipo : (idEquipo as number);
   const detalle = useQuery({
     queryKey: ["equipo-detalle", equipoActual],
     queryFn: () => obtenerEquipo(equipoActual!),
     enabled: equipoActual !== undefined,
   });
+  const { datosOrdenados: miembrosOrdenados, ordenarPor, descendente, ordenar } = useOrdenTabla(detalle.data?.miembros);
 
   const avisar = (mensaje: string, error = false) => setAviso({ tipo: error ? "error" : "success", mensaje });
   const refrescar = () => Promise.all([
@@ -95,8 +105,10 @@ export function EquiposTab() {
       <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
         <Paper variant="outlined" sx={{ p: 2, minWidth: 260 }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Equipos</Typography>
+          <TextField size="small" placeholder="Buscar equipo o lider..." value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)} sx={{ mb: 1, width: "100%" }} />
           {equipos.isLoading && <LinearProgress />}
-          {equipos.data?.map((eq) => (
+          {equiposFiltrados.map((eq) => (
             <Box key={eq.idEquipo} onClick={() => setIdEquipo(eq.idEquipo)}
               sx={{
                 p: 1, borderRadius: 1, cursor: "pointer",
@@ -109,7 +121,7 @@ export function EquiposTab() {
               </Typography>
             </Box>
           ))}
-          {equipos.data?.length === 0 && (
+          {equiposFiltrados.length === 0 && (
             <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>No hay equipos aun.</Typography>
           )}
         </Paper>
@@ -131,14 +143,14 @@ export function EquiposTab() {
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell>Usuario</TableCell>
-                    <TableCell>Rol</TableCell>
-                    <TableCell>% Dedicacion</TableCell>
+                    <EncabezadoOrdenable clave="usuario" ordenActual={ordenarPor} descendente={descendente} onOrdenar={ordenar}>Usuario</EncabezadoOrdenable>
+                    <EncabezadoOrdenable clave="rolEquipo" ordenActual={ordenarPor} descendente={descendente} onOrdenar={ordenar}>Rol</EncabezadoOrdenable>
+                    <EncabezadoOrdenable clave="porcentajeDedicacion" ordenActual={ordenarPor} descendente={descendente} onOrdenar={ordenar}>% Dedicacion</EncabezadoOrdenable>
                     <TableCell />
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {detalle.data.miembros.length === 0 && (
+                  {miembrosOrdenados.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={4}>
                         <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: "center" }}>
@@ -147,7 +159,7 @@ export function EquiposTab() {
                       </TableCell>
                     </TableRow>
                   )}
-                  {detalle.data.miembros.map((m) => (
+                  {miembrosOrdenados.map((m) => (
                     <TableRow key={m.idEquipoMiembro}>
                       <TableCell>{m.usuario}</TableCell>
                       <TableCell>{m.rolEquipo ?? "-"}</TableCell>
@@ -177,15 +189,15 @@ export function EquiposTab() {
           <TextField size="small" required label="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} />
           <TextField size="small" label="Descripcion" multiline minRows={2} value={descripcion}
             onChange={(e) => setDescripcion(e.target.value)} />
-          <FormControl size="small">
-            <InputLabel>Lider</InputLabel>
-            <Select label="Lider" value={idLider} onChange={(e) => setIdLider(e.target.value as number)}>
-              <MenuItem value="">Sin lider</MenuItem>
-              {catalogos.data?.usuarios.map((u) => (
-                <MenuItem key={u.id} value={u.id}>{u.nombre}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <ComboBuscable
+            label="Lider"
+            value={idLider}
+            onChange={(v) => setIdLider(v as number | "")}
+            opciones={[
+              { valor: "", etiqueta: "Sin lider" },
+              ...(catalogos.data?.usuarios ?? []).map((u) => ({ valor: u.id, etiqueta: u.nombre })),
+            ]}
+          />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setModalEquipo(false)}>Cancelar</Button>
@@ -198,14 +210,13 @@ export function EquiposTab() {
       <Dialog open={modalMiembro} onClose={() => setModalMiembro(false)} fullWidth maxWidth="xs">
         <DialogTitle>Agregar miembro</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
-          <FormControl size="small" required>
-            <InputLabel>Usuario</InputLabel>
-            <Select label="Usuario" value={idUsuarioNuevo} onChange={(e) => setIdUsuarioNuevo(e.target.value as number)}>
-              {catalogos.data?.usuarios.map((u) => (
-                <MenuItem key={u.id} value={u.id}>{u.nombre}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <ComboBuscable
+            label="Usuario"
+            required
+            value={idUsuarioNuevo}
+            onChange={(v) => setIdUsuarioNuevo(v as number | "")}
+            opciones={(catalogos.data?.usuarios ?? []).map((u) => ({ valor: u.id, etiqueta: u.nombre }))}
+          />
           <TextField size="small" type="number" label="% Dedicacion" value={porcentaje}
             onChange={(e) => setPorcentaje(Number(e.target.value))}
             slotProps={{ htmlInput: { min: 1, max: 100 } }} />

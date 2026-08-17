@@ -247,6 +247,24 @@ public class EntregaRepository(FabricaContexto fabrica, AuditContext auditoria)
             string.Join(", ", roles), cancellationToken);
     }
 
+    public async Task InvalidarCadenaAprobacionAsync(
+        int idRelease, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
+        var vigentes = await contexto.TblAprobacion
+            .Where(a => a.Entidad == EntidadAprobacion && a.IdEntidad == idRelease && a.Activo)
+            .ToListAsync(cancellationToken);
+
+        foreach (var aprobacion in vigentes)
+        {
+            aprobacion.Activo = false;
+        }
+        await contexto.SaveChangesAsync(cancellationToken);
+
+        await RegistrarBitacoraAsync("Release", idRelease, "INVALIDAR_CADENA_APROBACION",
+            $"{vigentes.Count} firma(s) dada(s) de baja", cancellationToken);
+    }
+
     public async Task<IReadOnlyList<AprobacionRelease>> ObtenerAprobacionesAsync(
         int idRelease, CancellationToken cancellationToken = default)
     {

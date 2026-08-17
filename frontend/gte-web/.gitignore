@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Generado por scripts/sync-manual.mjs a partir de Doctos/ManualUsuarioGTE.html
+public/manual-usuario.html
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

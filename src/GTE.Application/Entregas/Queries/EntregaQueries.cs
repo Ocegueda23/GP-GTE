@@ -1,6 +1,7 @@
 using GTE.Application.DTOs.Responses.Entregas;
 using GTE.Application.Interfaces;
 using GTE.Domain.Exceptions;
+using GTE.Domain.Planeacion;
 using MediatR;
 
 namespace GTE.Application.Entregas.Queries;
@@ -38,5 +39,20 @@ public class ObtenerMatrizAmbientesHandler(IEntregaQueryService consultas)
         ObtenerMatrizAmbientesQuery query, CancellationToken cancellationToken)
     {
         return await consultas.ObtenerMatrizAmbientesAsync(cancellationToken);
+    }
+}
+
+/// <summary>Paso aparte tras cerrar un sprint: mismo permiso que gestiona el sprint (P.LA).</summary>
+public record ObtenerCoberturaReleaseSprintQuery(int IdSprint) : IRequest<CoberturaReleaseSprintResponse>;
+
+public class ObtenerCoberturaReleaseSprintHandler(
+    IEntregaQueryService consultas, IVerificadorPermisos permisos)
+    : IRequestHandler<ObtenerCoberturaReleaseSprintQuery, CoberturaReleaseSprintResponse>
+{
+    public async Task<CoberturaReleaseSprintResponse> Handle(
+        ObtenerCoberturaReleaseSprintQuery query, CancellationToken cancellationToken)
+    {
+        await permisos.ExigirPermisoAsync(PermisosPlaneacion.GestionarSprints, null, cancellationToken);
+        return await consultas.ObtenerCoberturaReleaseSprintAsync(query.IdSprint, cancellationToken);
     }
 }

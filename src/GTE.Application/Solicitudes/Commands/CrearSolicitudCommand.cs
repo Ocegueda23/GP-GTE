@@ -35,6 +35,7 @@ public class CrearSolicitudHandler(
     ISolicitudQueryService consultas,
     IGeneradorFolios folios,
     IMotorWorkflow motor,
+    ISanitizadorHtml sanitizador,
     IProveedorUsuarioActual proveedorUsuario) : IRequestHandler<CrearSolicitudCommand, SolicitudResponse>
 {
     public async Task<SolicitudResponse> Handle(CrearSolicitudCommand command, CancellationToken cancellationToken)
@@ -42,10 +43,13 @@ public class CrearSolicitudHandler(
         var usuario = await proveedorUsuario.ObtenerAsync(cancellationToken)
             ?? throw new ForbiddenException("La identidad actual no esta registrada como usuario de GTE.");
 
+        var descripcion = string.IsNullOrWhiteSpace(command.Datos.Descripcion)
+            ? null : sanitizador.Sanitizar(command.Datos.Descripcion);
+
         var folio = await folios.GenerarAsync($"SOL-{DateTime.Today.Year}", cancellationToken: cancellationToken);
 
         var idSolicitud = await repositorio.CrearAsync(new SolicitudNueva(
-            folio, usuario.IdUsuario, command.Datos.Titulo.Trim(), command.Datos.Descripcion,
+            folio, usuario.IdUsuario, command.Datos.Titulo.Trim(), descripcion,
             command.Datos.IdTipoSolicitud, command.Datos.IdPrioridad,
             command.Datos.FechaDeseada, command.Datos.JustificacionNegocio,
             command.Datos.IdUsuarioSolicitante), cancellationToken);

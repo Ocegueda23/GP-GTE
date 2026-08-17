@@ -1,6 +1,8 @@
+using System.Net;
 using FluentValidation;
 using GTE.Application.DTOs.Responses.Soporte;
 using GTE.Application.Interfaces;
+using GTE.Domain.Comentarios;
 using GTE.Domain.Exceptions;
 using GTE.Domain.Interfaces;
 using GTE.Domain.Soporte;
@@ -34,11 +36,13 @@ public class CambiarEstatusTicketHandler(
     ITicketRepository repositorio,
     ITicketQueryService consultas,
     IMotorWorkflow motor,
-    IVerificadorPermisos permisos) : IRequestHandler<CambiarEstatusTicketCommand, TicketResponse>
+    IVerificadorPermisos permisos,
+    IComentarioRepository comentarios,
+    IServicioNotificaciones notificaciones) : IRequestHandler<CambiarEstatusTicketCommand, TicketResponse>
 {
     public async Task<TicketResponse> Handle(CambiarEstatusTicketCommand command, CancellationToken cancellationToken)
     {
-        _ = await repositorio.ObtenerEstadoAsync(command.IdTicket, cancellationToken)
+        var estado = await repositorio.ObtenerEstadoAsync(command.IdTicket, cancellationToken)
             ?? throw new NotFoundException("Ticket", command.IdTicket);
 
         await permisos.ExigirPermisoAsync(PermisosTicket.Atender, null, cancellationToken);
@@ -65,7 +69,30 @@ public class CambiarEstatusTicketHandler(
         await repositorio.AplicarEfectosTransicionAsync(
             command.IdTicket, command.Accion, command.Solucion, command.MinutosSolucion, cancellationToken);
 
+        if (command.Accion == AccionesTicket.EsperarUsuario && !string.IsNullOrWhiteSpace(command.Motivo))
+        {
+            await AvisarEsperaUsuarioAsync(estado, command.Motivo, cancellationToken);
+        }
+
         return await consultas.ObtenerPorIdAsync(command.IdTicket, cancellationToken)
             ?? throw new NotFoundException("Ticket", command.IdTicket);
+    }
+
+    /// <summary>
+    /// El motivo de ESPERAR_USUARIO se publica tambien como comentario (visible en el hilo
+    /// del ticket para el solicitante y el agente, no solo en el historial de estatus) y se
+    /// notifica al solicitante -- sin esto, nadie se enteraba de que se esperaba respuesta.
+    /// </summary>
+    private async Task AvisarEsperaUsuarioAsync(
+        EstadoTicket estado, string motivo, CancellationToken cancellationToken)
+    {
+        var html = $"<p>{WebUtility.HtmlEncode(motivo)}</p>";
+        await comentarios.CrearAsync(new ComentarioNuevo("Ticket", estado.IdTicket, html, null), cancellationToken);
+
+        await notificaciones.NotificarAsync(
+            [estado.IdSolicitante],
+            $"Tu ticket {estado.Folio} esta en espera de tu respuesta",
+            motivo,
+            "Ticket", estado.IdTicket, $"/tickets/{estado.Folio}", cancellationToken);
     }
 }

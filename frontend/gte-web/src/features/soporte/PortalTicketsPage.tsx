@@ -1,13 +1,14 @@
 import { useState } from "react";
 import {
   Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
-  FormControl, InputLabel, MenuItem, Paper, Rating, Select, Snackbar, Stack, Table,
+  Paper, Rating, Snackbar, Stack, Table,
   TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Tooltip, Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link as RouterLink } from "react-router-dom";
 import { ErrorApi } from "../../shared/api/http";
+import { ComboBuscable } from "../../shared/components/ComboBuscable";
 import { obtenerCatalogosBandeja } from "../../shared/api/workitems";
 import { useSesion } from "../../shared/api/sesion";
 import {
@@ -134,49 +135,44 @@ export function PortalTicketsPage() {
           <TextField size="small" required label="Titulo" value={titulo}
             onChange={(e) => setTitulo(e.target.value)}
             slotProps={{ htmlInput: { maxLength: 200 } }} />
-          <FormControl size="small">
-            <InputLabel>Categoria</InputLabel>
-            <Select label="Categoria" value={idCategoria}
-              onChange={(e) => setIdCategoria(e.target.value as number | "")}>
-              <MenuItem value="">Sin categoria</MenuItem>
-              {catalogos.data?.categoriasTicket.map((c) => (
-                <MenuItem key={c.id} value={c.id}>{c.nombre}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl size="small" required>
-            <InputLabel>Prioridad</InputLabel>
-            <Select label="Prioridad" value={idPrioridad}
-              onChange={(e) => setIdPrioridad(e.target.value as number | "")}>
-              {catalogos.data?.prioridades.map((p) => (
-                <MenuItem key={p.id} value={p.id}>{p.nombre}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <ComboBuscable
+            label="Categoria"
+            value={idCategoria}
+            onChange={(v) => setIdCategoria(v as number | "")}
+            opciones={[
+              { valor: "", etiqueta: "Sin categoria" },
+              ...(catalogos.data?.categoriasTicket ?? []).map((c) => ({ valor: c.id, etiqueta: c.nombre })),
+            ]}
+          />
+          <ComboBuscable
+            label="Prioridad"
+            required
+            value={idPrioridad}
+            onChange={(v) => setIdPrioridad(v as number | "")}
+            opciones={(catalogos.data?.prioridades ?? []).map((p) => ({ valor: p.id, etiqueta: p.nombre }))}
+          />
           <TextField size="small" label="Descripcion" multiline minRows={3}
             value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
           {esIngeniero && (
             <>
-              <FormControl size="small">
-                <InputLabel>Usuario solicitante</InputLabel>
-                <Select label="Usuario solicitante" value={idUsuarioSolicitante}
-                  onChange={(e) => setIdUsuarioSolicitante(e.target.value as number | "")}>
-                  <MenuItem value="">Sin especificar</MenuItem>
-                  {catalogos.data?.usuariosSolicitantes.map((u) => (
-                    <MenuItem key={u.id} value={u.id}>{u.nombre}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <FormControl size="small">
-                <InputLabel>Locacion</InputLabel>
-                <Select label="Locacion" value={idLocacion}
-                  onChange={(e) => setIdLocacion(e.target.value as number | "")}>
-                  <MenuItem value="">Sin especificar</MenuItem>
-                  {catalogos.data?.locaciones.map((l) => (
-                    <MenuItem key={l.id} value={l.id}>{l.nombre}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <ComboBuscable
+                label="Usuario solicitante"
+                value={idUsuarioSolicitante}
+                onChange={(v) => setIdUsuarioSolicitante(v as number | "")}
+                opciones={[
+                  { valor: "", etiqueta: "Sin especificar" },
+                  ...(catalogos.data?.usuariosSolicitantes ?? []).map((u) => ({ valor: u.id, etiqueta: u.nombre })),
+                ]}
+              />
+              <ComboBuscable
+                label="Locacion"
+                value={idLocacion}
+                onChange={(v) => setIdLocacion(v as number | "")}
+                opciones={[
+                  { valor: "", etiqueta: "Sin especificar" },
+                  ...(catalogos.data?.locaciones ?? []).map((l) => ({ valor: l.id, etiqueta: l.nombre })),
+                ]}
+              />
             </>
           )}
         </DialogContent>

@@ -1,4 +1,5 @@
-import { enviar, obtener } from "./http";
+import { enviar, http, lanzarErrorApi, obtener, ErrorApi, type ApiResponse } from "./http";
+import type { Archivo } from "./archivos";
 
 /* ---------- Catalogos ---------- */
 
@@ -45,6 +46,7 @@ export interface Proyecto {
   fechaInicioReal: string | null;
   fechaFinReal: string | null;
   esMantenimiento: boolean;
+  administrado: boolean;
 }
 
 export interface AccionDisponible {
@@ -69,6 +71,7 @@ export async function crearProyecto(datos: {
   fechaInicioPlan: string | null;
   fechaFinPlan: string | null;
   esMantenimiento: boolean;
+  administrado: boolean;
 }) {
   return enviar<Proyecto>("post", "/api/v1/proyectos", datos);
 }
@@ -81,6 +84,7 @@ export async function actualizarProyecto(idProyecto: number, datos: {
   fechaInicioPlan: string | null;
   fechaFinPlan: string | null;
   esMantenimiento: boolean;
+  administrado: boolean;
 }) {
   return enviar<Proyecto>("put", `/api/v1/proyectos/${idProyecto}`, datos);
 }
@@ -178,6 +182,7 @@ export interface Usuario {
   fechaAlta: string | null;
   fechaBaja: string | null;
   activo: boolean;
+  urlFoto: string | null;
 }
 
 export async function obtenerUsuarios(texto?: string, soloActivos = true) {
@@ -223,6 +228,26 @@ export async function actualizarUsuario(idUsuario: number, datos: {
 
 export async function darBajaUsuario(idUsuario: number) {
   return enviar<Usuario>("put", `/api/v1/usuarios/${idUsuario}/baja`, {});
+}
+
+/** Content-Type se deja "undefined" para que el navegador calcule el boundary multipart. */
+export async function subirFotoUsuario(idUsuario: number, archivo: File) {
+  const formulario = new FormData();
+  formulario.append("archivo", archivo);
+  try {
+    const { data } = await http.post<ApiResponse<Archivo>>(
+      `/api/v1/usuarios/${idUsuario}/foto`,
+      formulario,
+      { headers: { "Content-Type": undefined } },
+    );
+    if (!data.success || !data.response) {
+      throw new ErrorApi(data.userMessage, data.code);
+    }
+    return { dato: data.response, mensaje: data.userMessage };
+  } catch (error) {
+    if (error instanceof ErrorApi) throw error;
+    lanzarErrorApi(error);
+  }
 }
 
 /* ---------- Roles ---------- */
@@ -388,4 +413,52 @@ export async function actualizarAmbiente(idAmbiente: number, datos: {
 
 export async function retirarAmbiente(idAmbiente: number) {
   return enviar<object>("put", `/api/v1/ambientes/${idAmbiente}/retirar`, {});
+}
+
+/* ---------- Areas ---------- */
+
+export interface Area {
+  idArea: number;
+  nombre: string;
+}
+
+export async function obtenerAreas() {
+  return obtener<Area[]>("/api/v1/areas");
+}
+
+export async function crearArea(datos: { nombre: string }) {
+  return enviar<Area>("post", "/api/v1/areas", datos);
+}
+
+export async function actualizarArea(idArea: number, datos: { nombre: string }) {
+  return enviar<Area>("put", `/api/v1/areas/${idArea}`, datos);
+}
+
+export async function retirarArea(idArea: number) {
+  return enviar<object>("put", `/api/v1/areas/${idArea}/retirar`, {});
+}
+
+/* ---------- Puestos ---------- */
+
+export interface Puesto {
+  idPuesto: number;
+  nombre: string;
+  idArea: number | null;
+  area: string | null;
+}
+
+export async function obtenerPuestos() {
+  return obtener<Puesto[]>("/api/v1/puestos");
+}
+
+export async function crearPuesto(datos: { nombre: string; idArea: number | null }) {
+  return enviar<Puesto>("post", "/api/v1/puestos", datos);
+}
+
+export async function actualizarPuesto(idPuesto: number, datos: { nombre: string; idArea: number | null }) {
+  return enviar<Puesto>("put", `/api/v1/puestos/${idPuesto}`, datos);
+}
+
+export async function retirarPuesto(idPuesto: number) {
+  return enviar<object>("put", `/api/v1/puestos/${idPuesto}/retirar`, {});
 }

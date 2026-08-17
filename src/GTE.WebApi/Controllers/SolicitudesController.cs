@@ -42,9 +42,11 @@ public class SolicitudesController(IMediator mediator) : ControllerBase
         [FromQuery] int pageSize = 25,
         [FromQuery(Name = "estatus")] int[]? estatus = null,
         [FromQuery] string? texto = null,
+        [FromQuery] string? ordenarPor = null,
+        [FromQuery] bool ordenDescendente = false,
         CancellationToken cancellationToken = default)
     {
-        var filtro = new FiltroTriage(page, pageSize, estatus, texto);
+        var filtro = new FiltroTriage(page, pageSize, estatus, texto, ordenarPor, ordenDescendente);
         var resultado = await mediator.Send(new ObtenerTriageQuery(filtro), cancellationToken);
         return Ok(ApiResponse<PagedResult<SolicitudResponse>>.Exito(resultado));
     }
@@ -55,6 +57,15 @@ public class SolicitudesController(IMediator mediator) : ControllerBase
     {
         var resultado = await mediator.Send(new ObtenerSolicitudQuery(id), cancellationToken);
         return Ok(ApiResponse<SolicitudResponse>.Exito(resultado));
+    }
+
+    /// <summary>Edita la solicitud mientras siga activa en revision (Enviada/EnAnalisis/Aprobada).</summary>
+    [HttpPut("{id:int}")]
+    public async Task<ActionResult<ApiResponse<SolicitudResponse>>> Actualizar(
+        int id, [FromBody] SolicitudEditarRequest request, CancellationToken cancellationToken)
+    {
+        var resultado = await mediator.Send(new ActualizarSolicitudCommand(id, request), cancellationToken);
+        return Ok(ApiResponse<SolicitudResponse>.Exito(resultado, "Solicitud actualizada."));
     }
 
     [HttpGet("{id:int}/acciones")]

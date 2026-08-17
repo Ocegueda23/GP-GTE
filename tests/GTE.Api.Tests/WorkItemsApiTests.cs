@@ -67,7 +67,11 @@ public class WorkItemsApiTests(WebApplicationFactory<Program> fabricaApp)
             {
                 Clave = clave,
                 Nombre = $"Proyecto E2E {sufijo}",
-                IdCategoriaProyecto = 1,
+                // Categoria TI (2), no Desarrollo (1): esta prueba verifica RN-REQ-03
+                // (cierre sin avance bloqueado), no RN-QA-06 (QA obligatorio en Desarrollo,
+                // 2026-08-04) -- un proyecto Desarrollo exigiria WI.SaltarPruebas antes de
+                // llegar siquiera al 400 de RN-REQ-03.
+                IdCategoriaProyecto = 2,
                 IdEstatusProyecto = 3,
                 UsuarioRegistro = "e2e",
                 Activo = true
@@ -194,6 +198,7 @@ public class WorkItemsApiTests(WebApplicationFactory<Program> fabricaApp)
                 idTipoWorkItem = 3,
                 titulo = $"Sin asignar {sufijo}",
                 idPrioridad = 3,
+                idComplejidad = await FabricaApiAutenticada.ObtenerOCrearComplejidadAsync(),
                 fechaCompromiso = DateTime.Today.AddDays(5)
             });
             respuestaCrear.EnsureSuccessStatusCode();
@@ -573,12 +578,14 @@ public class WorkItemsApiTests(WebApplicationFactory<Program> fabricaApp)
     private static async Task<JsonElement> CrearItemAsync(
         HttpClient cliente, int idProyecto, int idAsignado, string titulo)
     {
+        var idComplejidad = await FabricaApiAutenticada.ObtenerOCrearComplejidadAsync();
         var respuesta = await cliente.PostAsJsonAsync("/api/v1/workitems", new
         {
             idProyecto,
             idTipoWorkItem = 3,   // Historia
             titulo,
             idPrioridad = 3,
+            idComplejidad,
             idAsignado,
             fechaCompromiso = DateTime.Today.AddDays(5)
         });

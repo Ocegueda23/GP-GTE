@@ -6,7 +6,8 @@ namespace GTE.Application.Interfaces;
 /// <summary>Filtro de la bandeja de mesa de ayuda. Sin estatus = abiertos (todos menos Cerrado).</summary>
 public record FiltroBandejaTicket(
     int Page = 1, int PageSize = 25, IReadOnlyList<int>? Estatus = null,
-    string? Texto = null, int? IdAsignado = null);
+    string? Texto = null, int? IdAsignado = null,
+    string? OrdenarPor = null, bool OrdenDescendente = false);
 
 public interface ITicketQueryService
 {

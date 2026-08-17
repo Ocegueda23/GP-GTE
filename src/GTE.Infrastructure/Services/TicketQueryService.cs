@@ -44,9 +44,35 @@ public class TicketQueryService(FabricaContexto fabrica) : ITicketQueryService
         var page = Math.Max(1, filtro.Page);
         var pageSize = Math.Clamp(filtro.PageSize, 1, 200);
 
-        var items = await consulta
-            .OrderBy(t => t.FechaLimiteResolucion ?? DateTime.MaxValue)
-            .ThenBy(t => t.IdTicket)
+        var ordenada = filtro.OrdenarPor switch
+        {
+            "folio" => filtro.OrdenDescendente
+                ? consulta.OrderByDescending(t => t.Folio)
+                : consulta.OrderBy(t => t.Folio),
+            "titulo" => filtro.OrdenDescendente
+                ? consulta.OrderByDescending(t => t.Titulo)
+                : consulta.OrderBy(t => t.Titulo),
+            "solicitante" => filtro.OrdenDescendente
+                ? consulta.OrderByDescending(t => t.Solicitante)
+                : consulta.OrderBy(t => t.Solicitante),
+            "categoria" => filtro.OrdenDescendente
+                ? consulta.OrderBy(t => t.Categoria == null).ThenByDescending(t => t.Categoria)
+                : consulta.OrderBy(t => t.Categoria == null).ThenBy(t => t.Categoria),
+            "prioridad" => filtro.OrdenDescendente
+                ? consulta.OrderByDescending(t => t.Prioridad)
+                : consulta.OrderBy(t => t.Prioridad),
+            "estatus" => filtro.OrdenDescendente
+                ? consulta.OrderByDescending(t => t.IdEstatus)
+                : consulta.OrderBy(t => t.IdEstatus),
+            "asignado" => filtro.OrdenDescendente
+                ? consulta.OrderBy(t => t.Asignado == null).ThenByDescending(t => t.Asignado)
+                : consulta.OrderBy(t => t.Asignado == null).ThenBy(t => t.Asignado),
+            _ => consulta
+                .OrderBy(t => t.FechaLimiteResolucion ?? DateTime.MaxValue)
+                .ThenBy(t => t.IdTicket)
+        };
+
+        var items = await ordenada
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);

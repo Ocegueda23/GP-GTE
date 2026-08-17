@@ -172,12 +172,13 @@ export function DetallePage() {
                     <TableCell align="right">Minutos</TableCell>
                     <TableCell>Descripcion</TableCell>
                     <TableCell>Usuario</TableCell>
+                    <TableCell>Origen</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {tiempos.data?.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={4}>
+                      <TableCell colSpan={5}>
                         <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: "center" }}>
                           Sin registros de tiempo. El cierre exige avance registrado.
                         </Typography>
@@ -190,8 +191,22 @@ export function DetallePage() {
                       <TableCell align="right">{formatearMinutos(registro.minutos)}</TableCell>
                       <TableCell>{registro.descripcion ?? "-"}</TableCell>
                       <TableCell>{registro.usuario}</TableCell>
+                      <TableCell>
+                        {registro.folioOrigen
+                          ? <Chip size="small" variant="outlined" label={registro.folioOrigen} />
+                          : "-"}
+                      </TableCell>
                     </TableRow>
                   ))}
+                  {tiempos.data && tiempos.data.length > 0 && (
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 700 }}>Total</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 700 }}>
+                        {formatearMinutos(tiempos.data.reduce((total, r) => total + r.minutos, 0))}
+                      </TableCell>
+                      <TableCell colSpan={3} />
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </Box>
@@ -239,6 +254,7 @@ export function DetallePage() {
             <Campo etiqueta="Usuario solicitante" valor={item.usuarioSolicitante} />
           )}
           <Campo etiqueta="Prioridad" valor={item.prioridad} />
+          <Campo etiqueta="Complejidad" valor={item.complejidad ?? "-"} />
           <Campo etiqueta="Sprint" valor={item.sprint ?? "-"} />
           <Campo etiqueta="Compromiso" valor={formatearFecha(item.fechaCompromiso)} resaltar={item.esVencida} />
           <Campo etiqueta="Inicio" valor={formatearFecha(item.fechaInicio)} />

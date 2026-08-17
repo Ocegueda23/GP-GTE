@@ -30,4 +30,12 @@ public interface IAdministracionQueryService
     /* ---------- Ambientes ---------- */
     Task<IReadOnlyList<AmbienteResponse>> ObtenerAmbientesAsync(int? idProyecto, CancellationToken cancellationToken = default);
     Task<AmbienteResponse?> ObtenerAmbienteAsync(int idAmbiente, CancellationToken cancellationToken = default);
+
+    /* ---------- Areas ---------- */
+    Task<IReadOnlyList<AreaResponse>> ObtenerAreasAsync(CancellationToken cancellationToken = default);
+    Task<AreaResponse?> ObtenerAreaAsync(int idArea, CancellationToken cancellationToken = default);
+
+    /* ---------- Puestos ---------- */
+    Task<IReadOnlyList<PuestoResponse>> ObtenerPuestosAsync(CancellationToken cancellationToken = default);
+    Task<PuestoResponse?> ObtenerPuestoAsync(int idPuesto, CancellationToken cancellationToken = default);
 }

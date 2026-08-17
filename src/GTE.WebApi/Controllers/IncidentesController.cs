@@ -35,9 +35,12 @@ public class IncidentesController(IMediator mediator) : ControllerBase
         [FromQuery] int? idSeveridad = null,
         [FromQuery] int? idProyecto = null,
         [FromQuery] string? texto = null,
+        [FromQuery] string? ordenarPor = null,
+        [FromQuery] bool ordenDescendente = false,
         CancellationToken cancellationToken = default)
     {
-        var filtro = new FiltroBandejaIncidente(page, pageSize, estatus, idSeveridad, idProyecto, texto);
+        var filtro = new FiltroBandejaIncidente(
+            page, pageSize, estatus, idSeveridad, idProyecto, texto, ordenarPor, ordenDescendente);
         var resultado = await mediator.Send(new ObtenerBandejaIncidentesQuery(filtro), cancellationToken);
         return Ok(ApiResponse<PagedResult<IncidenteResponse>>.Exito(resultado));
     }

@@ -11,4 +11,11 @@ public static class ConstantesArchivos
         ".png", ".jpg", ".jpeg", ".gif", ".webp",
         ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".zip", ".rar"
     };
+
+    /// <summary>Subconjunto de imagen, para adjuntos que deben ser una fotografia (ej. foto de perfil).</summary>
+    public static readonly IReadOnlySet<string> ExtensionesImagenPermitidas = new HashSet<string>(
+        StringComparer.OrdinalIgnoreCase)
+    {
+        ".png", ".jpg", ".jpeg", ".webp"
+    };
 }

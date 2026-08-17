@@ -6,11 +6,14 @@ public class SolicitudResponse
     public string? Folio { get; set; }
     public string Titulo { get; set; } = string.Empty;
     public string? Descripcion { get; set; }
+    public int IdTipoSolicitud { get; set; }
     public string Tipo { get; set; } = string.Empty;
+    public int IdPrioridad { get; set; }
     public string Prioridad { get; set; } = string.Empty;
     public int IdEstatus { get; set; }
     public string Estatus { get; set; } = string.Empty;
     public string Solicitante { get; set; } = string.Empty;
+    public int? IdUsuarioSolicitante { get; set; }
     public string? UsuarioSolicitante { get; set; }
     public string? Proyecto { get; set; }
     public int? IdProyecto { get; set; }

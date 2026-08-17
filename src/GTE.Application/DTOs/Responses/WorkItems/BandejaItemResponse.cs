@@ -13,8 +13,10 @@ public class BandejaItemResponse
     public int IdEstatus { get; set; }
     public string Estatus { get; set; } = string.Empty;
     public string Prioridad { get; set; } = string.Empty;
+    public string? Complejidad { get; set; }
     public int? IdAsignado { get; set; }
     public string? Asignado { get; set; }
+    public string? Sprint { get; set; }
     public DateTime? FechaCompromiso { get; set; }
     public bool EsVencida { get; set; }
     public decimal? PuntosHistoria { get; set; }

@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import {
-  Alert, Box, Button, Checkbox, FormControl, FormControlLabel, InputLabel, LinearProgress,
-  MenuItem, Paper, Select, Snackbar, Stack, Typography,
+  Alert, Box, Button, Checkbox, FormControlLabel, LinearProgress,
+  Paper, Snackbar, Stack, Typography,
 } from "@mui/material";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
+import { ComboBuscable } from "../../shared/components/ComboBuscable";
 import {
   guardarMatrizPermisos, obtenerMatrizPermisos, obtenerRoles, type PermisoMatrizItem,
 } from "../../shared/api/administracion";
@@ -62,12 +63,13 @@ export function RolesTab() {
     <Box>
       <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", mb: 2 }}>
         <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Roles y permisos</Typography>
-        <FormControl size="small" sx={{ minWidth: 220 }}>
-          <InputLabel>Rol</InputLabel>
-          <Select label="Rol" value={rolActual ?? ""} onChange={(e) => setIdRol(e.target.value as number)}>
-            {roles.data?.map((r) => <MenuItem key={r.idRol} value={r.idRol}>{r.nombre}</MenuItem>)}
-          </Select>
-        </FormControl>
+        <ComboBuscable
+          label="Rol"
+          value={rolActual ?? ""}
+          onChange={(v) => setIdRol(v as number | "")}
+          opciones={(roles.data ?? []).map((r) => ({ valor: r.idRol, etiqueta: r.nombre }))}
+          sx={{ minWidth: 220 }}
+        />
       </Stack>
 
       {matriz.isLoading && <LinearProgress />}

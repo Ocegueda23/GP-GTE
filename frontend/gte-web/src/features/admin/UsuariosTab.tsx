@@ -1,16 +1,22 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
-  Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Divider, FormControl,
-  IconButton, InputLabel, LinearProgress, MenuItem, Paper, Select, Snackbar, Stack, Table,
+  Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Divider,
+  IconButton, LinearProgress, Paper, Snackbar, Stack, Table,
   TableBody, TableCell, TableHead, TableRow, TextField, Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlineOutlined";
+import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
+import { AvatarUsuario } from "../../shared/components/AvatarUsuario";
+import { ComboBuscable } from "../../shared/components/ComboBuscable";
+import { EncabezadoOrdenable } from "../../shared/components/EncabezadoOrdenable";
+import { useOrdenTabla } from "../../shared/hooks/useOrdenTabla";
 import {
-  actualizarUsuario, asignarRol, crearUsuario, darBajaUsuario, obtenerCatalogosAdministracion,
-  obtenerRolesUsuario, obtenerUsuarios, restablecerPasswordUsuario, retirarRol, type Usuario,
+  actualizarUsuario, asignarRol, crearUsuario, darBajaUsuario, obtenerAreas,
+  obtenerCatalogosAdministracion, obtenerPuestos, obtenerRolesUsuario, obtenerUsuarios,
+  restablecerPasswordUsuario, retirarRol, subirFotoUsuario, type Usuario,
 } from "../../shared/api/administracion";
 
 /** P20 - Usuarios: alta manual, baja logica, nivel, horario, jefe y asignacion de roles. */
@@ -25,6 +31,7 @@ export function UsuariosTab() {
   const [dominio, setDominio] = useState("");
   const [nombre, setNombre] = useState("");
   const [correo, setCorreo] = useState("");
+  const [idArea, setIdArea] = useState<number | "">("");
   const [idPuesto, setIdPuesto] = useState<number | "">("");
   const [idNivel, setIdNivel] = useState<number | "">("");
   const [idHorario, setIdHorario] = useState<number | "">("");
@@ -32,18 +39,24 @@ export function UsuariosTab() {
 
   const [nombreEditar, setNombreEditar] = useState("");
   const [correoEditar, setCorreoEditar] = useState("");
+  const [idAreaEditar, setIdAreaEditar] = useState<number | "">("");
   const [idPuestoEditar, setIdPuestoEditar] = useState<number | "">("");
   const [idNivelEditar, setIdNivelEditar] = useState<number | "">("");
   const [idHorarioEditar, setIdHorarioEditar] = useState<number | "">("");
   const [idJefeEditar, setIdJefeEditar] = useState<number | "">("");
   const [idRolNuevo, setIdRolNuevo] = useState<number | "">("");
+  const inputFoto = useRef<HTMLInputElement>(null);
+  const [subiendoFoto, setSubiendoFoto] = useState(false);
 
   const catalogos = useQuery({
     queryKey: ["catalogos-admin"], queryFn: obtenerCatalogosAdministracion, staleTime: 5 * 60_000,
   });
+  const areas = useQuery({ queryKey: ["areas-admin"], queryFn: obtenerAreas, staleTime: 5 * 60_000 });
+  const puestos = useQuery({ queryKey: ["puestos-admin"], queryFn: obtenerPuestos, staleTime: 5 * 60_000 });
   const usuarios = useQuery({
     queryKey: ["usuarios-admin", texto], queryFn: () => obtenerUsuarios(texto || undefined),
   });
+  const { datosOrdenados: usuariosOrdenados, ordenarPor, descendente, ordenar } = useOrdenTabla(usuarios.data);
   const rolesUsuario = useQuery({
     queryKey: ["roles-usuario", usuarioEditar?.idUsuario],
     queryFn: () => obtenerRolesUsuario(usuarioEditar!.idUsuario),
@@ -58,7 +71,7 @@ export function UsuariosTab() {
 
   const limpiarAlta = () => {
     setDominio(""); setNombre(""); setCorreo("");
-    setIdPuesto(""); setIdNivel(""); setIdHorario(""); setIdJefe("");
+    setIdArea(""); setIdPuesto(""); setIdNivel(""); setIdHorario(""); setIdJefe("");
   };
 
   const crear = async () => {
@@ -94,10 +107,28 @@ export function UsuariosTab() {
     setUsuarioEditar(usuario);
     setNombreEditar(usuario.nombre);
     setCorreoEditar(usuario.correo ?? "");
+    const puestoActual = (puestos.data ?? []).find((p) => p.idPuesto === usuario.idPuesto);
+    setIdAreaEditar(puestoActual?.idArea ?? "");
     setIdPuestoEditar(usuario.idPuesto ?? "");
     setIdNivelEditar(usuario.idNivel ?? "");
     setIdHorarioEditar(usuario.idHorario ?? "");
     setIdJefeEditar(usuario.idJefe ?? "");
+  };
+
+  const subirFoto = async (archivo: File) => {
+    if (!usuarioEditar) return;
+    setSubiendoFoto(true);
+    try {
+      const { dato, mensaje } = await subirFotoUsuario(usuarioEditar.idUsuario, archivo);
+      avisar(mensaje);
+      setUsuarioEditar({ ...usuarioEditar, urlFoto: `/api/v1/archivos/${dato.guidArchivo}` });
+      await refrescar();
+    } catch (error) {
+      avisar(error instanceof ErrorApi ? error.message : "No se pudo subir la foto.", true);
+    } finally {
+      setSubiendoFoto(false);
+      if (inputFoto.current) inputFoto.current.value = "";
+    }
   };
 
   const guardarEdicion = async () => {
@@ -166,16 +197,16 @@ export function UsuariosTab() {
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>Dominio</TableCell>
-              <TableCell>Nombre</TableCell>
-              <TableCell>Puesto</TableCell>
-              <TableCell>Nivel</TableCell>
-              <TableCell>Jefe</TableCell>
-              <TableCell>Horario</TableCell>
+              <EncabezadoOrdenable clave="dominio" ordenActual={ordenarPor} descendente={descendente} onOrdenar={ordenar}>Dominio</EncabezadoOrdenable>
+              <EncabezadoOrdenable clave="nombre" ordenActual={ordenarPor} descendente={descendente} onOrdenar={ordenar}>Nombre</EncabezadoOrdenable>
+              <EncabezadoOrdenable clave="puesto" ordenActual={ordenarPor} descendente={descendente} onOrdenar={ordenar}>Puesto</EncabezadoOrdenable>
+              <EncabezadoOrdenable clave="nivel" ordenActual={ordenarPor} descendente={descendente} onOrdenar={ordenar}>Nivel</EncabezadoOrdenable>
+              <EncabezadoOrdenable clave="jefe" ordenActual={ordenarPor} descendente={descendente} onOrdenar={ordenar}>Jefe</EncabezadoOrdenable>
+              <EncabezadoOrdenable clave="horario" ordenActual={ordenarPor} descendente={descendente} onOrdenar={ordenar}>Horario</EncabezadoOrdenable>
             </TableRow>
           </TableHead>
           <TableBody>
-            {usuarios.data?.length === 0 && (
+            {usuariosOrdenados.length === 0 && (
               <TableRow>
                 <TableCell colSpan={6}>
                   <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: "center" }}>
@@ -184,7 +215,7 @@ export function UsuariosTab() {
                 </TableCell>
               </TableRow>
             )}
-            {usuarios.data?.map((u) => (
+            {usuariosOrdenados.map((u) => (
               <TableRow key={u.idUsuario} hover sx={{ cursor: "pointer" }} onClick={() => abrirEditar(u)}>
                 <TableCell>{u.dominio}</TableCell>
                 <TableCell>{u.nombre}</TableCell>
@@ -205,34 +236,53 @@ export function UsuariosTab() {
             onChange={(e) => setDominio(e.target.value)} />
           <TextField size="small" required label="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} />
           <TextField size="small" label="Correo" value={correo} onChange={(e) => setCorreo(e.target.value)} />
-          <FormControl size="small">
-            <InputLabel>Puesto</InputLabel>
-            <Select label="Puesto" value={idPuesto} onChange={(e) => setIdPuesto(e.target.value as number)}>
-              <MenuItem value="">Sin puesto</MenuItem>
-              {catalogos.data?.puestos.map((p) => <MenuItem key={p.id} value={p.id}>{p.nombre}</MenuItem>)}
-            </Select>
-          </FormControl>
-          <FormControl size="small">
-            <InputLabel>Nivel</InputLabel>
-            <Select label="Nivel" value={idNivel} onChange={(e) => setIdNivel(e.target.value as number)}>
-              <MenuItem value="">Sin nivel</MenuItem>
-              {catalogos.data?.niveles.map((n) => <MenuItem key={n.id} value={n.id}>{n.nombre}</MenuItem>)}
-            </Select>
-          </FormControl>
-          <FormControl size="small">
-            <InputLabel>Horario</InputLabel>
-            <Select label="Horario" value={idHorario} onChange={(e) => setIdHorario(e.target.value as number)}>
-              <MenuItem value="">Sin horario</MenuItem>
-              {catalogos.data?.horarios.map((h) => <MenuItem key={h.id} value={h.id}>{h.nombre}</MenuItem>)}
-            </Select>
-          </FormControl>
-          <FormControl size="small">
-            <InputLabel>Jefe</InputLabel>
-            <Select label="Jefe" value={idJefe} onChange={(e) => setIdJefe(e.target.value as number)}>
-              <MenuItem value="">Sin jefe</MenuItem>
-              {catalogos.data?.usuarios.map((u) => <MenuItem key={u.id} value={u.id}>{u.nombre}</MenuItem>)}
-            </Select>
-          </FormControl>
+          <ComboBuscable
+            label="Area"
+            value={idArea}
+            onChange={(v) => { setIdArea(v as number | ""); setIdPuesto(""); }}
+            opciones={[
+              { valor: "", etiqueta: "Todas" },
+              ...(areas.data ?? []).map((a) => ({ valor: a.idArea, etiqueta: a.nombre })),
+            ]}
+          />
+          <ComboBuscable
+            label="Puesto"
+            value={idPuesto}
+            onChange={(v) => setIdPuesto(v as number | "")}
+            opciones={[
+              { valor: "", etiqueta: "Sin puesto" },
+              ...(puestos.data ?? [])
+                .filter((p) => idArea === "" || p.idArea === idArea)
+                .map((p) => ({ valor: p.idPuesto, etiqueta: p.nombre })),
+            ]}
+          />
+          <ComboBuscable
+            label="Nivel"
+            value={idNivel}
+            onChange={(v) => setIdNivel(v as number | "")}
+            opciones={[
+              { valor: "", etiqueta: "Sin nivel" },
+              ...(catalogos.data?.niveles ?? []).map((n) => ({ valor: n.id, etiqueta: n.nombre })),
+            ]}
+          />
+          <ComboBuscable
+            label="Horario"
+            value={idHorario}
+            onChange={(v) => setIdHorario(v as number | "")}
+            opciones={[
+              { valor: "", etiqueta: "Sin horario" },
+              ...(catalogos.data?.horarios ?? []).map((h) => ({ valor: h.id, etiqueta: h.nombre })),
+            ]}
+          />
+          <ComboBuscable
+            label="Jefe"
+            value={idJefe}
+            onChange={(v) => setIdJefe(v as number | "")}
+            opciones={[
+              { valor: "", etiqueta: "Sin jefe" },
+              ...(catalogos.data?.usuarios ?? []).map((u) => ({ valor: u.id, etiqueta: u.nombre })),
+            ]}
+          />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setModalNuevo(false)}>Cancelar</Button>
@@ -249,36 +299,76 @@ export function UsuariosTab() {
           <TextField size="small" required label="Nombre" value={nombreEditar}
             onChange={(e) => setNombreEditar(e.target.value)} />
           <TextField size="small" label="Correo" value={correoEditar} onChange={(e) => setCorreoEditar(e.target.value)} />
-          <FormControl size="small">
-            <InputLabel>Puesto</InputLabel>
-            <Select label="Puesto" value={idPuestoEditar} onChange={(e) => setIdPuestoEditar(e.target.value as number)}>
-              <MenuItem value="">Sin puesto</MenuItem>
-              {catalogos.data?.puestos.map((p) => <MenuItem key={p.id} value={p.id}>{p.nombre}</MenuItem>)}
-            </Select>
-          </FormControl>
-          <FormControl size="small">
-            <InputLabel>Nivel</InputLabel>
-            <Select label="Nivel" value={idNivelEditar} onChange={(e) => setIdNivelEditar(e.target.value as number)}>
-              <MenuItem value="">Sin nivel</MenuItem>
-              {catalogos.data?.niveles.map((n) => <MenuItem key={n.id} value={n.id}>{n.nombre}</MenuItem>)}
-            </Select>
-          </FormControl>
-          <FormControl size="small">
-            <InputLabel>Horario</InputLabel>
-            <Select label="Horario" value={idHorarioEditar} onChange={(e) => setIdHorarioEditar(e.target.value as number)}>
-              <MenuItem value="">Sin horario</MenuItem>
-              {catalogos.data?.horarios.map((h) => <MenuItem key={h.id} value={h.id}>{h.nombre}</MenuItem>)}
-            </Select>
-          </FormControl>
-          <FormControl size="small">
-            <InputLabel>Jefe</InputLabel>
-            <Select label="Jefe" value={idJefeEditar} onChange={(e) => setIdJefeEditar(e.target.value as number)}>
-              <MenuItem value="">Sin jefe</MenuItem>
-              {catalogos.data?.usuarios.filter((u) => u.id !== usuarioEditar?.idUsuario).map((u) => (
-                <MenuItem key={u.id} value={u.id}>{u.nombre}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+
+          <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
+            {usuarioEditar && <AvatarUsuario urlFoto={usuarioEditar.urlFoto} nombre={usuarioEditar.nombre} sx={{ width: 56, height: 56 }} />}
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<PhotoCameraIcon />}
+              disabled={subiendoFoto}
+              onClick={() => inputFoto.current?.click()}
+            >
+              {subiendoFoto ? "Subiendo..." : "Cambiar foto"}
+            </Button>
+            <input
+              ref={inputFoto}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              style={{ display: "none" }}
+              onChange={(e) => { const archivo = e.target.files?.[0]; if (archivo) void subirFoto(archivo); }}
+            />
+          </Stack>
+
+          <ComboBuscable
+            label="Area"
+            value={idAreaEditar}
+            onChange={(v) => { setIdAreaEditar(v as number | ""); setIdPuestoEditar(""); }}
+            opciones={[
+              { valor: "", etiqueta: "Todas" },
+              ...(areas.data ?? []).map((a) => ({ valor: a.idArea, etiqueta: a.nombre })),
+            ]}
+          />
+          <ComboBuscable
+            label="Puesto"
+            value={idPuestoEditar}
+            onChange={(v) => setIdPuestoEditar(v as number | "")}
+            opciones={[
+              { valor: "", etiqueta: "Sin puesto" },
+              ...(puestos.data ?? [])
+                .filter((p) => idAreaEditar === "" || p.idArea === idAreaEditar)
+                .map((p) => ({ valor: p.idPuesto, etiqueta: p.nombre })),
+            ]}
+          />
+          <ComboBuscable
+            label="Nivel"
+            value={idNivelEditar}
+            onChange={(v) => setIdNivelEditar(v as number | "")}
+            opciones={[
+              { valor: "", etiqueta: "Sin nivel" },
+              ...(catalogos.data?.niveles ?? []).map((n) => ({ valor: n.id, etiqueta: n.nombre })),
+            ]}
+          />
+          <ComboBuscable
+            label="Horario"
+            value={idHorarioEditar}
+            onChange={(v) => setIdHorarioEditar(v as number | "")}
+            opciones={[
+              { valor: "", etiqueta: "Sin horario" },
+              ...(catalogos.data?.horarios ?? []).map((h) => ({ valor: h.id, etiqueta: h.nombre })),
+            ]}
+          />
+          <ComboBuscable
+            label="Jefe"
+            value={idJefeEditar}
+            onChange={(v) => setIdJefeEditar(v as number | "")}
+            opciones={[
+              { valor: "", etiqueta: "Sin jefe" },
+              ...(catalogos.data?.usuarios ?? [])
+                .filter((u) => u.id !== usuarioEditar?.idUsuario)
+                .map((u) => ({ valor: u.id, etiqueta: u.nombre })),
+            ]}
+          />
 
           <Divider />
           <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Roles asignados</Typography>
@@ -296,12 +386,13 @@ export function UsuariosTab() {
             </Stack>
           ))}
           <Stack direction="row" spacing={1}>
-            <FormControl size="small" sx={{ flex: 1 }}>
-              <InputLabel>Agregar rol</InputLabel>
-              <Select label="Agregar rol" value={idRolNuevo} onChange={(e) => setIdRolNuevo(e.target.value as number)}>
-                {catalogos.data?.roles.map((r) => <MenuItem key={r.id} value={r.id}>{r.nombre}</MenuItem>)}
-              </Select>
-            </FormControl>
+            <ComboBuscable
+              label="Agregar rol"
+              value={idRolNuevo}
+              onChange={(v) => setIdRolNuevo(v as number | "")}
+              opciones={(catalogos.data?.roles ?? []).map((r) => ({ valor: r.id, etiqueta: r.nombre }))}
+              sx={{ flex: 1 }}
+            />
             <Button variant="outlined" disabled={idRolNuevo === ""} onClick={() => void asignar()}>Asignar</Button>
           </Stack>
         </DialogContent>

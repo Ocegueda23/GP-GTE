@@ -104,6 +104,25 @@ public class ReleasesController(IMediator mediator) : ControllerBase
         return Ok(ApiResponse<string>.Exito(notas, "Notas de version generadas."));
     }
 
+    /// <summary>Paso aparte tras cerrar un sprint: que le falta a cada proyecto para no dejar nada fuera de un release.</summary>
+    [HttpGet("sprints/{idSprint:int}/cobertura-release")]
+    public async Task<ActionResult<ApiResponse<CoberturaReleaseSprintResponse>>> ObtenerCoberturaRelease(
+        int idSprint, CancellationToken cancellationToken)
+    {
+        var resultado = await mediator.Send(new ObtenerCoberturaReleaseSprintQuery(idSprint), cancellationToken);
+        return Ok(ApiResponse<CoberturaReleaseSprintResponse>.Exito(resultado));
+    }
+
+    /// <summary>Envia lo terminado y disponible del sprint, de un proyecto, a un release existente o nuevo.</summary>
+    [HttpPost("sprints/{idSprint:int}/enviar-a-release")]
+    public async Task<ActionResult<ApiResponse<ReleaseDetalleResponse>>> EnviarSprintARelease(
+        int idSprint, [FromBody] EnviarSprintAReleaseRequest request, CancellationToken cancellationToken)
+    {
+        var resultado = await mediator.Send(new EnviarSprintAReleaseCommand(idSprint, request), cancellationToken);
+        return Ok(ApiResponse<ReleaseDetalleResponse>.Exito(resultado,
+            $"Contenido enviado al release {resultado.Version} ({resultado.Folio})."));
+    }
+
     [HttpGet("ambientes/matriz")]
     public async Task<ActionResult<ApiResponse<IReadOnlyList<MatrizAmbienteResponse>>>> ObtenerMatriz(
         CancellationToken cancellationToken)

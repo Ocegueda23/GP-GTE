@@ -1,10 +1,10 @@
 import { useState } from "react";
 import {
-  Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField,
+  Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Typography,
 } from "@mui/material";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
-import { registrarTiempo } from "../../shared/api/workitems";
+import { formatearMinutos, obtenerTiempos, registrarTiempo } from "../../shared/api/workitems";
 
 interface Props {
   abierto: boolean;
@@ -24,6 +24,13 @@ export function ModalTiempo({ abierto, item, alCerrar, alExito, alError }: Props
   const [descripcion, setDescripcion] = useState("");
   const [enviando, setEnviando] = useState(false);
   const clienteQuery = useQueryClient();
+
+  const tiempos = useQuery({
+    queryKey: ["tiempos", item.idWorkItem],
+    queryFn: () => obtenerTiempos(item.idWorkItem),
+    enabled: abierto,
+  });
+  const totalRegistrado = tiempos.data?.reduce((total, r) => total + r.minutos, 0) ?? 0;
 
   const guardar = async () => {
     setEnviando(true);
@@ -52,6 +59,11 @@ export function ModalTiempo({ abierto, item, alCerrar, alExito, alError }: Props
     <Dialog open={abierto} onClose={alCerrar} fullWidth maxWidth="xs">
       <DialogTitle>Registrar tiempo - {item.folio}</DialogTitle>
       <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
+        {tiempos.data && tiempos.data.length > 0 && (
+          <Typography variant="caption" color="text.secondary">
+            Total ya registrado: {formatearMinutos(totalRegistrado)}
+          </Typography>
+        )}
         <TextField
           type="date"
           label="Fecha"

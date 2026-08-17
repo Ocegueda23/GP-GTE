@@ -12,6 +12,17 @@ public record SolicitudNueva(
     string? JustificacionNegocio,
     int? IdUsuarioSolicitante = null);
 
+/// <summary>Datos editables de una solicitud (folio y estatus no cambian aqui).</summary>
+public record SolicitudEdicion(
+    int IdSolicitud,
+    string Titulo,
+    string? Descripcion,
+    int IdTipoSolicitud,
+    int IdPrioridad,
+    DateTime? FechaDeseada,
+    string? JustificacionNegocio,
+    int? IdUsuarioSolicitante = null);
+
 /// <summary>Estado minimo de una solicitud para evaluar reglas.</summary>
 public record EstadoSolicitud(
     int IdSolicitud,

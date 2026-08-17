@@ -1,15 +1,18 @@
 import { useState } from "react";
 import {
   Alert, Box, Button, Checkbox, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
-  FormControl, FormControlLabel, InputLabel, LinearProgress, MenuItem, Paper, Select,
+  FormControlLabel, LinearProgress, Paper,
   Snackbar, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
+import { ComboBuscable } from "../../shared/components/ComboBuscable";
+import { EncabezadoOrdenable } from "../../shared/components/EncabezadoOrdenable";
+import { useOrdenTabla } from "../../shared/hooks/useOrdenTabla";
 import {
-  cambiarEstatusProyecto, crearProyecto, obtenerAccionesProyecto, obtenerCatalogosAdministracion,
-  obtenerProyectos, type Proyecto,
+  actualizarProyecto, cambiarEstatusProyecto, crearProyecto, obtenerAccionesProyecto,
+  obtenerCatalogosAdministracion, obtenerProyectos, type Proyecto,
 } from "../../shared/api/administracion";
 
 function BotonesAccionProyecto({
@@ -60,19 +63,39 @@ export function ProyectosTab() {
   const [fechaInicioPlan, setFechaInicioPlan] = useState("");
   const [fechaFinPlan, setFechaFinPlan] = useState("");
   const [esMantenimiento, setEsMantenimiento] = useState(false);
+  const [administrado, setAdministrado] = useState(false);
   const [aviso, setAviso] = useState<{ tipo: "success" | "error"; mensaje: string } | null>(null);
   const clienteQuery = useQueryClient();
+
+  const [proyectoEditar, setProyectoEditar] = useState<Proyecto | null>(null);
+  const [nombreEditar, setNombreEditar] = useState("");
+  const [idCategoriaEditar, setIdCategoriaEditar] = useState<number | "">("");
+  const [idResponsableEditar, setIdResponsableEditar] = useState<number | "">("");
+  const [idEquipoEditar, setIdEquipoEditar] = useState<number | "">("");
+  const [fechaInicioPlanEditar, setFechaInicioPlanEditar] = useState("");
+  const [fechaFinPlanEditar, setFechaFinPlanEditar] = useState("");
+  const [esMantenimientoEditar, setEsMantenimientoEditar] = useState(false);
+  const [administradoEditar, setAdministradoEditar] = useState(false);
+
+  const [busqueda, setBusqueda] = useState("");
 
   const catalogos = useQuery({
     queryKey: ["catalogos-admin"], queryFn: obtenerCatalogosAdministracion, staleTime: 5 * 60_000,
   });
   const proyectos = useQuery({ queryKey: ["proyectos"], queryFn: () => obtenerProyectos() });
 
+  const proyectosFiltrados = (proyectos.data ?? []).filter((p) => {
+    const texto = busqueda.trim().toLowerCase();
+    if (!texto) return true;
+    return p.clave.toLowerCase().includes(texto) || p.nombre.toLowerCase().includes(texto);
+  });
+  const { datosOrdenados: proyectosOrdenados, ordenarPor, descendente, ordenar } = useOrdenTabla(proyectosFiltrados);
+
   const avisar = (mensaje: string, error = false) => setAviso({ tipo: error ? "error" : "success", mensaje });
 
   const limpiar = () => {
     setClave(""); setNombre(""); setIdCategoria(""); setIdResponsable(""); setIdEquipo("");
-    setFechaInicioPlan(""); setFechaFinPlan(""); setEsMantenimiento(false);
+    setFechaInicioPlan(""); setFechaFinPlan(""); setEsMantenimiento(false); setAdministrado(false);
   };
 
   const guardar = async () => {
@@ -87,6 +110,7 @@ export function ProyectosTab() {
         fechaInicioPlan: fechaInicioPlan || null,
         fechaFinPlan: fechaFinPlan || null,
         esMantenimiento,
+        administrado,
       });
       avisar(mensaje);
       setModal(false);
@@ -97,7 +121,40 @@ export function ProyectosTab() {
     }
   };
 
+  const abrirEditar = (p: Proyecto) => {
+    setProyectoEditar(p);
+    setNombreEditar(p.nombre);
+    setIdCategoriaEditar(p.idCategoriaProyecto);
+    setIdResponsableEditar(p.idResponsable ?? "");
+    setIdEquipoEditar(p.idEquipo ?? "");
+    setFechaInicioPlanEditar(p.fechaInicioPlan?.slice(0, 10) ?? "");
+    setFechaFinPlanEditar(p.fechaFinPlan?.slice(0, 10) ?? "");
+    setEsMantenimientoEditar(p.esMantenimiento);
+    setAdministradoEditar(p.administrado);
+  };
+
+  const guardarEdicion = async () => {
+    try {
+      const { mensaje } = await actualizarProyecto(proyectoEditar!.idProyecto, {
+        nombre: nombreEditar.trim(),
+        idCategoriaProyecto: idCategoriaEditar as number,
+        idResponsable: idResponsableEditar === "" ? null : (idResponsableEditar as number),
+        idEquipo: idEquipoEditar === "" ? null : (idEquipoEditar as number),
+        fechaInicioPlan: fechaInicioPlanEditar || null,
+        fechaFinPlan: fechaFinPlanEditar || null,
+        esMantenimiento: esMantenimientoEditar,
+        administrado: administradoEditar,
+      });
+      avisar(mensaje);
+      setProyectoEditar(null);
+      await clienteQuery.invalidateQueries({ queryKey: ["proyectos"] });
+    } catch (error) {
+      avisar(error instanceof ErrorApi ? error.message : "No se pudo actualizar el proyecto.", true);
+    }
+  };
+
   const valido = clave.trim().length > 0 && nombre.trim().length > 0 && idCategoria !== "";
+  const validoEditar = nombreEditar.trim().length > 0 && idCategoriaEditar !== "";
 
   return (
     <Box>
@@ -108,22 +165,25 @@ export function ProyectosTab() {
         </Button>
       </Stack>
 
+      <TextField size="small" placeholder="Buscar clave o nombre..." value={busqueda}
+        onChange={(e) => setBusqueda(e.target.value)} sx={{ mb: 1.5, minWidth: 280 }} />
+
       <Paper variant="outlined">
         {proyectos.isLoading && <LinearProgress />}
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>Clave</TableCell>
-              <TableCell>Nombre</TableCell>
-              <TableCell>Categoria</TableCell>
-              <TableCell>Estatus</TableCell>
-              <TableCell>Equipo</TableCell>
-              <TableCell>Responsable</TableCell>
+              <EncabezadoOrdenable clave="clave" ordenActual={ordenarPor} descendente={descendente} onOrdenar={ordenar}>Clave</EncabezadoOrdenable>
+              <EncabezadoOrdenable clave="nombre" ordenActual={ordenarPor} descendente={descendente} onOrdenar={ordenar}>Nombre</EncabezadoOrdenable>
+              <EncabezadoOrdenable clave="categoriaProyecto" ordenActual={ordenarPor} descendente={descendente} onOrdenar={ordenar}>Categoria</EncabezadoOrdenable>
+              <EncabezadoOrdenable clave="estatus" ordenActual={ordenarPor} descendente={descendente} onOrdenar={ordenar}>Estatus</EncabezadoOrdenable>
+              <EncabezadoOrdenable clave="equipo" ordenActual={ordenarPor} descendente={descendente} onOrdenar={ordenar}>Equipo</EncabezadoOrdenable>
+              <EncabezadoOrdenable clave="responsable" ordenActual={ordenarPor} descendente={descendente} onOrdenar={ordenar}>Responsable</EncabezadoOrdenable>
               <TableCell>Acciones</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {proyectos.data?.length === 0 && (
+            {proyectosOrdenados.length === 0 && (
               <TableRow>
                 <TableCell colSpan={7}>
                   <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: "center" }}>
@@ -132,7 +192,7 @@ export function ProyectosTab() {
                 </TableCell>
               </TableRow>
             )}
-            {proyectos.data?.map((p) => (
+            {proyectosOrdenados.map((p) => (
               <TableRow key={p.idProyecto}>
                 <TableCell>
                   {p.clave}
@@ -143,12 +203,18 @@ export function ProyectosTab() {
                 <TableCell>
                   {p.nombre}
                   {p.esMantenimiento && <Chip size="small" label="Mantenimiento" sx={{ ml: 1, height: 18 }} />}
+                  {p.administrado && <Chip size="small" color="primary" label="Administrado" sx={{ ml: 1, height: 18 }} />}
                 </TableCell>
                 <TableCell>{p.categoriaProyecto}</TableCell>
                 <TableCell><Chip size="small" label={p.estatus} /></TableCell>
                 <TableCell>{p.equipo ?? "-"}</TableCell>
                 <TableCell>{p.responsable ?? "-"}</TableCell>
-                <TableCell><BotonesAccionProyecto proyecto={p} onCambio={avisar} /></TableCell>
+                <TableCell>
+                  <Stack direction="row" spacing={0.5} sx={{ flexWrap: "wrap" }}>
+                    <Button size="small" onClick={() => abrirEditar(p)}>Editar</Button>
+                    <BotonesAccionProyecto proyecto={p} onCambio={avisar} />
+                  </Stack>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -160,32 +226,31 @@ export function ProyectosTab() {
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
           <TextField size="small" required label="Clave" value={clave} onChange={(e) => setClave(e.target.value)} />
           <TextField size="small" required label="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} />
-          <FormControl size="small" required>
-            <InputLabel>Categoria</InputLabel>
-            <Select label="Categoria" value={idCategoria} onChange={(e) => setIdCategoria(e.target.value as number)}>
-              {catalogos.data?.categoriasProyecto.map((c) => (
-                <MenuItem key={c.id} value={c.id}>{c.nombre}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl size="small">
-            <InputLabel>Equipo</InputLabel>
-            <Select label="Equipo" value={idEquipo} onChange={(e) => setIdEquipo(e.target.value as number)}>
-              <MenuItem value="">Sin equipo</MenuItem>
-              {catalogos.data?.equipos.map((eq) => (
-                <MenuItem key={eq.id} value={eq.id}>{eq.nombre}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl size="small">
-            <InputLabel>Responsable</InputLabel>
-            <Select label="Responsable" value={idResponsable} onChange={(e) => setIdResponsable(e.target.value as number)}>
-              <MenuItem value="">Sin responsable</MenuItem>
-              {catalogos.data?.usuarios.map((u) => (
-                <MenuItem key={u.id} value={u.id}>{u.nombre}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <ComboBuscable
+            label="Categoria"
+            required
+            value={idCategoria}
+            onChange={(v) => setIdCategoria(v as number | "")}
+            opciones={(catalogos.data?.categoriasProyecto ?? []).map((c) => ({ valor: c.id, etiqueta: c.nombre }))}
+          />
+          <ComboBuscable
+            label="Equipo"
+            value={idEquipo}
+            onChange={(v) => setIdEquipo(v as number | "")}
+            opciones={[
+              { valor: "", etiqueta: "Sin equipo" },
+              ...(catalogos.data?.equipos ?? []).map((eq) => ({ valor: eq.id, etiqueta: eq.nombre })),
+            ]}
+          />
+          <ComboBuscable
+            label="Responsable"
+            value={idResponsable}
+            onChange={(v) => setIdResponsable(v as number | "")}
+            opciones={[
+              { valor: "", etiqueta: "Sin responsable" },
+              ...(catalogos.data?.usuarios ?? []).map((u) => ({ valor: u.id, etiqueta: u.nombre })),
+            ]}
+          />
           <TextField size="small" type="date" label="Inicio plan" value={fechaInicioPlan}
             onChange={(e) => setFechaInicioPlan(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
           <TextField size="small" type="date" label="Fin plan" value={fechaFinPlan}
@@ -193,10 +258,60 @@ export function ProyectosTab() {
           <FormControlLabel
             control={<Checkbox checked={esMantenimiento} onChange={(e) => setEsMantenimiento(e.target.checked)} />}
             label="Proyecto de mantenimiento" />
+          <FormControlLabel
+            control={<Checkbox checked={administrado} onChange={(e) => setAdministrado(e.target.checked)} />}
+            label="Proyecto administrado (solo con acceso especial crea o elimina tareas)" />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setModal(false)}>Cancelar</Button>
           <Button variant="contained" disabled={!valido} onClick={() => void guardar()}>Crear</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={proyectoEditar !== null} onClose={() => setProyectoEditar(null)} fullWidth maxWidth="sm">
+        <DialogTitle>{proyectoEditar?.clave}</DialogTitle>
+        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
+          <TextField size="small" required label="Nombre" value={nombreEditar}
+            onChange={(e) => setNombreEditar(e.target.value)} />
+          <ComboBuscable
+            label="Categoria"
+            required
+            value={idCategoriaEditar}
+            onChange={(v) => setIdCategoriaEditar(v as number | "")}
+            opciones={(catalogos.data?.categoriasProyecto ?? []).map((c) => ({ valor: c.id, etiqueta: c.nombre }))}
+          />
+          <ComboBuscable
+            label="Equipo"
+            value={idEquipoEditar}
+            onChange={(v) => setIdEquipoEditar(v as number | "")}
+            opciones={[
+              { valor: "", etiqueta: "Sin equipo" },
+              ...(catalogos.data?.equipos ?? []).map((eq) => ({ valor: eq.id, etiqueta: eq.nombre })),
+            ]}
+          />
+          <ComboBuscable
+            label="Responsable"
+            value={idResponsableEditar}
+            onChange={(v) => setIdResponsableEditar(v as number | "")}
+            opciones={[
+              { valor: "", etiqueta: "Sin responsable" },
+              ...(catalogos.data?.usuarios ?? []).map((u) => ({ valor: u.id, etiqueta: u.nombre })),
+            ]}
+          />
+          <TextField size="small" type="date" label="Inicio plan" value={fechaInicioPlanEditar}
+            onChange={(e) => setFechaInicioPlanEditar(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
+          <TextField size="small" type="date" label="Fin plan" value={fechaFinPlanEditar}
+            onChange={(e) => setFechaFinPlanEditar(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
+          <FormControlLabel
+            control={<Checkbox checked={esMantenimientoEditar} onChange={(e) => setEsMantenimientoEditar(e.target.checked)} />}
+            label="Proyecto de mantenimiento" />
+          <FormControlLabel
+            control={<Checkbox checked={administradoEditar} onChange={(e) => setAdministradoEditar(e.target.checked)} />}
+            label="Proyecto administrado (solo con acceso especial crea o elimina tareas)" />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setProyectoEditar(null)}>Cancelar</Button>
+          <Button variant="contained" disabled={!validoEditar} onClick={() => void guardarEdicion()}>Guardar</Button>
         </DialogActions>
       </Dialog>
 

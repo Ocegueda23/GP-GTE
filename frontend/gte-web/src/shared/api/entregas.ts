@@ -76,6 +76,29 @@ export interface MatrizAmbiente {
   fechaDespliegue: string | null;
 }
 
+export interface ItemCobertura {
+  idWorkItem: number;
+  folio: string;
+  titulo: string;
+}
+
+export interface ProyectoCobertura {
+  idProyecto: number;
+  claveProyecto: string;
+  proyecto: string;
+  disponibles: ItemCobertura[];
+  bloqueados: ItemCobertura[];
+  idReleaseEnPreparacion: number | null;
+  versionEnPreparacion: string | null;
+  folioReleaseEnPreparacion: string | null;
+}
+
+export interface CoberturaReleaseSprint {
+  idSprint: number;
+  sprint: string;
+  proyectos: ProyectoCobertura[];
+}
+
 export function colorEstatusRelease(
   idEstatus: number,
 ): "default" | "info" | "warning" | "success" | "error" {
@@ -151,4 +174,16 @@ export async function generarNotas(idRelease: number) {
 
 export async function obtenerMatrizAmbientes() {
   return obtener<MatrizAmbiente[]>("/api/v1/ambientes/matriz");
+}
+
+export async function obtenerCoberturaReleaseSprint(idSprint: number) {
+  return obtener<CoberturaReleaseSprint>(`/api/v1/sprints/${idSprint}/cobertura-release`);
+}
+
+export async function enviarSprintARelease(idSprint: number, datos: {
+  idProyecto: number;
+  idReleaseExistente: number | null;
+  versionNueva: string | null;
+}) {
+  return enviar<ReleaseDetalle>("post", `/api/v1/sprints/${idSprint}/enviar-a-release`, datos);
 }

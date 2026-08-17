@@ -29,7 +29,12 @@ import { TableroPage } from "./features/planeacion/TableroPage";
 import { QaPage } from "./features/calidad/QaPage";
 import { ReleasesPage } from "./features/entregas/ReleasesPage";
 import { GuardiaSesion } from "./features/sesion/GuardiaSesion";
+import { DashboardEjecutivoPage } from "./features/dashboard/DashboardEjecutivoPage";
+import { IndicadoresEjecutivosPage } from "./features/indicadoresEjecutivos/IndicadoresEjecutivosPage";
+import { ActividadUsuarioPage } from "./features/reportes/ActividadUsuarioPage";
+import { CatalogoReportesPage } from "./features/reportes/CatalogoReportesPage";
 import { AdminPage } from "./features/admin/AdminPage";
+import { WorkflowsPage } from "./features/admin/WorkflowsPage";
 import { ManualUsuarioPage } from "./features/ayuda/ManualUsuarioPage";
 import { cerrarSesion, cerrarSesionServidor, useSesion } from "./shared/api/sesion";
 
@@ -63,8 +68,12 @@ const NAVEGACION: { ruta: string; etiqueta: string; permiso: string | string[] |
   { ruta: "/tickets", etiqueta: "Mis tickets", permiso: null },
   { ruta: "/soporte", etiqueta: "Mesa de ayuda", permiso: "TKT.Atender" },
   { ruta: "/operacion/incidentes", etiqueta: "Incidentes", permiso: "INC.Gestionar" },
+  { ruta: "/dashboard-ejecutivo", etiqueta: "Dashboard ejecutivo", permiso: null },
+  { ruta: "/indicadores-ejecutivos", etiqueta: "Indicadores ejecutivos", permiso: ["DASH.Ejecutivo", "DASH.VerDepartamento"] },
   { ruta: "/portafolio", etiqueta: "Portafolio", permiso: ["POR.GestionarCosteo", "POR.GestionarOkr", "RPT.Costos"] },
+  { ruta: "/reportes", etiqueta: "Reportes", permiso: ["RPT.Ver", "RPT.Costos", "RPT.Auditoria", "RPT.Actividad"] },
   { ruta: "/admin", etiqueta: "Administracion", permiso: ["ADM.Usuarios", "ADM.Roles"] },
+  { ruta: "/admin/workflows", etiqueta: "Workflows", permiso: "ADM.Workflows" },
   { ruta: "/ayuda", etiqueta: "Ayuda", permiso: null },
 ];
 
@@ -260,8 +269,13 @@ export default function App() {
                 <Route path="/soporte" element={<BandejaTicketsPage />} />
                 <Route path="/operacion/incidentes" element={<BandejaIncidentesPage />} />
                 <Route path="/operacion/incidentes/:folio" element={<DetalleIncidentePage />} />
+                <Route path="/dashboard-ejecutivo" element={<DashboardEjecutivoPage />} />
+                <Route path="/indicadores-ejecutivos" element={<IndicadoresEjecutivosPage />} />
                 <Route path="/portafolio" element={<PortafolioPage />} />
+                <Route path="/reportes" element={<CatalogoReportesPage />} />
+                <Route path="/reportes/actividad-usuario" element={<ActividadUsuarioPage />} />
                 <Route path="/admin" element={<AdminPage />} />
+                <Route path="/admin/workflows" element={<WorkflowsPage />} />
                 <Route path="/ayuda" element={<ManualUsuarioPage />} />
               </Routes>
             </Box>

@@ -8,6 +8,9 @@ public interface ISolicitudRepository
     /// <summary>Crea la solicitud en Borrador y siembra el historial (ALTA).</summary>
     Task<int> CrearAsync(SolicitudNueva datos, CancellationToken cancellationToken = default);
 
+    /// <summary>Edita los campos capturables mientras la solicitud sigue activa en revision.</summary>
+    Task ActualizarAsync(SolicitudEdicion datos, CancellationToken cancellationToken = default);
+
     Task<EstadoSolicitud?> ObtenerEstadoAsync(int idSolicitud, CancellationToken cancellationToken = default);
 
     /// <summary>Al APROBAR se fija el proyecto destino (antes de la transicion).</summary>

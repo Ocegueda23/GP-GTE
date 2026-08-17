@@ -44,9 +44,38 @@ public class SolicitudQueryService(FabricaContexto fabrica) : ISolicitudQuerySer
         var page = Math.Max(1, filtro.Page);
         var pageSize = Math.Clamp(filtro.PageSize, 1, 200);
 
-        var items = await consulta
-            .OrderByDescending(s => s.DiasEspera)
-            .ThenBy(s => s.IdSolicitud)
+        var ordenada = filtro.OrdenarPor switch
+        {
+            "folio" => filtro.OrdenDescendente
+                ? consulta.OrderByDescending(s => s.Folio)
+                : consulta.OrderBy(s => s.Folio),
+            "titulo" => filtro.OrdenDescendente
+                ? consulta.OrderByDescending(s => s.Titulo)
+                : consulta.OrderBy(s => s.Titulo),
+            "solicitante" => filtro.OrdenDescendente
+                ? consulta.OrderByDescending(s => s.Solicitante)
+                : consulta.OrderBy(s => s.Solicitante),
+            "tipo" => filtro.OrdenDescendente
+                ? consulta.OrderByDescending(s => s.Tipo)
+                : consulta.OrderBy(s => s.Tipo),
+            "prioridad" => filtro.OrdenDescendente
+                ? consulta.OrderByDescending(s => s.Prioridad)
+                : consulta.OrderBy(s => s.Prioridad),
+            "diasEspera" => filtro.OrdenDescendente
+                ? consulta.OrderByDescending(s => s.DiasEspera)
+                : consulta.OrderBy(s => s.DiasEspera),
+            "estatus" => filtro.OrdenDescendente
+                ? consulta.OrderByDescending(s => s.IdEstatus)
+                : consulta.OrderBy(s => s.IdEstatus),
+            "proyecto" => filtro.OrdenDescendente
+                ? consulta.OrderBy(s => s.Proyecto == null).ThenByDescending(s => s.Proyecto)
+                : consulta.OrderBy(s => s.Proyecto == null).ThenBy(s => s.Proyecto),
+            _ => consulta
+                .OrderByDescending(s => s.DiasEspera)
+                .ThenBy(s => s.IdSolicitud)
+        };
+
+        var items = await ordenada
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);
@@ -96,6 +125,14 @@ public class SolicitudQueryService(FabricaContexto fabrica) : ISolicitudQuerySer
         return solicitudes;
     }
 
+    public async Task<int> ContarPendientesTriageAsync(CancellationToken cancellationToken = default)
+    {
+        await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
+        return await contexto.TblSolicitud.AsNoTracking()
+            .Where(s => s.Activo && EstatusPendientesTriage.Contains(s.IdEstatusSolicitud))
+            .CountAsync(cancellationToken);
+    }
+
     public async Task<SolicitudResponse?> ObtenerPorIdAsync(
         int idSolicitud, CancellationToken cancellationToken = default)
     {
@@ -142,11 +179,14 @@ public class SolicitudQueryService(FabricaContexto fabrica) : ISolicitudQuerySer
                    Folio = s.Folio,
                    Titulo = s.Titulo,
                    Descripcion = s.Descripcion,
+                   IdTipoSolicitud = s.IdTipoSolicitud,
                    Tipo = t.Nombre,
+                   IdPrioridad = s.IdPrioridad,
                    Prioridad = p.Nombre,
                    IdEstatus = s.IdEstatusSolicitud,
                    Estatus = e.Descripcion,
                    Solicitante = u.Nombre,
+                   IdUsuarioSolicitante = s.IdUsuarioSolicitante,
                    UsuarioSolicitante = us != null ? (us.Nombre ?? us.Usuario) : null,
                    IdSolicitanteInterno = s.IdSolicitante,
                    Proyecto = pr != null ? pr.Nombre : null,

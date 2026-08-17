@@ -7,7 +7,7 @@ import { Link as RouterLink } from "react-router-dom";
 import RateReviewIcon from "@mui/icons-material/RateReview";
 import type { ResultadoPaginado } from "../../shared/api/http";
 import {
-  formatearMinutos, type BandejaItem, type CatalogosBandeja, type FiltroBandeja,
+  colorEstatus, formatearMinutos, type BandejaItem, type CatalogosBandeja, type FiltroBandeja,
 } from "../../shared/api/workitems";
 import { useFiltrosBandeja } from "./storeFiltros";
 import { MenuAcciones } from "./MenuAcciones";
@@ -18,17 +18,6 @@ interface Props {
   catalogos: CatalogosBandeja | undefined;
   alExito: (mensaje: string) => void;
   alError: (mensaje: string) => void;
-}
-
-/** Colores de chip por estatus (contrato de IDs del motor). */
-function colorEstatus(idEstatus: number): "default" | "success" | "info" | "warning" | "error" {
-  switch (idEstatus) {
-    case 2: return "success";   // En Proceso
-    case 3: return "info";      // En Pruebas
-    case 4: return "warning";   // Correccion
-    case 7: return "error";     // Cancelado
-    default: return "default";
-  }
 }
 
 /** Semantica visual heredada del GT: vencida en rojo suave, En Proceso en verde suave. */
@@ -94,9 +83,10 @@ export function TablaBandeja({ datos, cargando, catalogos, alExito, alError }: P
               <EncabezadoOrdenable clave="proyecto" filtro={filtro} alOrdenar={manejarOrden}>Proyecto</EncabezadoOrdenable>
               <EncabezadoOrdenable clave="asignado" filtro={filtro} alOrdenar={manejarOrden}>Asignado</EncabezadoOrdenable>
               <EncabezadoOrdenable clave="estatus" filtro={filtro} alOrdenar={manejarOrden}>Estatus</EncabezadoOrdenable>
+              <EncabezadoOrdenable clave="sprint" filtro={filtro} alOrdenar={manejarOrden}>Sprint</EncabezadoOrdenable>
               <EncabezadoOrdenable clave="prioridad" filtro={filtro} alOrdenar={manejarOrden}>Prioridad</EncabezadoOrdenable>
+              <TableCell>Complejidad</TableCell>
               <EncabezadoOrdenable clave="compromiso" filtro={filtro} alOrdenar={manejarOrden}>Compromiso</EncabezadoOrdenable>
-              <EncabezadoOrdenable clave="presupuesto" filtro={filtro} alOrdenar={manejarOrden} align="right">Presupuesto</EncabezadoOrdenable>
               <EncabezadoOrdenable clave="invertido" filtro={filtro} alOrdenar={manejarOrden} align="right">Invertido</EncabezadoOrdenable>
               <TableCell align="center">Rev.</TableCell>
               <TableCell align="center">Acciones</TableCell>
@@ -105,7 +95,7 @@ export function TablaBandeja({ datos, cargando, catalogos, alExito, alError }: P
           <TableBody>
             {!cargando && datos?.items.length === 0 && (
               <TableRow>
-                <TableCell colSpan={12}>
+                <TableCell colSpan={13}>
                   <Box sx={{ py: 4, textAlign: "center" }}>
                     <Typography color="text.secondary">
                       No hay elementos con los filtros actuales. Ajusta la busqueda o crea uno nuevo.
@@ -133,11 +123,16 @@ export function TablaBandeja({ datos, cargando, catalogos, alExito, alError }: P
                   <Chip size="small" label={item.estatus} color={colorEstatus(item.idEstatus)}
                     variant={item.idEstatus === 6 ? "outlined" : "filled"} />
                 </TableCell>
+                <TableCell sx={{ whiteSpace: "nowrap" }}>
+                  {item.sprint
+                    ? <Chip size="small" variant="outlined" label={item.sprint} />
+                    : <Chip size="small" label="Backlog" />}
+                </TableCell>
                 <TableCell>{item.prioridad}</TableCell>
+                <TableCell>{item.complejidad ?? "-"}</TableCell>
                 <TableCell sx={{ whiteSpace: "nowrap", color: item.esVencida ? "error.main" : undefined, fontWeight: item.esVencida ? 700 : 400 }}>
                   {formatearFecha(item.fechaCompromiso)}
                 </TableCell>
-                <TableCell align="right">{formatearMinutos(item.minutosPresupuesto)}</TableCell>
                 <TableCell align="right">{formatearMinutos(item.minutosInvertidos)}</TableCell>
                 <TableCell align="center">
                   {item.revisionesPendientes > 0 && (

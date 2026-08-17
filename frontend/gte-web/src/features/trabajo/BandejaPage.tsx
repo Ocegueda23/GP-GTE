@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, Box, Button, Snackbar, Stack, Typography } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import { useQuery } from "@tanstack/react-query";
 import { obtenerBandeja, obtenerCatalogosBandeja } from "../../shared/api/workitems";
+import { useSesion } from "../../shared/api/sesion";
 import { BarraFiltros } from "./BarraFiltros";
 import { NuevoItemModal } from "./NuevoItemModal";
 import { TablaBandeja } from "./TablaBandeja";
@@ -15,9 +16,18 @@ interface Aviso {
 
 /** P03 - Bandeja de trabajo: sucesora directa de FrmRegistro del GT. */
 export function BandejaPage() {
-  const { filtro } = useFiltrosBandeja();
+  const { filtro, establecer } = useFiltrosBandeja();
+  const sesion = useSesion((estado) => estado.sesion);
   const [aviso, setAviso] = useState<Aviso | null>(null);
   const [modalNuevo, setModalNuevo] = useState(false);
+
+  // Al entrar a la bandeja sin un Asignado ya elegido, parte filtrando por el usuario firmado.
+  useEffect(() => {
+    if (filtro.idAsignado === null && sesion) {
+      establecer({ idAsignado: sesion.idUsuario });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al montar la pantalla
+  }, []);
 
   const catalogos = useQuery({
     queryKey: ["catalogos-bandeja"],

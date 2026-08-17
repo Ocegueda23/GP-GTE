@@ -70,11 +70,11 @@ public class WorkItemRepository(FabricaContexto fabrica, AuditContext auditoria)
         entidad.IdPrioridad = datos.IdPrioridad;
         entidad.IdComplejidad = datos.IdComplejidad;
         entidad.IdAsignado = datos.IdAsignado;
-        entidad.PuntosHistoria = datos.PuntosHistoria;
         entidad.FechaCompromiso = datos.FechaCompromiso;
         if (datos.ActualizarPresupuesto)
         {
             entidad.MinutosPresupuesto = datos.MinutosPresupuesto;   // RN-REQ-08
+            entidad.PuntosHistoria = datos.PuntosHistoria;           // RN-REQ-08: puntos se congelan junto con minutos
         }
         MarcarMovimiento(entidad);
 
@@ -95,7 +95,7 @@ public class WorkItemRepository(FabricaContexto fabrica, AuditContext auditoria)
                 w.IdAsignado,
                 contexto.TblUsuario.Where(u => u.IdUsuario == w.IdAsignado)
                     .Select(u => u.IdHorario).FirstOrDefault(),
-                w.IdComplejidad, w.FechaCompromiso, w.Activo)
+                w.IdComplejidad, w.FechaCompromiso, w.Activo, p.Administrado, p.IdCategoriaProyecto)
             ).FirstOrDefaultAsync(cancellationToken);
     }
 
@@ -104,7 +104,8 @@ public class WorkItemRepository(FabricaContexto fabrica, AuditContext auditoria)
         await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
         return await contexto.TblProyecto.AsNoTracking()
             .Where(p => p.IdProyecto == idProyecto)
-            .Select(p => new ProyectoResumen(p.IdProyecto, p.Clave, p.EsMantenimiento, p.Activo))
+            .Select(p => new ProyectoResumen(
+                p.IdProyecto, p.Clave, p.EsMantenimiento, p.Activo, p.IdEstatusProyecto, p.Administrado))
             .FirstOrDefaultAsync(cancellationToken);
     }
 
@@ -117,12 +118,22 @@ public class WorkItemRepository(FabricaContexto fabrica, AuditContext auditoria)
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    public async Task<int?> ObtenerMinutosMatrizAsync(int idComplejidad, int idNivel, CancellationToken cancellationToken = default)
+    public async Task<PresupuestoMatriz?> ObtenerPresupuestoMatrizAsync(int idComplejidad, int idNivel, CancellationToken cancellationToken = default)
     {
         await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
         return await contexto.TblMatrizPresupuesto.AsNoTracking()
             .Where(m => m.IdComplejidad == idComplejidad && m.IdNivel == idNivel && m.Activo)
-            .Select(m => (int?)m.Minutos)
+            .Select(m => new PresupuestoMatriz(m.Minutos, m.Puntos))
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<int?> ObtenerComplejidadPorDefectoAsync(CancellationToken cancellationToken = default)
+    {
+        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
+        return await contexto.TblComplejidad.AsNoTracking()
+            .Where(c => c.Activo)
+            .OrderBy(c => c.Orden)
+            .Select(c => (int?)c.IdComplejidad)
             .FirstOrDefaultAsync(cancellationToken);
     }
 

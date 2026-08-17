@@ -19,3 +19,8 @@ export function normalizarHtmlLegado(valor: string): string {
     .replaceAll(">", "&gt;");
   return escapado.split(/\r?\n/).join("<br>");
 }
+
+/** Texto plano aproximado de un HTML guardado por EditorEnriquecido, para previews (tooltips, listas) sin formato. */
+export function htmlATextoPlano(html: string): string {
+  return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+}

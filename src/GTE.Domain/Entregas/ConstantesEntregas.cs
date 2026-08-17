@@ -19,6 +19,7 @@ public static class AccionesRelease
     public const string DesplegarProd = "DESPLEGAR_PROD";
     public const string Rollback = "ROLLBACK";
     public const string Cancelar = "CANCELAR";
+    public const string Reabrir = "REABRIR";
 }
 
 /// <summary>IDs de dbo.tblEstatusAprobacion.</summary>

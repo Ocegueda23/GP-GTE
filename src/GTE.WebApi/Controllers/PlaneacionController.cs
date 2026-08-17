@@ -78,6 +78,15 @@ public class PlaneacionController(IMediator mediator) : ControllerBase
         return Ok(ApiResponse<BacklogResponse>.Exito(resultado));
     }
 
+    /// <summary>Backlog de todos los proyectos a la vez, solo lectura (consulta/busqueda).</summary>
+    [HttpGet("backlog")]
+    public async Task<ActionResult<ApiResponse<BacklogResponse>>> ObtenerBacklogGlobal(
+        [FromQuery] string? texto, CancellationToken cancellationToken)
+    {
+        var resultado = await mediator.Send(new ObtenerBacklogGlobalQuery(texto), cancellationToken);
+        return Ok(ApiResponse<BacklogResponse>.Exito(resultado));
+    }
+
     [HttpPut("backlog/orden")]
     public async Task<ActionResult<ApiResponse<object>>> ReordenarBacklog(
         [FromBody] ReordenarBacklogRequest request, CancellationToken cancellationToken)
@@ -98,9 +107,10 @@ public class PlaneacionController(IMediator mediator) : ControllerBase
 
     /* ---------- Tablero kanban ---------- */
 
-    [HttpGet("equipos/{idEquipo:int}/tablero")]
+    /// <summary>Sin idEquipo: vista consolidada de todos los equipos y usuarios a la vez.</summary>
+    [HttpGet("tablero")]
     public async Task<ActionResult<ApiResponse<TableroResponse>>> ObtenerTablero(
-        int idEquipo, CancellationToken cancellationToken)
+        [FromQuery] int? idEquipo, CancellationToken cancellationToken)
     {
         var resultado = await mediator.Send(new ObtenerTableroQuery(idEquipo), cancellationToken);
         return Ok(ApiResponse<TableroResponse>.Exito(resultado));

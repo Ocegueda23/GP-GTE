@@ -33,6 +33,8 @@ public partial class TblProyecto
 
     public bool EsMantenimiento { get; set; }
 
+    public bool Administrado { get; set; }
+
     public DateTime FechaRegistro { get; set; }
 
     public string UsuarioRegistro { get; set; } = null!;

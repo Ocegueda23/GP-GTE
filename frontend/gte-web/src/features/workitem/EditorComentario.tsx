@@ -105,7 +105,8 @@ function crearSugerenciaMenciones(usuarios: CatalogoItem[]) {
 }
 
 interface Props {
-  idWorkItem: number;
+  /** Solo WorkItem soporta hoy pegar imagenes en un comentario (adjunto real via tblArchivoVinculo). */
+  idWorkItemParaAdjuntos?: number;
   usuarios: CatalogoItem[];
   enviando: boolean;
   placeholder?: string;
@@ -114,7 +115,9 @@ interface Props {
 }
 
 /** Editor enriquecido para comentarios: formato basico, @menciones e imagenes pegadas del portapapeles. */
-export function EditorComentario({ idWorkItem, usuarios, enviando, placeholder, onEnviar, onError }: Props) {
+export function EditorComentario({
+  idWorkItemParaAdjuntos, usuarios, enviando, placeholder, onEnviar, onError,
+}: Props) {
   const clienteQuery = useQueryClient();
   const editor = useEditor({
     extensions: [
@@ -135,13 +138,17 @@ export function EditorComentario({ idWorkItem, usuarios, enviando, placeholder, 
         if (!archivo) return false;
 
         event.preventDefault();
-        subirArchivo(idWorkItem, archivo)
+        if (!idWorkItemParaAdjuntos) {
+          onError("No se pueden pegar imagenes aqui.");
+          return true;
+        }
+        subirArchivo(idWorkItemParaAdjuntos, archivo)
           .then((resultado) => {
             if (!resultado) return;
             const nodo = view.state.schema.nodes.imagenProtegida.create({ guid: resultado.dato.guidArchivo });
             view.dispatch(view.state.tr.replaceSelectionWith(nodo));
             // Tambien crea un adjunto real (tblArchivoVinculo): refleja en la pestana Adjuntos.
-            void clienteQuery.invalidateQueries({ queryKey: ["archivos", idWorkItem] });
+            void clienteQuery.invalidateQueries({ queryKey: ["archivos", idWorkItemParaAdjuntos] });
           })
           .catch((error: unknown) => {
             onError(error instanceof Error ? error.message : "No se pudo subir la imagen pegada.");
@@ -149,7 +156,7 @@ export function EditorComentario({ idWorkItem, usuarios, enviando, placeholder, 
         return true;
       },
     },
-  }, [idWorkItem]);
+  }, [idWorkItemParaAdjuntos]);
 
   const vacio = useEditorState({ editor, selector: ({ editor: instancia }) => instancia.isEmpty });
   const activo = useEditorState({

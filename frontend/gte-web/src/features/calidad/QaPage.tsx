@@ -10,6 +10,9 @@ import AddIcon from "@mui/icons-material/Add";
 import BugReportIcon from "@mui/icons-material/BugReport";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
+import { ComboBuscable } from "../../shared/components/ComboBuscable";
+import { EncabezadoOrdenable } from "../../shared/components/EncabezadoOrdenable";
+import { useOrdenTabla } from "../../shared/hooks/useOrdenTabla";
 import {
   RESULTADOS, crearBugDesdeEjecucion, crearCaso, crearCiclo, crearPlan,
   obtenerCasos, obtenerCiclos, obtenerMatriz, obtenerPlanes, registrarEjecucion,
@@ -34,6 +37,8 @@ export function QaPage() {
   const [pasoCaso, setPasoCaso] = useState("");
   const [idRequisito, setIdRequisito] = useState<number | "">("");
   const [enviando, setEnviando] = useState(false);
+  const [busquedaCasos, setBusquedaCasos] = useState("");
+  const [busquedaMatriz, setBusquedaMatriz] = useState("");
   const clienteQuery = useQueryClient();
 
   const catalogos = useQuery({
@@ -105,6 +110,22 @@ export function QaPage() {
 
   const cicloSeleccionado = ciclos.data?.find((c) => c.idCicloPrueba === cicloActual);
 
+  const casosFiltrados = (casos.data ?? []).filter((c) => {
+    const texto = busquedaCasos.trim().toLowerCase();
+    if (!texto) return true;
+    return (c.folio ?? "").toLowerCase().includes(texto) || c.titulo.toLowerCase().includes(texto);
+  });
+  const { datosOrdenados: casosOrdenados, ordenarPor: ordenCasos, descendente: descCasos, ordenar: ordenarCasos }
+    = useOrdenTabla(casosFiltrados);
+
+  const matrizFiltrada = (matriz.data ?? []).filter((f) => {
+    const texto = busquedaMatriz.trim().toLowerCase();
+    if (!texto) return true;
+    return f.folio.toLowerCase().includes(texto) || f.titulo.toLowerCase().includes(texto);
+  });
+  const { datosOrdenados: matrizOrdenada, ordenarPor: ordenMatriz, descendente: descMatriz, ordenar: ordenarMatriz }
+    = useOrdenTabla(matrizFiltrada);
+
   return (
     <Box sx={{ p: 2 }}>
       <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", mb: 2 }}>
@@ -121,24 +142,20 @@ export function QaPage() {
       </Stack>
 
       <Stack direction="row" spacing={2} sx={{ mb: 2, flexWrap: "wrap" }}>
-        <FormControl size="small" sx={{ minWidth: 260 }}>
-          <InputLabel>Plan de pruebas</InputLabel>
-          <Select label="Plan de pruebas" value={planActual ?? ""}
-            onChange={(e) => { setIdPlan(e.target.value as number); setIdCiclo(""); }}>
-            {planes.data?.map((p) => (
-              <MenuItem key={p.idPlanPrueba} value={p.idPlanPrueba}>{p.nombre}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <FormControl size="small" sx={{ minWidth: 200 }}>
-          <InputLabel>Ciclo</InputLabel>
-          <Select label="Ciclo" value={cicloActual ?? ""}
-            onChange={(e) => setIdCiclo(e.target.value as number)}>
-            {ciclos.data?.map((c) => (
-              <MenuItem key={c.idCicloPrueba} value={c.idCicloPrueba}>{c.nombre}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+        <ComboBuscable
+          label="Plan de pruebas"
+          value={planActual ?? ""}
+          onChange={(v) => { setIdPlan(v as number | ""); setIdCiclo(""); }}
+          opciones={(planes.data ?? []).map((p) => ({ valor: p.idPlanPrueba, etiqueta: p.nombre }))}
+          sx={{ minWidth: 260 }}
+        />
+        <ComboBuscable
+          label="Ciclo"
+          value={cicloActual ?? ""}
+          onChange={(v) => setIdCiclo(v as number | "")}
+          opciones={(ciclos.data ?? []).map((c) => ({ valor: c.idCicloPrueba, etiqueta: c.nombre }))}
+          sx={{ minWidth: 200 }}
+        />
         <Button size="small" disabled={planActual === undefined}
           onClick={() => void manejar(
             () => crearCiclo(planActual!, `Ciclo ${(ciclos.data?.length ?? 0) + 1}`),
@@ -170,20 +187,24 @@ export function QaPage() {
 
       {pestana === 0 && (
         <Paper variant="outlined">
+          <Box sx={{ p: 1.5 }}>
+            <TextField size="small" placeholder="Buscar folio o caso..." value={busquedaCasos}
+              onChange={(e) => setBusquedaCasos(e.target.value)} sx={{ minWidth: 280 }} />
+          </Box>
           <Table size="small">
             <TableHead>
               <TableRow sx={{ "& th": { fontWeight: 700, whiteSpace: "nowrap" } }}>
-                <TableCell>Folio</TableCell>
-                <TableCell>Caso</TableCell>
-                <TableCell>Tipo</TableCell>
-                <TableCell>Requisito</TableCell>
-                <TableCell>Ultimo resultado</TableCell>
-                <TableCell>Bug</TableCell>
+                <EncabezadoOrdenable clave="folio" ordenActual={ordenCasos} descendente={descCasos} onOrdenar={ordenarCasos}>Folio</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="titulo" ordenActual={ordenCasos} descendente={descCasos} onOrdenar={ordenarCasos}>Caso</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="tipoPrueba" ordenActual={ordenCasos} descendente={descCasos} onOrdenar={ordenarCasos}>Tipo</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="folioWorkItem" ordenActual={ordenCasos} descendente={descCasos} onOrdenar={ordenarCasos}>Requisito</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="idUltimoResultado" ordenActual={ordenCasos} descendente={descCasos} onOrdenar={ordenarCasos}>Ultimo resultado</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="folioBug" ordenActual={ordenCasos} descendente={descCasos} onOrdenar={ordenarCasos}>Bug</EncabezadoOrdenable>
                 <TableCell align="center">Acciones</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {casos.data?.length === 0 && (
+              {casosOrdenados.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={7}>
                     <Typography color="text.secondary" sx={{ py: 3, textAlign: "center" }}>
@@ -192,7 +213,7 @@ export function QaPage() {
                   </TableCell>
                 </TableRow>
               )}
-              {casos.data?.map((caso) => {
+              {casosOrdenados.map((caso) => {
                 const resultado = RESULTADOS.find((r) => r.id === caso.idUltimoResultado);
                 return (
                   <TableRow key={caso.idCasoPrueba} hover>
@@ -254,19 +275,23 @@ export function QaPage() {
 
       {pestana === 1 && (
         <Paper variant="outlined">
+          <Box sx={{ p: 1.5 }}>
+            <TextField size="small" placeholder="Buscar folio o titulo..." value={busquedaMatriz}
+              onChange={(e) => setBusquedaMatriz(e.target.value)} sx={{ minWidth: 280 }} />
+          </Box>
           <Table size="small">
             <TableHead>
               <TableRow sx={{ "& th": { fontWeight: 700 } }}>
-                <TableCell>Requisito</TableCell>
-                <TableCell>Titulo</TableCell>
-                <TableCell align="center">Casos</TableCell>
-                <TableCell align="center">Pasa</TableCell>
-                <TableCell align="center">Falla</TableCell>
+                <EncabezadoOrdenable clave="folio" ordenActual={ordenMatriz} descendente={descMatriz} onOrdenar={ordenarMatriz}>Requisito</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="titulo" ordenActual={ordenMatriz} descendente={descMatriz} onOrdenar={ordenarMatriz}>Titulo</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="totalCasos" ordenActual={ordenMatriz} descendente={descMatriz} onOrdenar={ordenarMatriz} align="center">Casos</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="casosPasa" ordenActual={ordenMatriz} descendente={descMatriz} onOrdenar={ordenarMatriz} align="center">Pasa</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="casosFalla" ordenActual={ordenMatriz} descendente={descMatriz} onOrdenar={ordenarMatriz} align="center">Falla</EncabezadoOrdenable>
                 <TableCell>Cobertura</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {matriz.data?.map((fila) => (
+              {matrizOrdenada.map((fila) => (
                 <TableRow key={fila.idWorkItem} hover
                   sx={{ backgroundColor: fila.sinCobertura ? "#fff8e1" : undefined }}>
                   <TableCell sx={{ whiteSpace: "nowrap" }}>
@@ -321,15 +346,13 @@ export function QaPage() {
       <Dialog open={modalPlan} onClose={() => setModalPlan(false)} fullWidth maxWidth="sm">
         <DialogTitle>Nuevo plan de pruebas</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
-          <FormControl size="small" required>
-            <InputLabel>Proyecto</InputLabel>
-            <Select label="Proyecto" value={idProyectoPlan}
-              onChange={(e) => setIdProyectoPlan(e.target.value as number)}>
-              {catalogos.data?.proyectos.map((p) => (
-                <MenuItem key={p.id} value={p.id}>{p.clave} - {p.nombre}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <ComboBuscable
+            label="Proyecto"
+            required
+            value={idProyectoPlan}
+            onChange={(v) => setIdProyectoPlan(v as number | "")}
+            opciones={(catalogos.data?.proyectos ?? []).map((p) => ({ valor: p.id, etiqueta: `${p.clave} - ${p.nombre}` }))}
+          />
           <TextField size="small" required label="Nombre del plan" value={nombrePlan}
             onChange={(e) => setNombrePlan(e.target.value)} />
         </DialogContent>
@@ -355,18 +378,17 @@ export function QaPage() {
           <TextField size="small" label="Primer paso" value={pasoCaso}
             onChange={(e) => setPasoCaso(e.target.value)}
             helperText="Los pasos adicionales se agregan editando el caso" />
-          <FormControl size="small">
-            <InputLabel>Requisito que cubre</InputLabel>
-            <Select label="Requisito que cubre" value={idRequisito}
-              onChange={(e) => setIdRequisito(e.target.value as number | "")}>
-              <MenuItem value="">Sin vincular</MenuItem>
-              {requisitos.data?.items.map((item) => (
-                <MenuItem key={item.idWorkItem} value={item.idWorkItem}>
-                  {item.folio} - {item.titulo}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <ComboBuscable
+            label="Requisito que cubre"
+            value={idRequisito}
+            onChange={(v) => setIdRequisito(v as number | "")}
+            opciones={[
+              { valor: "", etiqueta: "Sin vincular" },
+              ...(requisitos.data?.items ?? []).map((item) => ({
+                valor: item.idWorkItem, etiqueta: `${item.folio} - ${item.titulo}`,
+              })),
+            ]}
+          />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setModalCaso(false)}>Cancelar</Button>

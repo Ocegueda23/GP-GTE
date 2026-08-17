@@ -63,7 +63,8 @@ public class AdministracionQueryService(FabricaContexto fabrica) : IAdministraci
                    FechaFinPlan = p.FechaFinPlan,
                    FechaInicioReal = p.FechaInicioReal,
                    FechaFinReal = p.FechaFinReal,
-                   EsMantenimiento = p.EsMantenimiento
+                   EsMantenimiento = p.EsMantenimiento,
+                   Administrado = p.Administrado
                };
     }
 
@@ -169,6 +170,12 @@ public class AdministracionQueryService(FabricaContexto fabrica) : IAdministraci
                from horario in horarios.DefaultIfEmpty()
                join jefe in contexto.TblUsuario.AsNoTracking() on u.IdJefe equals jefe.IdUsuario into jefes
                from jefe in jefes.DefaultIfEmpty()
+               join vinculoFoto in contexto.TblArchivoVinculo.AsNoTracking().Where(v => v.Activo && v.Entidad == "Usuario")
+                   on u.IdUsuario equals vinculoFoto.IdEntidad into vinculosFoto
+               from vinculoFoto in vinculosFoto.DefaultIfEmpty()
+               join archivoFoto in contexto.TblArchivo.AsNoTracking().Where(a => a.Activo)
+                   on (vinculoFoto == null ? (int?)null : vinculoFoto.IdArchivo) equals archivoFoto.IdArchivo into archivosFoto
+               from archivoFoto in archivosFoto.DefaultIfEmpty()
                select new UsuarioResponse
                {
                    IdUsuario = u.IdUsuario,
@@ -186,7 +193,8 @@ public class AdministracionQueryService(FabricaContexto fabrica) : IAdministraci
                    EsExterno = u.EsExterno,
                    FechaAlta = u.FechaAlta,
                    FechaBaja = u.FechaBaja,
-                   Activo = u.Activo
+                   Activo = u.Activo,
+                   UrlFoto = archivoFoto != null ? "/api/v1/archivos/" + archivoFoto.GuidArchivo : null
                };
     }
 
@@ -396,6 +404,58 @@ public class AdministracionQueryService(FabricaContexto fabrica) : IAdministraci
                    BaseDatos = a.BaseDatos,
                    IdResponsable = a.IdResponsable,
                    Responsable = r != null ? r.Nombre : null
+               };
+    }
+
+    /* ---------- Areas ---------- */
+
+    public async Task<IReadOnlyList<AreaResponse>> ObtenerAreasAsync(CancellationToken cancellationToken = default)
+    {
+        await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
+        return await contexto.TblArea.AsNoTracking()
+            .Where(a => a.Activo)
+            .OrderBy(a => a.Nombre)
+            .Select(a => new AreaResponse { IdArea = a.IdArea, Nombre = a.Nombre })
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<AreaResponse?> ObtenerAreaAsync(int idArea, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
+        return await contexto.TblArea.AsNoTracking()
+            .Where(a => a.IdArea == idArea)
+            .Select(a => new AreaResponse { IdArea = a.IdArea, Nombre = a.Nombre })
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    /* ---------- Puestos ---------- */
+
+    public async Task<IReadOnlyList<PuestoResponse>> ObtenerPuestosAsync(CancellationToken cancellationToken = default)
+    {
+        await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
+        return await ProyectarPuestos(contexto.TblPuesto.AsNoTracking().Where(p => p.Activo), contexto)
+            .OrderBy(p => p.Nombre)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<PuestoResponse?> ObtenerPuestoAsync(int idPuesto, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
+        return await ProyectarPuestos(contexto.TblPuesto.AsNoTracking().Where(p => p.IdPuesto == idPuesto), contexto)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private static IQueryable<PuestoResponse> ProyectarPuestos(IQueryable<TblPuesto> puestos, DbContextGTE contexto)
+    {
+        return from p in puestos
+               join a in contexto.TblArea.AsNoTracking() on p.IdArea equals a.IdArea into areas
+               from a in areas.DefaultIfEmpty()
+               select new PuestoResponse
+               {
+                   IdPuesto = p.IdPuesto,
+                   Nombre = p.Nombre,
+                   IdArea = p.IdArea,
+                   Area = a != null ? a.Nombre : null
                };
     }
 }

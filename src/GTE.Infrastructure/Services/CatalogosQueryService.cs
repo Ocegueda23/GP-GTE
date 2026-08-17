@@ -8,9 +8,14 @@ namespace GTE.Infrastructure.Services;
 public class CatalogosQueryService(FabricaContexto fabrica) : ICatalogosQueryService
 {
     public async Task<CatalogosBandejaResponse> ObtenerCatalogosBandejaAsync(
-        CancellationToken cancellationToken = default)
+        int idUsuario, CancellationToken cancellationToken = default)
     {
         await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
+
+        var idsEquiposUsuario = await contexto.TblEquipoMiembro.AsNoTracking()
+            .Where(m => m.IdUsuario == idUsuario && m.Activo)
+            .Select(m => m.IdEquipo)
+            .ToListAsync(cancellationToken);
 
         return new CatalogosBandejaResponse
         {
@@ -29,10 +34,19 @@ public class CatalogosQueryService(FabricaContexto fabrica) : ICatalogosQuerySer
                 .OrderBy(p => p.Id)
                 .Select(p => new CatalogoItemResponse { Id = p.Id, Nombre = p.Nombre })
                 .ToListAsync(cancellationToken),
+            // Solo proyectos donde el usuario es responsable o pertenece al equipo asignado.
             Proyectos = await contexto.TblProyecto.AsNoTracking()
                 .Where(p => p.Activo)
+                .Where(p => p.IdResponsable == idUsuario
+                    || (p.IdEquipo != null && idsEquiposUsuario.Contains(p.IdEquipo.Value)))
                 .OrderBy(p => p.Nombre)
-                .Select(p => new ProyectoItemResponse { Id = p.IdProyecto, Clave = p.Clave, Nombre = p.Nombre })
+                .Select(p => new ProyectoItemResponse
+                {
+                    Id = p.IdProyecto,
+                    Clave = p.Clave,
+                    Nombre = p.Nombre,
+                    CategoriaProyecto = p.IdCategoriaProyectoNavigation.Nombre,
+                })
                 .ToListAsync(cancellationToken),
             Usuarios = await contexto.TblUsuario.AsNoTracking()
                 .Where(u => u.Activo)

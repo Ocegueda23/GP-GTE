@@ -1,5 +1,9 @@
+using GTE.Application.Comentarios.Commands;
+using GTE.Application.Comentarios.Queries;
 using GTE.Application.Common;
+using GTE.Application.DTOs.Request.Comentarios;
 using GTE.Application.DTOs.Request.Soporte;
+using GTE.Application.DTOs.Responses.Comentarios;
 using GTE.Application.DTOs.Responses.Soporte;
 using GTE.Application.DTOs.Responses.WorkItems;
 using GTE.Application.Interfaces;
@@ -43,9 +47,11 @@ public class TicketsController(IMediator mediator) : ControllerBase
         [FromQuery(Name = "estatus")] int[]? estatus = null,
         [FromQuery] string? texto = null,
         [FromQuery] int? idAsignado = null,
+        [FromQuery] string? ordenarPor = null,
+        [FromQuery] bool ordenDescendente = false,
         CancellationToken cancellationToken = default)
     {
-        var filtro = new FiltroBandejaTicket(page, pageSize, estatus, texto, idAsignado);
+        var filtro = new FiltroBandejaTicket(page, pageSize, estatus, texto, idAsignado, ordenarPor, ordenDescendente);
         var resultado = await mediator.Send(new ObtenerBandejaTicketsQuery(filtro), cancellationToken);
         return Ok(ApiResponse<PagedResult<TicketResponse>>.Exito(resultado));
     }
@@ -99,5 +105,23 @@ public class TicketsController(IMediator mediator) : ControllerBase
     {
         var resultado = await mediator.Send(new RegistrarEncuestaTicketCommand(id, request), cancellationToken);
         return Ok(ApiResponse<TicketResponse>.Exito(resultado, "Gracias por tu calificacion."));
+    }
+
+    /// <summary>Comentarios del ticket: hilo visible tanto para el solicitante como para el agente.</summary>
+    [HttpGet("{id:int}/comentarios")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<ComentarioResponse>>>> ObtenerComentarios(
+        int id, CancellationToken cancellationToken)
+    {
+        var resultado = await mediator.Send(new ObtenerComentariosTicketQuery(id), cancellationToken);
+        return Ok(ApiResponse<IReadOnlyList<ComentarioResponse>>.Exito(resultado));
+    }
+
+    /// <summary>El solicitante siempre puede comentar su propio ticket; cualquier otro usuario necesita TKT.Atender.</summary>
+    [HttpPost("{id:int}/comentarios")]
+    public async Task<ActionResult<ApiResponse<ComentarioResponse>>> Comentar(
+        int id, [FromBody] ComentarioCrearRequest request, CancellationToken cancellationToken)
+    {
+        var resultado = await mediator.Send(new CrearComentarioTicketCommand(id, request), cancellationToken);
+        return Ok(ApiResponse<ComentarioResponse>.Exito(resultado, "Comentario publicado."));
     }
 }

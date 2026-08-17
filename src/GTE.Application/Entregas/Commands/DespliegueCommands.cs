@@ -21,6 +21,8 @@ public class CambiarEstatusReleaseValidator : AbstractValidator<CambiarEstatusRe
         RuleFor(c => c.IdRelease).GreaterThan(0);
         RuleFor(c => c.Accion).NotEmpty().MaximumLength(50);
         RuleFor(c => c.Motivo).MaximumLength(500);
+        RuleFor(c => c.Motivo).NotEmpty().When(c => c.Accion == AccionesRelease.Reabrir)
+            .WithMessage("Explica por que reabres el release.");
     }
 }
 
@@ -28,6 +30,9 @@ public class CambiarEstatusReleaseValidator : AbstractValidator<CambiarEstatusRe
 /// SOLICITAR_APROBACION congela el contenido y crea la cadena de firmas, validando antes
 /// la calidad del release (RN-QA-01: sin fallas de prueba sin bug ni bugs S1/S2 abiertos)
 /// y el rollback de los scripts (RN-REL-02). CANCELAR y ROLLBACK usan la misma puerta.
+/// REABRIR regresa un release ya Aprobado a preparacion (para agregar contenido o
+/// artefactos que hicieron falta) e invalida la cadena de firmas vigente: como deshace
+/// aprobaciones ya puestas, exige el mismo permiso que firmar, no el de solo preparar.
 /// </summary>
 public class CambiarEstatusReleaseHandler(
     IEntregaRepository repositorio,
@@ -41,9 +46,12 @@ public class CambiarEstatusReleaseHandler(
         var release = await repositorio.ObtenerEstadoAsync(command.IdRelease, cancellationToken)
             ?? throw new NotFoundException("Release", command.IdRelease);
 
-        var permisoRequerido = command.Accion == AccionesRelease.Rollback
-            ? PermisosEntregas.Desplegar
-            : PermisosEntregas.Crear;
+        var permisoRequerido = command.Accion switch
+        {
+            AccionesRelease.Rollback => PermisosEntregas.Desplegar,
+            AccionesRelease.Reabrir => PermisosEntregas.Aprobar,
+            _ => PermisosEntregas.Crear,
+        };
         await permisos.ExigirPermisoAsync(permisoRequerido, release.IdProyecto, cancellationToken);
 
         if (command.Accion == AccionesRelease.SolicitarAprobacion)
@@ -59,6 +67,10 @@ public class CambiarEstatusReleaseHandler(
         {
             await repositorio.CrearCadenaAprobacionAsync(
                 command.IdRelease, RolesAprobacion.Cadena, cancellationToken);
+        }
+        else if (command.Accion == AccionesRelease.Reabrir)
+        {
+            await repositorio.InvalidarCadenaAprobacionAsync(command.IdRelease, cancellationToken);
         }
 
         return await consultas.ObtenerDetalleAsync(command.IdRelease, cancellationToken)

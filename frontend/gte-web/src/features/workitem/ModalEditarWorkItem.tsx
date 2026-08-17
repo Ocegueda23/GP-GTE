@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import {
-  Button, Dialog, DialogActions, DialogContent, DialogTitle,
-  FormControl, InputLabel, MenuItem, Select, TextField,
+  Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField,
 } from "@mui/material";
 import { useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
+import { ComboBuscable } from "../../shared/components/ComboBuscable";
 import { EditorEnriquecido } from "../../shared/editor/EditorEnriquecido";
 import {
   actualizarWorkItem, type CatalogosBandeja, type WorkItemDetalle,
@@ -29,7 +29,6 @@ export function ModalEditarWorkItem({ abierto, item, catalogos, alCerrar, alExit
   const [idComplejidad, setIdComplejidad] = useState<number | "">(item.idComplejidad ?? "");
   const [idAsignado, setIdAsignado] = useState<number | "">(item.idAsignado ?? "");
   const [compromiso, setCompromiso] = useState(item.fechaCompromiso?.slice(0, 10) ?? "");
-  const [puntos, setPuntos] = useState(item.puntosHistoria?.toString() ?? "");
   const [enviando, setEnviando] = useState(false);
   const clienteQuery = useQueryClient();
 
@@ -42,10 +41,9 @@ export function ModalEditarWorkItem({ abierto, item, catalogos, alCerrar, alExit
     setIdComplejidad(item.idComplejidad ?? "");
     setIdAsignado(item.idAsignado ?? "");
     setCompromiso(item.fechaCompromiso?.slice(0, 10) ?? "");
-    setPuntos(item.puntosHistoria?.toString() ?? "");
   }, [abierto, item]);
 
-  const valido = titulo.trim().length > 0 && idPrioridad !== "";
+  const valido = titulo.trim().length > 0 && idPrioridad !== "" && idComplejidad !== "";
 
   const guardar = async () => {
     if (!valido) return;
@@ -56,10 +54,9 @@ export function ModalEditarWorkItem({ abierto, item, catalogos, alCerrar, alExit
         descripcion: descripcion.trim() || null,
         criteriosAceptacion: criterios.trim() || null,
         idPrioridad: idPrioridad as number,
-        idComplejidad: idComplejidad === "" ? null : (idComplejidad as number),
+        idComplejidad: idComplejidad as number,
         idAsignado: idAsignado === "" ? null : (idAsignado as number),
         fechaCompromiso: compromiso || null,
-        puntosHistoria: puntos === "" ? null : Number(puntos),
       });
       alExito(mensaje);
       alCerrar();
@@ -95,44 +92,39 @@ export function ModalEditarWorkItem({ abierto, item, catalogos, alCerrar, alExit
           size="small" label="Criterios de aceptacion" multiline minRows={2}
           value={criterios} onChange={(e) => setCriterios(e.target.value)}
         />
-        <FormControl size="small" required>
-          <InputLabel>Prioridad</InputLabel>
-          <Select label="Prioridad" value={idPrioridad}
-            onChange={(e) => setIdPrioridad(e.target.value as number | "")}>
-            {catalogos?.prioridades.map((p) => (
-              <MenuItem key={p.id} value={p.id}>{p.nombre}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <FormControl size="small">
-          <InputLabel>Complejidad</InputLabel>
-          <Select label="Complejidad" value={idComplejidad}
-            onChange={(e) => setIdComplejidad(e.target.value as number | "")}>
-            <MenuItem value="">Sin definir</MenuItem>
-            {catalogos?.complejidades.map((c) => (
-              <MenuItem key={c.id} value={c.id}>{c.nombre}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <FormControl size="small">
-          <InputLabel>Asignado</InputLabel>
-          <Select label="Asignado" value={idAsignado}
-            onChange={(e) => setIdAsignado(e.target.value as number | "")}>
-            <MenuItem value="">Sin asignar</MenuItem>
-            {catalogos?.usuarios.map((u) => (
-              <MenuItem key={u.id} value={u.id}>{u.nombre}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+        <ComboBuscable
+          label="Prioridad"
+          required
+          value={idPrioridad}
+          onChange={(v) => setIdPrioridad(v as number | "")}
+          opciones={(catalogos?.prioridades ?? []).map((p) => ({ valor: p.id, etiqueta: p.nombre }))}
+        />
+        <ComboBuscable
+          label="Complejidad"
+          required
+          value={idComplejidad}
+          onChange={(v) => setIdComplejidad(v as number | "")}
+          opciones={(catalogos?.complejidades ?? []).map((c) => ({ valor: c.id, etiqueta: c.nombre }))}
+        />
+        <ComboBuscable
+          label="Asignado"
+          value={idAsignado}
+          onChange={(v) => setIdAsignado(v as number | "")}
+          opciones={[
+            { valor: "", etiqueta: "Sin asignar" },
+            ...(catalogos?.usuarios ?? []).map((u) => ({ valor: u.id, etiqueta: u.nombre })),
+          ]}
+        />
         <TextField
           size="small" type="date" label="Fecha compromiso"
           value={compromiso} onChange={(e) => setCompromiso(e.target.value)}
           slotProps={{ inputLabel: { shrink: true } }}
         />
         <TextField
-          size="small" type="number" label="Puntos de historia"
-          value={puntos} onChange={(e) => setPuntos(e.target.value)}
-          slotProps={{ htmlInput: { min: 0 } }}
+          size="small" label="Puntos de historia (automatico)"
+          value={item.puntosHistoria ?? "Sin calcular"}
+          disabled
+          helperText="Se calcula solo de la matriz Complejidad x Nivel al asignar o cambiar complejidad."
         />
       </DialogContent>
       <DialogActions>

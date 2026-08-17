@@ -23,4 +23,6 @@ public class RegistroTiempoResponse
     public string? Descripcion { get; set; }
     public string Usuario { get; set; } = string.Empty;
     public DateTime FechaRegistro { get; set; }
+    /// <summary>Folio de la subtarea de origen; null cuando el registro es del propio WorkItem consultado.</summary>
+    public string? FolioOrigen { get; set; }
 }

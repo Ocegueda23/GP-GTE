@@ -3,7 +3,7 @@ import { Link as RouterLink } from "react-router-dom";
 import {
   Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
   Divider, FormControl, InputLabel, LinearProgress, Link, MenuItem, Paper, Select,
-  Snackbar, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField,
+  Snackbar, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField,
   Tooltip, Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
@@ -11,6 +11,9 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
+import { ComboBuscable, ComboBuscableMultiple } from "../../shared/components/ComboBuscable";
+import { EncabezadoOrdenable } from "../../shared/components/EncabezadoOrdenable";
+import { useOrdenTabla } from "../../shared/hooks/useOrdenTabla";
 import {
   agregarArtefacto, agregarContenido, cambiarEstatusRelease, colorEstatusRelease,
   crearRelease, generarNotas, obtenerMatrizAmbientes, obtenerRelease, obtenerReleases,
@@ -33,6 +36,8 @@ export function ReleasesPage() {
   const [modalArtefacto, setModalArtefacto] = useState(false);
   const [modalDespliegue, setModalDespliegue] = useState(false);
   const [modalRechazo, setModalRechazo] = useState<number | null>(null);
+  const [modalReabrir, setModalReabrir] = useState(false);
+  const [motivoReabrir, setMotivoReabrir] = useState("");
   const [idProyectoNuevo, setIdProyectoNuevo] = useState<number | "">("");
   const [version, setVersion] = useState("");
   const [seleccionados, setSeleccionados] = useState<number[]>([]);
@@ -44,6 +49,8 @@ export function ReleasesPage() {
   const [bitacora, setBitacora] = useState("");
   const [comentario, setComentario] = useState("");
   const [enviando, setEnviando] = useState(false);
+  const [busquedaMatriz, setBusquedaMatriz] = useState("");
+  const [busquedaReleases, setBusquedaReleases] = useState("");
   const clienteQuery = useQueryClient();
 
   const catalogos = useQuery({
@@ -66,7 +73,25 @@ export function ReleasesPage() {
     enabled: modalContenido && detalle.data !== undefined,
   });
 
+  const releasesFiltrados = (releases.data ?? []).filter((rel) => {
+    const texto = busquedaReleases.trim().toLowerCase();
+    if (!texto) return true;
+    return rel.claveProyecto.toLowerCase().includes(texto)
+      || rel.proyecto.toLowerCase().includes(texto)
+      || rel.version.toLowerCase().includes(texto)
+      || (rel.folio ?? "").toLowerCase().includes(texto);
+  });
+  const { datosOrdenados: releasesOrdenados, ordenarPor: ordenReleases, descendente: descReleases, ordenar: ordenarReleases }
+    = useOrdenTabla(releasesFiltrados);
+
   const matriz = useQuery({ queryKey: ["matriz-ambientes"], queryFn: obtenerMatrizAmbientes });
+  const matrizFiltrada = (matriz.data ?? []).filter((f) => {
+    const texto = busquedaMatriz.trim().toLowerCase();
+    if (!texto) return true;
+    return f.ambiente.toLowerCase().includes(texto) || (f.claveProyecto ?? "").toLowerCase().includes(texto);
+  });
+  const { datosOrdenados: matrizOrdenada, ordenarPor: ordenMatriz, descendente: descMatriz, ordenar: ordenarMatriz }
+    = useOrdenTabla(matrizFiltrada);
 
   const refrescar = () => Promise.all([
     clienteQuery.invalidateQueries({ queryKey: ["releases"] }),
@@ -106,23 +131,56 @@ export function ReleasesPage() {
     <Box sx={{ p: 2 }}>
       <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", mb: 2 }}>
         <Typography variant="h5" sx={{ fontWeight: 700 }}>Releases</Typography>
-        <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
-          <FormControl size="small" sx={{ minWidth: 240 }}>
-            <InputLabel>Release</InputLabel>
-            <Select label="Release" value={actual ?? ""}
-              onChange={(e) => setIdRelease(e.target.value as number)}>
-              {releases.data?.map((rel) => (
-                <MenuItem key={rel.idRelease} value={rel.idRelease}>
-                  {rel.claveProyecto} {rel.version} ({rel.estatus})
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setModalNuevo(true)}>
-            Nuevo release
-          </Button>
-        </Stack>
+        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setModalNuevo(true)}>
+          Nuevo release
+        </Button>
       </Stack>
+
+      <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+          Todos los releases ({releasesFiltrados.length})
+        </Typography>
+        <TextField size="small" placeholder="Buscar proyecto, version o folio..." value={busquedaReleases}
+          onChange={(e) => setBusquedaReleases(e.target.value)} sx={{ mb: 1.5, minWidth: 280 }} />
+        <TableContainer sx={{ maxHeight: 360, overflowY: "auto" }}>
+          <Table size="small" stickyHeader>
+            <TableHead>
+              <TableRow sx={{ "& th": { fontWeight: 700 } }}>
+                <EncabezadoOrdenable clave="folio" ordenActual={ordenReleases} descendente={descReleases} onOrdenar={ordenarReleases}>Folio</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="claveProyecto" ordenActual={ordenReleases} descendente={descReleases} onOrdenar={ordenarReleases}>Proyecto</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="version" ordenActual={ordenReleases} descendente={descReleases} onOrdenar={ordenarReleases}>Version</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="estatus" ordenActual={ordenReleases} descendente={descReleases} onOrdenar={ordenarReleases}>Estatus</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="fechaPlan" ordenActual={ordenReleases} descendente={descReleases} onOrdenar={ordenarReleases}>Fecha plan</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="fechaLiberacion" ordenActual={ordenReleases} descendente={descReleases} onOrdenar={ordenarReleases}>Liberado</EncabezadoOrdenable>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {releasesOrdenados.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6}>
+                    <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: "center" }}>
+                      Sin releases con esa busqueda.
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              )}
+              {releasesOrdenados.map((rel) => (
+                <TableRow key={rel.idRelease} hover selected={rel.idRelease === actual}
+                  sx={{ cursor: "pointer" }} onClick={() => setIdRelease(rel.idRelease)}>
+                  <TableCell sx={{ whiteSpace: "nowrap" }}>{rel.folio ?? "-"}</TableCell>
+                  <TableCell sx={{ whiteSpace: "nowrap" }}>{rel.claveProyecto} - {rel.proyecto}</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>{rel.version}</TableCell>
+                  <TableCell>
+                    <Chip size="small" label={rel.estatus} color={colorEstatusRelease(rel.idEstatus)} />
+                  </TableCell>
+                  <TableCell>{formatearFecha(rel.fechaPlan)}</TableCell>
+                  <TableCell>{formatearFecha(rel.fechaLiberacion)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
 
       {releases.data?.length === 0 && (
         <Alert severity="info">No hay releases. Crea uno para empezar a preparar una entrega.</Alert>
@@ -167,6 +225,12 @@ export function ReleasesPage() {
                 {(r.idEstatus === 3 || r.idEstatus === 4) && (
                   <Button size="small" variant="contained" onClick={() => setModalDespliegue(true)}>
                     Registrar despliegue
+                  </Button>
+                )}
+                {r.idEstatus === 3 && (
+                  <Button size="small" color="warning" variant="outlined"
+                    onClick={() => setModalReabrir(true)}>
+                    Reabrir
                   </Button>
                 )}
                 <Button size="small" onClick={() => void manejar(
@@ -329,17 +393,19 @@ export function ReleasesPage() {
         <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
           Version viva por ambiente
         </Typography>
+        <TextField size="small" placeholder="Buscar ambiente o proyecto..." value={busquedaMatriz}
+          onChange={(e) => setBusquedaMatriz(e.target.value)} sx={{ mb: 1.5, minWidth: 280 }} />
         <Table size="small">
           <TableHead>
             <TableRow sx={{ "& th": { fontWeight: 700 } }}>
-              <TableCell>Ambiente</TableCell>
-              <TableCell>Proyecto</TableCell>
-              <TableCell>Version</TableCell>
-              <TableCell>Desplegado</TableCell>
+              <EncabezadoOrdenable clave="ambiente" ordenActual={ordenMatriz} descendente={descMatriz} onOrdenar={ordenarMatriz}>Ambiente</EncabezadoOrdenable>
+              <EncabezadoOrdenable clave="claveProyecto" ordenActual={ordenMatriz} descendente={descMatriz} onOrdenar={ordenarMatriz}>Proyecto</EncabezadoOrdenable>
+              <EncabezadoOrdenable clave="versionDesplegada" ordenActual={ordenMatriz} descendente={descMatriz} onOrdenar={ordenarMatriz}>Version</EncabezadoOrdenable>
+              <EncabezadoOrdenable clave="fechaDespliegue" ordenActual={ordenMatriz} descendente={descMatriz} onOrdenar={ordenarMatriz}>Desplegado</EncabezadoOrdenable>
             </TableRow>
           </TableHead>
           <TableBody>
-            {matriz.data?.map((fila) => (
+            {matrizOrdenada.map((fila) => (
               <TableRow key={fila.idAmbiente}>
                 <TableCell><Chip size="small" label={fila.ambiente} /></TableCell>
                 <TableCell>{fila.claveProyecto ?? "-"}</TableCell>
@@ -354,15 +420,13 @@ export function ReleasesPage() {
       <Dialog open={modalNuevo} onClose={() => setModalNuevo(false)} fullWidth maxWidth="xs">
         <DialogTitle>Nuevo release</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
-          <FormControl size="small" required>
-            <InputLabel>Proyecto</InputLabel>
-            <Select label="Proyecto" value={idProyectoNuevo}
-              onChange={(e) => setIdProyectoNuevo(e.target.value as number)}>
-              {catalogos.data?.proyectos.map((p) => (
-                <MenuItem key={p.id} value={p.id}>{p.clave} - {p.nombre}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <ComboBuscable
+            label="Proyecto"
+            required
+            value={idProyectoNuevo}
+            onChange={(v) => setIdProyectoNuevo(v as number | "")}
+            opciones={(catalogos.data?.proyectos ?? []).map((p) => ({ valor: p.id, etiqueta: `${p.clave} - ${p.nombre}` }))}
+          />
           <TextField size="small" required label="Version" value={version} placeholder="2.11.0"
             onChange={(e) => setVersion(e.target.value)}
             helperText="Versionado semantico" />
@@ -384,18 +448,15 @@ export function ReleasesPage() {
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
             Solo aparecen los elementos terminados del proyecto.
           </Typography>
-          <FormControl size="small" fullWidth>
-            <InputLabel>Elementos</InputLabel>
-            <Select multiple label="Elementos" value={seleccionados}
-              onChange={(e) => setSeleccionados(e.target.value as number[])}
-              renderValue={(sel) => `${sel.length} seleccionado(s)`}>
-              {candidatos.data?.items.map((item) => (
-                <MenuItem key={item.idWorkItem} value={item.idWorkItem}>
-                  {item.folio} - {item.titulo}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <ComboBuscableMultiple
+            label="Elementos"
+            resumenSimple
+            value={seleccionados}
+            onChange={(valores) => setSeleccionados(valores as number[])}
+            opciones={(candidatos.data?.items ?? []).map((item) => ({
+              valor: item.idWorkItem, etiqueta: `${item.folio} - ${item.titulo}`,
+            }))}
+          />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setModalContenido(false)}>Cancelar</Button>
@@ -451,15 +512,13 @@ export function ReleasesPage() {
       <Dialog open={modalDespliegue} onClose={() => setModalDespliegue(false)} fullWidth maxWidth="xs">
         <DialogTitle>Registrar despliegue</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
-          <FormControl size="small" required>
-            <InputLabel>Ambiente</InputLabel>
-            <Select label="Ambiente" value={idAmbiente}
-              onChange={(e) => setIdAmbiente(e.target.value as number)}>
-              {matriz.data?.map((a) => (
-                <MenuItem key={a.idAmbiente} value={a.idAmbiente}>{a.ambiente}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <ComboBuscable
+            label="Ambiente"
+            required
+            value={idAmbiente}
+            onChange={(v) => setIdAmbiente(v as number | "")}
+            opciones={(matriz.data ?? []).map((a) => ({ valor: a.idAmbiente, etiqueta: a.ambiente }))}
+          />
           <FormControl size="small">
             <InputLabel>Tipo</InputLabel>
             <Select label="Tipo" value={esRollback ? 1 : 0}
@@ -505,6 +564,31 @@ export function ReleasesPage() {
                 setComentario(""); return res;
               }), "No se pudo rechazar."); }}>
             Rechazar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={modalReabrir} onClose={() => setModalReabrir(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Reabrir release</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            El release regresa a preparacion para agregar contenido o artefactos. Esto invalida
+            las firmas ya puestas: al volver a solicitar aprobacion, QA/Lider/Negocio deben firmar
+            de nuevo.
+          </Typography>
+          <TextField autoFocus fullWidth multiline minRows={2} margin="dense"
+            label="Motivo de la reapertura (obligatorio)"
+            value={motivoReabrir} onChange={(e) => setMotivoReabrir(e.target.value)} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setModalReabrir(false)}>Cancelar</Button>
+          <Button variant="contained" color="warning"
+            disabled={enviando || !motivoReabrir.trim()}
+            onClick={() => { setModalReabrir(false); void manejar(
+              () => cambiarEstatusRelease(r!.idRelease, "REABRIR", motivoReabrir.trim()).then((res) => {
+                setMotivoReabrir(""); return res;
+              }), "No se pudo reabrir el release."); }}>
+            Reabrir
           </Button>
         </DialogActions>
       </Dialog>

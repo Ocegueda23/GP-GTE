@@ -33,3 +33,21 @@ public record ColumnaTablero(
     int IdEstatusWorkItem,
     int Orden,
     int? LimiteWip);
+
+/// <summary>
+/// Mapeo estandar de columnas de tablero (estatus abiertos + Terminado), unica fuente de
+/// verdad: lo usa PlaneacionRepository para aprovisionar el tablero de un equipo nuevo y
+/// PlaneacionQueryService para la vista consolidada "todos los equipos" (que no tiene un
+/// TblTablero propio del que leer columnas).
+/// </summary>
+public static class ColumnasTableroEstandar
+{
+    public static readonly IReadOnlyList<(string Nombre, int IdEstatus, int Orden, int? Wip)> Columnas =
+    [
+        ("Pendiente",  WorkItems.EstatusWorkItem.Pendiente,  1, null),
+        ("En proceso", WorkItems.EstatusWorkItem.EnProceso,  2, 5),
+        ("En pruebas", WorkItems.EstatusWorkItem.EnPruebas,  3, 5),
+        ("Correccion", WorkItems.EstatusWorkItem.Correccion, 4, null),
+        ("Terminado",  WorkItems.EstatusWorkItem.Terminado,  5, null)
+    ];
+}

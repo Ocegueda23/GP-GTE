@@ -5,6 +5,9 @@ public static class PermisosAdministracion
 {
     public const string Usuarios = "ADM.Usuarios";
     public const string Roles = "ADM.Roles";
+
+    /// <summary>Editar procesos y transiciones (P21). Sembrado en el script 02, sin uso hasta ahora.</summary>
+    public const string Workflows = "ADM.Workflows";
 }
 
 /// <summary>

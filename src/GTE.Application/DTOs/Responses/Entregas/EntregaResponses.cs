@@ -84,3 +84,41 @@ public class MatrizAmbienteResponse
     public string? VersionDesplegada { get; set; }
     public DateTime? FechaDespliegue { get; set; }
 }
+
+public class ItemCoberturaResponse
+{
+    public int IdWorkItem { get; set; }
+    public string Folio { get; set; } = string.Empty;
+    public string Titulo { get; set; } = string.Empty;
+}
+
+/// <summary>Un proyecto tocado por el sprint, con lo que le falta enviar a un release.</summary>
+public class ProyectoCoberturaResponse
+{
+    public int IdProyecto { get; set; }
+    public string ClaveProyecto { get; set; } = string.Empty;
+    public string Proyecto { get; set; } = string.Empty;
+
+    /// <summary>Terminados, sin hallazgos pendientes y sin release todavia: lo que se puede enviar ya.</summary>
+    public IReadOnlyList<ItemCoberturaResponse> Disponibles { get; set; } = [];
+
+    /// <summary>Terminados sin release pero con hallazgos de revision pendientes: no pueden entrar (RN-REL-01).</summary>
+    public IReadOnlyList<ItemCoberturaResponse> Bloqueados { get; set; } = [];
+
+    /// <summary>Release En Preparacion de este proyecto, si ya existe uno (normalmente solo hay uno a la vez).</summary>
+    public int? IdReleaseEnPreparacion { get; set; }
+    public string? VersionEnPreparacion { get; set; }
+    public string? FolioReleaseEnPreparacion { get; set; }
+}
+
+/// <summary>
+/// Cobertura de release de un sprint (paso aparte tras cerrarlo, RN-PLA-02 complementaria):
+/// por cada proyecto que el sprint toco, que le falta mandar a un release. Vacio = nada
+/// pendiente, ya sea porque no hubo terminados o porque ya todos tienen release.
+/// </summary>
+public class CoberturaReleaseSprintResponse
+{
+    public int IdSprint { get; set; }
+    public string Sprint { get; set; } = string.Empty;
+    public IReadOnlyList<ProyectoCoberturaResponse> Proyectos { get; set; } = [];
+}

@@ -47,13 +47,21 @@ public record EstadoWorkItem(
     int? IdHorarioAsignado,
     int? IdComplejidad,
     DateTime? FechaCompromiso,
-    bool Activo);
+    bool Activo,
+    bool Administrado,
+    int IdCategoriaProyecto);
 
 /// <summary>Resumen de proyecto para reglas y folios.</summary>
-public record ProyectoResumen(int IdProyecto, string Clave, bool EsMantenimiento, bool Activo);
+public record ProyectoResumen(
+    int IdProyecto, string Clave, bool EsMantenimiento, bool Activo, int IdEstatusProyecto,
+    bool Administrado);
 
 /// <summary>Resumen de usuario para presupuesto y materializacion de tiempos.</summary>
 public record UsuarioResumen(int IdUsuario, int? IdNivel, int? IdHorario, bool Activo);
+
+/// <summary>RN-REQ-08: fila de tblMatrizPresupuesto (complejidad x nivel) -- minutos y puntos
+/// de historia se congelan juntos al asignar/reasignar o cambiar complejidad.</summary>
+public record PresupuestoMatriz(int Minutos, decimal? Puntos);
 
 /// <summary>Hallazgo de revision que bloquea el cierre (RN-REQ-03).</summary>
 public record RevisionPendiente(int IdRevision, string Revisor, string? Comentarios);

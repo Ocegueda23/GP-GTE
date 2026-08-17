@@ -1,4 +1,8 @@
 import { enviar, obtener, type ResultadoPaginado } from "./http";
+import type { Ticket } from "./tickets";
+import type { Incidente } from "./incidentes";
+import type { Solicitud } from "./solicitudes";
+import type { Release } from "./entregas";
 
 export interface BandejaItem {
   idWorkItem: number;
@@ -11,8 +15,10 @@ export interface BandejaItem {
   idEstatus: number;
   estatus: string;
   prioridad: string;
+  complejidad: string | null;
   idAsignado: number | null;
   asignado: string | null;
+  sprint: string | null;
   fechaCompromiso: string | null;
   esVencida: boolean;
   puntosHistoria: number | null;
@@ -43,7 +49,7 @@ export interface CatalogosBandeja {
   estatus: CatalogoItem[];
   tipos: CatalogoItem[];
   prioridades: CatalogoItem[];
-  proyectos: { id: number; clave: string; nombre: string }[];
+  proyectos: { id: number; clave: string; nombre: string; categoriaProyecto: string }[];
   usuarios: CatalogoItem[];
   tiposSolicitud: CatalogoItem[];
   equipos: CatalogoItem[];
@@ -118,6 +124,17 @@ export async function obtenerCatalogosBandeja() {
   return obtener<CatalogosBandeja>("/api/v1/catalogos/bandeja");
 }
 
+/** Colores de chip por estatus de work item (contrato de IDs del motor). */
+export function colorEstatus(idEstatus: number): "default" | "success" | "info" | "warning" | "error" {
+  switch (idEstatus) {
+    case 2: return "success";   // En Proceso
+    case 3: return "info";      // En Pruebas
+    case 4: return "warning";   // Correccion
+    case 7: return "error";     // Cancelado
+    default: return "default";
+  }
+}
+
 /** Formato "6h 30m" para presupuesto/invertido. */
 export function formatearMinutos(minutos: number | null): string {
   if (minutos === null || minutos === undefined) return "-";
@@ -143,6 +160,7 @@ export interface WorkItemDetalle {
   idPrioridad: number;
   prioridad: string;
   idComplejidad: number | null;
+  complejidad: string | null;
   idAsignado: number | null;
   asignado: string | null;
   solicitante: string | null;
@@ -167,7 +185,6 @@ export interface WorkItemEditar {
   idComplejidad: number | null;
   idAsignado: number | null;
   fechaCompromiso: string | null;
-  puntosHistoria: number | null;
 }
 
 export interface RegistroTiempo {
@@ -177,6 +194,8 @@ export interface RegistroTiempo {
   descripcion: string | null;
   usuario: string;
   fechaRegistro: string;
+  /** Folio de la subtarea de origen; null cuando el registro es del propio elemento consultado. */
+  folioOrigen: string | null;
 }
 
 export interface NuevoWorkItem {
@@ -185,6 +204,7 @@ export interface NuevoWorkItem {
   titulo: string;
   descripcion: string | null;
   idPrioridad: number;
+  idComplejidad: number;
   idAsignado: number | null;
   fechaCompromiso: string | null;
   idPadre?: number;
@@ -238,6 +258,11 @@ export interface MiDia {
   proximas: MiDiaItem[];
   minutosHoy: number;
   totalAbiertos: number;
+  ticketsAsignados: Ticket[];
+  incidentesRelevantes: Incidente[];
+  solicitudesPendientes: Solicitud[];
+  triagePendientes: number;
+  releasesRelevantes: Release[];
 }
 
 export async function obtenerMiDia() {

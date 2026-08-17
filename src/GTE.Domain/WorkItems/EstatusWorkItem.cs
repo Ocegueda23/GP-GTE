@@ -46,4 +46,37 @@ public static class PermisosWorkItem
 
     /// <summary>Aprobar (TERMINAR) o rechazar (RECHAZAR_QA) la fase de pruebas, desde En Pruebas.</summary>
     public const string AprobarPruebas = "WI.AprobarPruebas";
+
+    /// <summary>Crear un WorkItem en un proyecto marcado tblProyecto.Administrado.</summary>
+    public const string CrearEnAdministrado = "WI.CrearEnAdministrado";
+
+    /// <summary>Cancelar (= "eliminar") un WorkItem en un proyecto marcado tblProyecto.Administrado. Se exige ADEMAS de Eliminar.</summary>
+    public const string EliminarEnAdministrado = "WI.EliminarEnAdministrado";
+
+    /// <summary>Terminar un WorkItem de proyecto categoria Desarrollo sin pasar por En Pruebas.</summary>
+    public const string SaltarPruebas = "WI.SaltarPruebas";
+}
+
+/// <summary>IDs de dbo.tblCategoriaProyecto (seed del script 01).</summary>
+public static class CategoriasProyecto
+{
+    public const int Desarrollo = 1;
+    public const int TI = 2;
+    public const int Mantenimiento = 3;
+}
+
+/// <summary>IDs de dbo.tblTipoWorkItem (contrato de seeds del script 01).</summary>
+public static class TiposWorkItem
+{
+    public const int Epica = 1;
+    public const int Feature = 2;
+    public const int Historia = 3;
+    public const int Tarea = 4;
+    public const int Bug = 5;
+    public const int Cambio = 6;
+    public const int Mejora = 7;
+    public const int Soporte = 8;
+
+    /// <summary>Mismo valor que <see cref="GTE.Domain.Operacion.EstatusIncidente.IdTipoWorkItemCorreccion"/>.</summary>
+    public const int Correccion = 9;
 }

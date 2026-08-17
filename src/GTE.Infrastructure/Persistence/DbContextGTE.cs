@@ -54,6 +54,8 @@ public partial class DbContextGTE : DbContext
 
     public virtual DbSet<TblComplejidad> TblComplejidad { get; set; }
 
+    public virtual DbSet<TblDashboardLayoutUsuario> TblDashboardLayoutUsuario { get; set; }
+
     public virtual DbSet<TblDespliegue> TblDespliegue { get; set; }
 
     public virtual DbSet<TblDiaFestivo> TblDiaFestivo { get; set; }
@@ -672,6 +674,22 @@ public partial class DbContextGTE : DbContext
             entity.HasOne(d => d.IdCategoriaProyectoNavigation).WithMany(p => p.TblComplejidad)
                 .HasForeignKey(d => d.IdCategoriaProyecto)
                 .HasConstraintName("FK_tblComplejidad_tblCategoriaProyecto");
+        });
+
+        modelBuilder.Entity<TblDashboardLayoutUsuario>(entity =>
+        {
+            entity.HasKey(e => e.IdUsuario);
+
+            entity.ToTable("tblDashboardLayoutUsuario");
+
+            entity.Property(e => e.IdUsuario).ValueGeneratedNever();
+            entity.Property(e => e.FechaMovto).HasColumnType("datetime");
+            entity.Property(e => e.FechaRegistro).HasDefaultValueSql("(sysdatetime())");
+            entity.Property(e => e.UsuarioMovto).HasMaxLength(50);
+
+            entity.HasOne(d => d.IdUsuarioNavigation).WithOne()
+                .HasForeignKey<TblDashboardLayoutUsuario>(d => d.IdUsuario)
+                .HasConstraintName("FK_tblDashboardLayoutUsuario_tblUsuario");
         });
 
         modelBuilder.Entity<TblDespliegue>(entity =>
@@ -2439,6 +2457,7 @@ public partial class DbContextGTE : DbContext
 
             entity.Property(e => e.Asignado).HasMaxLength(200);
             entity.Property(e => e.ClaveProyecto).HasMaxLength(20);
+            entity.Property(e => e.Complejidad).HasMaxLength(100);
             entity.Property(e => e.Estatus).HasMaxLength(100);
             entity.Property(e => e.Folio).HasMaxLength(50);
             entity.Property(e => e.Prioridad).HasMaxLength(100);

@@ -25,6 +25,21 @@ export async function crearComentario(
   });
 }
 
+export async function obtenerComentariosTicket(idTicket: number) {
+  return obtener<Comentario[]>(`/api/v1/tickets/${idTicket}/comentarios`);
+}
+
+export async function crearComentarioTicket(
+  idTicket: number,
+  contenido: string,
+  idComentarioPadre?: number,
+) {
+  return enviar<Comentario>("post", `/api/v1/tickets/${idTicket}/comentarios`, {
+    contenido,
+    idComentarioPadre: idComentarioPadre ?? null,
+  });
+}
+
 export async function eliminarComentario(idComentario: number) {
   const { mensaje } = await enviar<object>("delete", `/api/v1/comentarios/${idComentario}`);
   return mensaje;

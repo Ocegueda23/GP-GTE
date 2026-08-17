@@ -76,6 +76,22 @@ public class CambiarEstatusWorkItemHandler(
             throw new BusinessException($"La accion {command.Accion} requiere capturar un motivo.");
         }
 
+        // Proyecto administrado: cancelar (= "eliminar", ver WI.Eliminar arriba en
+        // accion.ClavePermisoRequerida) exige ademas este permiso especifico.
+        if (command.Accion == AccionesWorkItem.Cancelar && estado.Administrado)
+        {
+            await permisos.ExigirPermisoAsync(PermisosWorkItem.EliminarEnAdministrado, estado.IdProyecto, cancellationToken);
+        }
+
+        // RN-QA-06: proyectos categoria Desarrollo deben pasar por En Pruebas antes de
+        // Terminado; terminar directo desde En Proceso (saltando la fase) exige permiso.
+        // TI y Mantenimiento quedan libres, igual que hoy.
+        if (command.Accion == AccionesWorkItem.Terminar && estado.IdEstatus == EstatusWorkItem.EnProceso
+            && estado.IdCategoriaProyecto == CategoriasProyecto.Desarrollo)
+        {
+            await permisos.ExigirPermisoAsync(PermisosWorkItem.SaltarPruebas, estado.IdProyecto, cancellationToken);
+        }
+
         var horarioAsignado = await ObtenerHorarioAsignadoAsync(estado, cancellationToken);
 
         if (esRevisionPruebas)

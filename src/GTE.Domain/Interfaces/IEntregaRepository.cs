@@ -38,6 +38,10 @@ public interface IEntregaRepository
 
     Task CrearCadenaAprobacionAsync(int idRelease, IReadOnlyList<string> roles, CancellationToken cancellationToken = default);
 
+    /// <summary>Da de baja la cadena de aprobacion vigente (REABRIR): la siguiente
+    /// SOLICITAR_APROBACION crea firmas nuevas en vez de reusar las ya resueltas.</summary>
+    Task InvalidarCadenaAprobacionAsync(int idRelease, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<AprobacionRelease>> ObtenerAprobacionesAsync(int idRelease, CancellationToken cancellationToken = default);
 
     Task ResolverAprobacionAsync(

@@ -59,6 +59,94 @@ public class CrearReleaseHandler(
     }
 }
 
+/* ---------- Envio de sprint a release (paso aparte tras cerrar el sprint) ---------- */
+
+public record EnviarSprintAReleaseCommand(int IdSprint, EnviarSprintAReleaseRequest Datos)
+    : IRequest<ReleaseDetalleResponse>;
+
+public class EnviarSprintAReleaseValidator : AbstractValidator<EnviarSprintAReleaseCommand>
+{
+    public EnviarSprintAReleaseValidator()
+    {
+        RuleFor(c => c.IdSprint).GreaterThan(0);
+        RuleFor(c => c.Datos.IdProyecto).GreaterThan(0).WithMessage("El proyecto es obligatorio.");
+        RuleFor(c => c.Datos.VersionNueva)
+            .NotEmpty().WithMessage("La version es obligatoria para crear un release nuevo.")
+            .MaximumLength(50)
+            .Matches(@"^\d+\.\d+(\.\d+)?([-.].+)?$").WithMessage("Usa versionado semantico, por ejemplo 2.11.0.")
+            .When(c => c.Datos.IdReleaseExistente is null || c.Datos.IdReleaseExistente <= 0);
+    }
+}
+
+/// <summary>
+/// RN-PLA-02 complementaria: en vez de que a alguien se le olvide meter a un release lo
+/// que un sprint termino, este comando manda todo lo disponible de un proyecto de un
+/// jalon -- a un release ya En Preparacion de ese proyecto, o a uno nuevo si no hay.
+/// Recalcula los disponibles contra la BD (no confia en lo que mande el front).
+/// </summary>
+public class EnviarSprintAReleaseHandler(
+    IEntregaRepository repositorio,
+    IEntregaQueryService consultas,
+    IGeneradorFolios folios,
+    IWorkItemRepository workItems,
+    IVerificadorPermisos permisos) : IRequestHandler<EnviarSprintAReleaseCommand, ReleaseDetalleResponse>
+{
+    public async Task<ReleaseDetalleResponse> Handle(
+        EnviarSprintAReleaseCommand command, CancellationToken cancellationToken)
+    {
+        var datos = command.Datos;
+        await permisos.ExigirPermisoAsync(PermisosEntregas.Crear, datos.IdProyecto, cancellationToken);
+
+        var cobertura = await consultas.ObtenerCoberturaReleaseSprintAsync(command.IdSprint, cancellationToken);
+        var proyecto = cobertura.Proyectos.FirstOrDefault(p => p.IdProyecto == datos.IdProyecto);
+        if (proyecto is null || proyecto.Disponibles.Count == 0)
+        {
+            throw new BusinessException(
+                "No hay elementos de este sprint listos para enviar a un release en ese proyecto.");
+        }
+
+        int idRelease;
+        if (datos.IdReleaseExistente.HasValue)
+        {
+            var release = await repositorio.ObtenerEstadoAsync(datos.IdReleaseExistente.Value, cancellationToken)
+                ?? throw new NotFoundException("Release", datos.IdReleaseExistente.Value);
+            if (release.IdProyecto != datos.IdProyecto)
+            {
+                throw new BusinessException("El release indicado no pertenece a ese proyecto.");
+            }
+            if (release.IdEstatus != EstatusRelease.EnPreparacion)
+            {
+                throw new BusinessException("El contenido solo se modifica mientras el release esta En Preparacion.");
+            }
+            idRelease = release.IdRelease;
+        }
+        else
+        {
+            var version = datos.VersionNueva!.Trim();
+            if (await repositorio.ExisteVersionAsync(datos.IdProyecto, version, cancellationToken))
+            {
+                throw new ConflictException($"El proyecto ya tiene un release con la version {version}.");
+            }
+
+            var infoProyecto = await workItems.ObtenerProyectoAsync(datos.IdProyecto, cancellationToken)
+                ?? throw new NotFoundException("Proyecto", datos.IdProyecto);
+            var folio = await folios.GenerarAsync(
+                $"REL-{infoProyecto.Clave}-{DateTime.Today.Year}", 3, cancellationToken);
+
+            idRelease = await repositorio.CrearReleaseAsync(
+                new ReleaseNuevo(datos.IdProyecto, version, folio, null, null), cancellationToken);
+        }
+
+        foreach (var item in proyecto.Disponibles)
+        {
+            await repositorio.AgregarWorkItemAsync(idRelease, item.IdWorkItem, cancellationToken);
+        }
+
+        return await consultas.ObtenerDetalleAsync(idRelease, cancellationToken)
+            ?? throw new NotFoundException("Release", idRelease);
+    }
+}
+
 /* ---------- Contenido ---------- */
 
 public record AgregarContenidoCommand(int IdRelease, AgregarContenidoRequest Datos) : IRequest<ReleaseDetalleResponse>;
@@ -262,6 +350,13 @@ public class ResolverAprobacionHandler(
             await motor.EjecutarAccionAsync("Release", idRelease, AccionesRelease.Rechazar,
                 command.Datos.Comentario, null, cancellationToken);
             await repositorio.AplicarEfectosTransicionAsync(idRelease, AccionesRelease.Rechazar, cancellationToken);
+
+            // Invalida toda la cadena (incluida la fila recien rechazada, que ya quedo con su
+            // firma/comentario/fecha escritos arriba): sin esto, un SOLICITAR_APROBACION
+            // posterior no crea firmas nuevas para roles que ya tienen fila activa (Aprobada
+            // o Rechazada) y la fila Rechazada, al no ser Pendiente, nunca se puede volver a
+            // resolver -- el release queda atorado en En Aprobacion para siempre.
+            await repositorio.InvalidarCadenaAprobacionAsync(idRelease, cancellationToken);
         }
         else
         {

@@ -4,5 +4,5 @@ namespace GTE.Application.Interfaces;
 
 public interface IMiDiaQueryService
 {
-    Task<MiDiaResponse> ObtenerAsync(int idUsuario, string nombreUsuario, CancellationToken cancellationToken = default);
+    Task<MiDiaResponse> ObtenerAsync(int idUsuario, string nombreUsuario, bool puedeTriage, CancellationToken cancellationToken = default);
 }

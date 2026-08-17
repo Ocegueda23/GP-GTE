@@ -19,7 +19,7 @@ public class ActualizarWorkItemValidator : AbstractValidator<ActualizarWorkItemC
         RuleFor(c => c.Datos.Titulo).NotEmpty().WithMessage("El titulo es obligatorio.")
             .MaximumLength(200);
         RuleFor(c => c.Datos.IdPrioridad).GreaterThan(0).WithMessage("La prioridad es obligatoria.");
-        RuleFor(c => c.Datos.PuntosHistoria).GreaterThanOrEqualTo(0).When(c => c.Datos.PuntosHistoria.HasValue);
+        RuleFor(c => c.Datos.IdComplejidad).NotNull().WithMessage("La complejidad es obligatoria.");
     }
 }
 
@@ -54,34 +54,42 @@ public class ActualizarWorkItemHandler(
             await permisos.ExigirPermisoAsync(PermisosWorkItem.ModificarAjeno, estado.IdProyecto, cancellationToken);
         }
 
-        // RN-REQ-04: mover el compromiso al pasado solo con permiso
+        // RN-REQ-04: el usuario fija la fecha compromiso libremente la primera vez (de vacia
+        // a una fecha), pero moverla una vez capturada -- a cualquier fecha, no solo al
+        // pasado -- exige permiso; decision del equipo 2026-08-04, antes solo se bloqueaba
+        // moverla al pasado y el resto de cambios pasaban libres.
         var compromisoCambio = datos.FechaCompromiso != estado.FechaCompromiso;
-        if (compromisoCambio && datos.FechaCompromiso.HasValue
-            && datos.FechaCompromiso.Value.Date < DateTime.Today)
+        if (compromisoCambio && estado.FechaCompromiso.HasValue)
         {
             await permisos.ExigirPermisoAsync(PermisosWorkItem.ModificarCompromiso, estado.IdProyecto, cancellationToken);
         }
 
-        // Cambiar complejidad exige permiso (regla heredada del GT)
+        // Cambiar complejidad exige permiso (regla heredada del GT); fijarla por primera vez
+        // (de vacia a un valor, tipico de items legacy que quedaron sin capturar) queda libre --
+        // mismo criterio que RN-REQ-04 para fecha compromiso. La complejidad es obligatoria
+        // (ver validator), asi que completar un dato que antes faltaba no deberia exigir un
+        // permiso especial; el permiso protege RE-CLASIFICAR una complejidad ya elegida.
         var complejidadCambio = datos.IdComplejidad != estado.IdComplejidad;
-        if (complejidadCambio)
+        if (complejidadCambio && estado.IdComplejidad.HasValue)
         {
             await permisos.ExigirPermisoAsync(PermisosWorkItem.ModificarComplejidad, estado.IdProyecto, cancellationToken);
         }
 
-        // RN-REQ-08: el presupuesto solo se recalcula al reasignar o cambiar complejidad
+        // RN-REQ-08: el presupuesto (minutos + puntos) solo se recalcula al reasignar o
+        // cambiar complejidad; fuera de eso se conserva el valor ya congelado.
         var asignadoCambio = datos.IdAsignado != estado.IdAsignado;
         int? minutosPresupuesto = null;
+        decimal? puntosHistoria = null;
         var recalcularPresupuesto = complejidadCambio || asignadoCambio;
         if (recalcularPresupuesto)
         {
-            minutosPresupuesto = await CrearWorkItemHandler.CalcularPresupuestoAsync(
+            (minutosPresupuesto, puntosHistoria) = await CrearWorkItemHandler.CalcularPresupuestoAsync(
                 repositorio, datos.IdComplejidad, datos.IdAsignado, cancellationToken);
         }
 
         await repositorio.ActualizarAsync(new WorkItemEdicion(
             command.IdWorkItem, datos.Titulo.Trim(), descripcion, datos.CriteriosAceptacion,
-            datos.IdPrioridad, datos.IdComplejidad, datos.IdAsignado, datos.PuntosHistoria,
+            datos.IdPrioridad, datos.IdComplejidad, datos.IdAsignado, puntosHistoria,
             recalcularPresupuesto, minutosPresupuesto, datos.FechaCompromiso), cancellationToken);
 
         return await consultas.ObtenerPorIdAsync(command.IdWorkItem, cancellationToken)

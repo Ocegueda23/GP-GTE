@@ -2,6 +2,7 @@ using FluentValidation;
 using GTE.Application.DTOs.Request.WorkItems;
 using GTE.Application.DTOs.Responses.WorkItems;
 using GTE.Application.Interfaces;
+using GTE.Domain.Administracion;
 using GTE.Domain.Exceptions;
 using GTE.Domain.Interfaces;
 using GTE.Domain.WorkItems;
@@ -20,7 +21,12 @@ public class CrearWorkItemValidator : AbstractValidator<CrearWorkItemCommand>
         RuleFor(c => c.Datos.IdProyecto).GreaterThan(0).WithMessage("El proyecto es obligatorio.");
         RuleFor(c => c.Datos.IdTipoWorkItem).GreaterThan(0).WithMessage("El tipo es obligatorio.");
         RuleFor(c => c.Datos.IdPrioridad).GreaterThan(0).WithMessage("La prioridad es obligatoria.");
-        RuleFor(c => c.Datos.PuntosHistoria).GreaterThanOrEqualTo(0).When(c => c.Datos.PuntosHistoria.HasValue);
+        // Sin NotNull aqui a proposito: este comando tambien lo reutilizan flujos internos
+        // sin momento de captura humana (ConvertirSolicitudCommand, VincularCorrectivoIncidenteCommand,
+        // EscalarTicketCommand, CalidadCommands al crear un bug desde una ejecucion fallida) --
+        // ver CrearWorkItemHandler.Handle, que rellena un default cuando viene null. La UI de
+        // alta manual (NuevoItemModal.tsx) SI la exige como campo obligatorio, para que una
+        // persona la elija a conciencia en el camino principal.
     }
 }
 
@@ -42,6 +48,17 @@ public class CrearWorkItemHandler(
         if (!proyecto.Activo)
         {
             throw new BusinessException("El proyecto esta inactivo; no admite elementos nuevos.");
+        }
+        if (proyecto.IdEstatusProyecto is EstatusProyecto.Cerrado or EstatusProyecto.Cancelado)
+        {
+            throw new BusinessException("El proyecto esta cerrado; no admite elementos nuevos.");
+        }
+
+        // Proyecto administrado: crear elementos exige un permiso especifico ademas del
+        // flujo normal; en proyectos no administrados no cambia nada (decision del equipo).
+        if (proyecto.Administrado)
+        {
+            await permisos.ExigirPermisoAsync(PermisosWorkItem.CrearEnAdministrado, datos.IdProyecto, cancellationToken);
         }
 
         // RN-REQ-05: agregar una subtarea a un elemento ajeno (asignado a otra persona
@@ -69,9 +86,17 @@ public class CrearWorkItemHandler(
             throw new BusinessException("La fecha compromiso no puede ser anterior a hoy.");
         }
 
-        // RN-REQ-08: presupuesto congelado al asignar (matriz complejidad x nivel del asignado)
-        var minutosPresupuesto = await CalcularPresupuestoAsync(
-            repositorio, datos.IdComplejidad, datos.IdAsignado, cancellationToken);
+        // La complejidad nunca queda vacia: si quien crea el item no la trae (flujos
+        // internos que no tienen un momento de captura humana), se usa la de menor Orden
+        // activa como default -- asi RN-REQ-08 siempre tiene con que calcular presupuesto,
+        // sin bloquear esos flujos ni obligarlos a construir su propio selector.
+        var idComplejidadEfectiva = datos.IdComplejidad
+            ?? await repositorio.ObtenerComplejidadPorDefectoAsync(cancellationToken);
+
+        // RN-REQ-08: presupuesto (minutos + puntos de historia) congelado al asignar
+        // (matriz complejidad x nivel del asignado)
+        var (minutosPresupuesto, puntosHistoria) = await CalcularPresupuestoAsync(
+            repositorio, idComplejidadEfectiva, datos.IdAsignado, cancellationToken);
 
         var folio = await folios.GenerarAsync(proyecto.Clave, cancellationToken: cancellationToken);
 
@@ -79,19 +104,25 @@ public class CrearWorkItemHandler(
         var idWorkItem = await repositorio.CrearAsync(new WorkItemNuevo(
             folio, datos.IdTipoWorkItem, datos.IdPadre, datos.IdProyecto, datos.IdSolicitud,
             datos.Titulo.Trim(), descripcion, datos.CriteriosAceptacion, datos.IdPrioridad,
-            datos.IdComplejidad, datos.IdAsignado, datos.IdSolicitante, datos.PuntosHistoria,
+            idComplejidadEfectiva, datos.IdAsignado, datos.IdSolicitante, puntosHistoria,
             minutosPresupuesto, datos.FechaCompromiso, datos.IdUsuarioSolicitante), cancellationToken);
 
         return await consultas.ObtenerPorIdAsync(idWorkItem, cancellationToken)
             ?? throw new NotFoundException("WorkItem", idWorkItem);
     }
 
-    internal static async Task<int?> CalcularPresupuestoAsync(
+    /// <summary>
+    /// RN-REQ-08: minutos de presupuesto y puntos de historia se derivan siempre de
+    /// tblMatrizPresupuesto (complejidad x nivel del asignado) -- nunca se capturan a mano.
+    /// Sin asignado (o sin nivel capturado en el asignado) no hay como resolver la matriz,
+    /// ambos quedan en null hasta que se asigne.
+    /// </summary>
+    internal static async Task<(int? Minutos, decimal? Puntos)> CalcularPresupuestoAsync(
         IWorkItemRepository repositorio, int? idComplejidad, int? idAsignado, CancellationToken cancellationToken)
     {
         if (!idComplejidad.HasValue || !idAsignado.HasValue)
         {
-            return null;
+            return (null, null);
         }
 
         var usuario = await repositorio.ObtenerUsuarioAsync(idAsignado.Value, cancellationToken);
@@ -100,8 +131,12 @@ public class CrearWorkItemHandler(
             throw new BusinessException("El asignado no existe o esta inactivo.");
         }
 
-        return usuario.IdNivel.HasValue
-            ? await repositorio.ObtenerMinutosMatrizAsync(idComplejidad.Value, usuario.IdNivel.Value, cancellationToken)
-            : null;
+        if (!usuario.IdNivel.HasValue)
+        {
+            return (null, null);
+        }
+
+        var presupuesto = await repositorio.ObtenerPresupuestoMatrizAsync(idComplejidad.Value, usuario.IdNivel.Value, cancellationToken);
+        return (presupuesto?.Minutos, presupuesto?.Puntos);
     }
 }

@@ -2,9 +2,11 @@ using FluentValidation;
 using GTE.Application.Common;
 using GTE.Application.Common.Behaviors;
 using GTE.Infrastructure.Persistence;
+using GTE.Infrastructure.Services;
 using GTE.WebApi;
 using GTE.WebApi.Middleware;
 using GTE.WebApi.Seguridad;
+using Hangfire;
 using MediatR;
 using Serilog;
 
@@ -94,6 +96,18 @@ builder.Services.AddScoped<GTE.Application.Interfaces.IOkrQueryService, GTE.Infr
 builder.Services.AddScoped<GTE.Domain.Interfaces.IAdministracionRepository, GTE.Infrastructure.Repositories.AdministracionRepository>();
 builder.Services.AddScoped<GTE.Application.Interfaces.IAdministracionQueryService, GTE.Infrastructure.Services.AdministracionQueryService>();
 
+// Modulo Dashboard Ejecutivo de colaborador individual (solo lectura, sin repositorio de escritura)
+builder.Services.AddScoped<GTE.Application.Interfaces.IDashboardQueryService, GTE.Infrastructure.Services.DashboardQueryService>();
+
+// Modulo Dashboard Ejecutivo P18 (equipo/proyecto: DORA, costo, OKR)
+builder.Services.AddScoped<GTE.Domain.Interfaces.IIndicadoresEjecutivosRepository, GTE.Infrastructure.Repositories.IndicadoresEjecutivosRepository>();
+builder.Services.AddScoped<GTE.Application.Interfaces.IIndicadoresEjecutivosQueryService, GTE.Infrastructure.Services.IndicadoresEjecutivosQueryService>();
+builder.Services.AddScoped<SnapshotKpiJob>();
+
+// Modulo Workflow (P21, editor de transiciones)
+builder.Services.AddScoped<GTE.Domain.Interfaces.IWorkflowRepository, GTE.Infrastructure.Repositories.WorkflowRepository>();
+builder.Services.AddScoped<GTE.Application.Interfaces.IWorkflowQueryService, GTE.Infrastructure.Services.WorkflowQueryService>();
+
 // Modulo Comentarios y Archivos (adjuntos)
 builder.Services.AddScoped<GTE.Domain.Interfaces.IComentarioRepository, GTE.Infrastructure.Repositories.ComentarioRepository>();
 builder.Services.AddScoped<GTE.Application.Interfaces.IComentarioQueryService, GTE.Infrastructure.Services.ComentarioQueryService>();
@@ -105,6 +119,10 @@ builder.Services.AddSingleton<GTE.Application.Interfaces.ISanitizadorHtml, GTE.I
 // Modulo Notificaciones (InApp + SignalR)
 builder.Services.AddScoped<GTE.Domain.Interfaces.INotificacionRepository, GTE.Infrastructure.Repositories.NotificacionRepository>();
 builder.Services.AddScoped<GTE.Application.Interfaces.INotificacionQueryService, GTE.Infrastructure.Services.NotificacionQueryService>();
+
+// Modulo Reportes (solo lectura, sin repositorio de escritura)
+builder.Services.AddScoped<GTE.Application.Interfaces.IReportesQueryService, GTE.Infrastructure.Services.ReportesQueryService>();
+builder.Services.AddSingleton<GTE.Application.Interfaces.IExportadorExcel, GTE.Infrastructure.Services.ExportadorExcelClosedXml>();
 builder.Services.AddScoped<GTE.Application.Interfaces.IServicioNotificaciones, GTE.Infrastructure.Services.ServicioNotificaciones>();
 builder.Services.AddScoped<GTE.Application.Interfaces.INotificadorTiempoReal, GTE.WebApi.Hubs.NotificadorSignalR>();
 
@@ -126,7 +144,48 @@ builder.Services.AddCors(opciones => opciones.AddPolicy("Spa", politica => polit
     .AllowAnyMethod()
     .AllowCredentials()));
 
+// Hangfire (A4 del roadmap): storage propio en bdsGTE (schema [HangFire], la libreria lo
+// crea/migra sola). Sin dashboard web expuesto en esta primera pasada (el .UseHangfireDashboard
+// de ASP.NET Core no entiende el JWT propio de GTE; exponerlo exigiria un filtro de
+// autorizacion dedicado, fuera de alcance de este bloque).
+// Deshabilitado explicitamente en pruebas de integracion (Hangfire:Deshabilitado=true en
+// FabricaApiAutenticada): cada prueba levanta su propio WebApplicationFactory, y
+// reinstalar/consultar el storage SQL de Hangfire en cada una satura LocalDB (mismo tipo de
+// congestion ya documentado en Doctos/PENDIENTES.md) y ademas RecurringJob (API estatica)
+// no reinicializa JobStorage.Current entre hosts sucesivos del mismo proceso de pruebas.
+var hangfireDeshabilitado = builder.Configuration.GetValue<bool>("Hangfire:Deshabilitado");
+if (!hangfireDeshabilitado)
+{
+    var cadenaHangfire = builder.Configuration.GetConnectionString("bdsGTE")
+        ?? throw new InvalidOperationException("Falta ConnectionStrings:bdsGTE para Hangfire.");
+    builder.Services.AddHangfire(configuracion => configuracion
+        .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+        .UseSimpleAssemblyNameTypeSerializer()
+        .UseRecommendedSerializerSettings()
+        .UseSqlServerStorage(cadenaHangfire));
+    builder.Services.AddHangfireServer();
+}
+
 var app = builder.Build();
+
+if (!hangfireDeshabilitado)
+{
+    // Snapshot nocturno de KPIs personalizados (Dashboard Ejecutivo P18): 01:00 hora del servidor.
+    // IRecurringJobManager (service-based API) en vez de RecurringJob (estatica): la estatica
+    // depende de JobStorage.Current, fragil cuando el proceso hospeda mas de un host (pruebas).
+    // Envuelto en try/catch: si bdsGTE no esta disponible en el arranque (ej. WebApplicationFactory
+    // sin base real, ver VersionEndpointTests), el resto de la API debe poder arrancar igual --
+    // el registro del job se reintenta solo en el siguiente arranque.
+    try
+    {
+        app.Services.GetRequiredService<IRecurringJobManager>().AddOrUpdate<SnapshotKpiJob>(
+            "snapshot-kpi-diario", job => job.EjecutarAsync(CancellationToken.None), Cron.Daily(1));
+    }
+    catch (Exception ex)
+    {
+        Log.Warning(ex, "No se pudo registrar el job recurrente snapshot-kpi-diario en el arranque.");
+    }
+}
 
 app.UseSerilogRequestLogging();
 app.UseMiddleware<GlobalExceptionMiddleware>();

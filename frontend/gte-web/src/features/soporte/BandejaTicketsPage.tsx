@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent,
-  DialogTitle, FormControl, IconButton, InputLabel, Menu, MenuItem, Paper, Select,
+  DialogTitle, IconButton, Menu, MenuItem, Paper,
   Snackbar, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   TextField, Tooltip, Typography,
 } from "@mui/material";
@@ -10,7 +10,10 @@ import UpgradeIcon from "@mui/icons-material/UpgradeOutlined";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link as RouterLink } from "react-router-dom";
 import { ErrorApi } from "../../shared/api/http";
+import { ComboBuscable, ComboBuscableMultiple } from "../../shared/components/ComboBuscable";
+import { EncabezadoOrdenable } from "../../shared/components/EncabezadoOrdenable";
 import { obtenerCatalogosBandeja, type AccionDisponible, type CatalogosBandeja } from "../../shared/api/workitems";
+import { useSesion } from "../../shared/api/sesion";
 import {
   cambiarEstatusTicket, colorEstatusTicket, escalarTicket, filtroBandejaTicketsInicial,
   obtenerAccionesTicket, obtenerBandejaTickets, type Ticket,
@@ -26,9 +29,28 @@ function formatearFecha(iso: string | null): string {
 /** P15 - Mesa de ayuda: bandeja de agentes (permiso TKT.Atender). */
 export function BandejaTicketsPage() {
   const [texto, setTexto] = useState("");
-  const [estatus, setEstatus] = useState<number[]>([-1]);
+  // Sin filtro = abiertos (todos menos Cerrado), igual que la Bandeja de trabajo;
+  // "Todos" (-1) sigue disponible como opcion explicita en el combo de abajo.
+  const [estatus, setEstatus] = useState<number[]>([]);
+  const [idAsignado, setIdAsignado] = useState<number | null>(null);
+  const [ordenarPor, setOrdenarPor] = useState<string | null>(null);
+  const [ordenDescendente, setOrdenDescendente] = useState(false);
   const [aviso, setAviso] = useState<{ tipo: "success" | "error"; mensaje: string } | null>(null);
   const clienteQuery = useQueryClient();
+  const sesion = useSesion((estado) => estado.sesion);
+
+  const manejarOrden = (clave: string) => {
+    if (ordenarPor === clave) setOrdenDescendente((d) => !d);
+    else { setOrdenarPor(clave); setOrdenDescendente(false); }
+  };
+
+  // Al entrar a la bandeja sin un Agente ya elegido, parte filtrando por el usuario firmado.
+  useEffect(() => {
+    if (idAsignado === null && sesion) {
+      setIdAsignado(sesion.idUsuario);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al montar la pantalla
+  }, []);
 
   const catalogos = useQuery({
     queryKey: ["catalogos-bandeja"],
@@ -36,8 +58,10 @@ export function BandejaTicketsPage() {
     staleTime: 5 * 60_000,
   });
   const bandeja = useQuery({
-    queryKey: ["bandeja-tickets", texto, estatus],
-    queryFn: () => obtenerBandejaTickets({ ...filtroBandejaTicketsInicial, texto, estatus }),
+    queryKey: ["bandeja-tickets", texto, estatus, idAsignado, ordenarPor, ordenDescendente],
+    queryFn: () => obtenerBandejaTickets({
+      ...filtroBandejaTicketsInicial, texto, estatus, idAsignado, ordenarPor, ordenDescendente,
+    }),
     placeholderData: (anterior) => anterior,
   });
 
@@ -51,37 +75,32 @@ export function BandejaTicketsPage() {
         <TextField size="small" label="Buscar folio, titulo o solicitante" value={texto}
           onChange={(e) => setTexto(e.target.value)} sx={{ minWidth: 300 }} />
 
-        <FormControl size="small" sx={{ minWidth: 200 }}>
-          <InputLabel>Estatus</InputLabel>
-          <Select
-            multiple
-            label="Estatus"
-            value={estatus}
-            onChange={(e) => {
-              const valor = e.target.value as number[];
-              // -1 (Todos) es excluyente: elegirlo limpia cualquier otro estatus marcado
-              const eligioTodos = valor.includes(-1) && !estatus.includes(-1);
-              setEstatus(eligioTodos ? [-1] : valor.filter((v) => v !== -1));
-            }}
-            renderValue={(seleccion) =>
-              seleccion.includes(-1) ? (
-                <Chip size="small" label="Todos" />
-              ) : (
-                <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
-                  {seleccion.map((id) => (
-                    <Chip key={id} size="small"
-                      label={catalogos.data?.estatusTicket.find((c) => c.id === id)?.nombre ?? id} />
-                  ))}
-                </Box>
-              )
-            }
-          >
-            <MenuItem value={-1}>Todos</MenuItem>
-            {catalogos.data?.estatusTicket.map((c) => (
-              <MenuItem key={c.id} value={c.id}>{c.nombre}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+        <ComboBuscableMultiple
+          label="Estatus"
+          value={estatus}
+          onChange={(valores) => {
+            const valor = valores as number[];
+            // -1 (Todos) es excluyente: elegirlo limpia cualquier otro estatus marcado
+            const eligioTodos = valor.includes(-1) && !estatus.includes(-1);
+            setEstatus(eligioTodos ? [-1] : valor.filter((v) => v !== -1));
+          }}
+          opciones={[
+            { valor: -1, etiqueta: "Todos" },
+            ...(catalogos.data?.estatusTicket ?? []).map((c) => ({ valor: c.id, etiqueta: c.nombre })),
+          ]}
+          sx={{ minWidth: 200 }}
+        />
+
+        <ComboBuscable
+          label="Agente"
+          value={idAsignado ?? ""}
+          onChange={(v) => setIdAsignado(v === "" ? null : Number(v))}
+          opciones={[
+            { valor: "", etiqueta: "Todos" },
+            ...(catalogos.data?.usuarios ?? []).map((u) => ({ valor: u.id, etiqueta: u.nombre })),
+          ]}
+          sx={{ minWidth: 180 }}
+        />
       </Box>
 
       {bandeja.isError && (
@@ -93,13 +112,13 @@ export function BandejaTicketsPage() {
           <Table size="small">
             <TableHead>
               <TableRow sx={{ "& th": { fontWeight: 700, whiteSpace: "nowrap" } }}>
-                <TableCell>Folio</TableCell>
-                <TableCell>Titulo</TableCell>
-                <TableCell>Solicitante</TableCell>
-                <TableCell>Categoria</TableCell>
-                <TableCell>Prioridad</TableCell>
-                <TableCell>Estatus</TableCell>
-                <TableCell>Asignado</TableCell>
+                <EncabezadoOrdenable clave="folio" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Folio</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="titulo" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Titulo</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="solicitante" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Solicitante</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="categoria" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Categoria</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="prioridad" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Prioridad</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="estatus" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Estatus</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="asignado" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Asignado</EncabezadoOrdenable>
                 <TableCell>Limite resolucion</TableCell>
                 <TableCell align="center">Acciones</TableCell>
               </TableRow>
@@ -308,15 +327,13 @@ function MenuAccionesTicket({ ticket, catalogos, alExito, alError }: PropsAccion
       <Dialog open={dialogoAsignar} onClose={() => setDialogoAsignar(false)} fullWidth maxWidth="xs">
         <DialogTitle>Asignar {ticket.folio}</DialogTitle>
         <DialogContent sx={{ pt: "12px !important" }}>
-          <FormControl size="small" fullWidth required>
-            <InputLabel>Agente</InputLabel>
-            <Select label="Agente" value={idAsignado}
-              onChange={(e) => setIdAsignado(e.target.value as number | "")}>
-              {catalogos?.usuarios.map((u) => (
-                <MenuItem key={u.id} value={u.id}>{u.nombre}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <ComboBuscable
+            label="Agente"
+            required
+            value={idAsignado}
+            onChange={(v) => setIdAsignado(v as number | "")}
+            opciones={(catalogos?.usuarios ?? []).map((u) => ({ valor: u.id, etiqueta: u.nombre }))}
+          />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialogoAsignar(false)}>Cancelar</Button>
@@ -350,25 +367,22 @@ function MenuAccionesTicket({ ticket, catalogos, alExito, alError }: PropsAccion
       <Dialog open={dialogoEscalar} onClose={() => setDialogoEscalar(false)} fullWidth maxWidth="xs">
         <DialogTitle>Escalar {ticket.folio} a elemento de trabajo</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
-          <FormControl size="small" fullWidth required>
-            <InputLabel>Proyecto destino</InputLabel>
-            <Select label="Proyecto destino" value={idProyecto}
-              onChange={(e) => setIdProyecto(e.target.value as number | "")}>
-              {catalogos?.proyectos.map((p) => (
-                <MenuItem key={p.id} value={p.id}>{p.clave} - {p.nombre}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl size="small" fullWidth>
-            <InputLabel>Asignado (opcional)</InputLabel>
-            <Select label="Asignado (opcional)" value={idAsignadoEscalar}
-              onChange={(e) => setIdAsignadoEscalar(e.target.value as number | "")}>
-              <MenuItem value="">Sin asignar</MenuItem>
-              {catalogos?.usuarios.map((u) => (
-                <MenuItem key={u.id} value={u.id}>{u.nombre}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <ComboBuscable
+            label="Proyecto destino"
+            required
+            value={idProyecto}
+            onChange={(v) => setIdProyecto(v as number | "")}
+            opciones={(catalogos?.proyectos ?? []).map((p) => ({ valor: p.id, etiqueta: `${p.clave} - ${p.nombre}` }))}
+          />
+          <ComboBuscable
+            label="Asignado (opcional)"
+            value={idAsignadoEscalar}
+            onChange={(v) => setIdAsignadoEscalar(v as number | "")}
+            opciones={[
+              { valor: "", etiqueta: "Sin asignar" },
+              ...(catalogos?.usuarios ?? []).map((u) => ({ valor: u.id, etiqueta: u.nombre })),
+            ]}
+          />
           <TextField size="small" type="date" label="Compromiso (opcional)" value={fechaCompromiso}
             onChange={(e) => setFechaCompromiso(e.target.value)}
             slotProps={{ inputLabel: { shrink: true } }} />

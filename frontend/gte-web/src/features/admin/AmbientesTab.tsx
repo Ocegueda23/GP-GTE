@@ -1,12 +1,15 @@
 import { useState } from "react";
 import {
-  Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControl,
-  InputLabel, LinearProgress, MenuItem, Paper, Select, Snackbar, Stack, Table, TableBody,
+  Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle,
+  LinearProgress, Paper, Snackbar, Stack, Table, TableBody,
   TableCell, TableHead, TableRow, TextField, Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
+import { ComboBuscable } from "../../shared/components/ComboBuscable";
+import { EncabezadoOrdenable } from "../../shared/components/EncabezadoOrdenable";
+import { useOrdenTabla } from "../../shared/hooks/useOrdenTabla";
 import {
   crearAmbiente, obtenerAmbientes, obtenerCatalogosAdministracion, obtenerProyectos, retirarAmbiente,
 } from "../../shared/api/administracion";
@@ -21,6 +24,7 @@ export function AmbientesTab() {
   const [baseDatos, setBaseDatos] = useState("");
   const [idResponsable, setIdResponsable] = useState<number | "">("");
   const [aviso, setAviso] = useState<{ tipo: "success" | "error"; mensaje: string } | null>(null);
+  const [busqueda, setBusqueda] = useState("");
   const clienteQuery = useQueryClient();
 
   const catalogos = useQuery({
@@ -28,6 +32,13 @@ export function AmbientesTab() {
   });
   const proyectos = useQuery({ queryKey: ["proyectos"], queryFn: () => obtenerProyectos() });
   const ambientes = useQuery({ queryKey: ["ambientes-admin"], queryFn: () => obtenerAmbientes() });
+
+  const ambientesFiltrados = (ambientes.data ?? []).filter((a) => {
+    const texto = busqueda.trim().toLowerCase();
+    if (!texto) return true;
+    return a.nombre.toLowerCase().includes(texto) || (a.proyecto ?? "").toLowerCase().includes(texto);
+  });
+  const { datosOrdenados: ambientesOrdenados, ordenarPor, descendente, ordenar } = useOrdenTabla(ambientesFiltrados);
 
   const avisar = (mensaje: string, error = false) => setAviso({ tipo: error ? "error" : "success", mensaje });
 
@@ -71,22 +82,25 @@ export function AmbientesTab() {
         </Button>
       </Stack>
 
+      <TextField size="small" placeholder="Buscar nombre o proyecto..." value={busqueda}
+        onChange={(e) => setBusqueda(e.target.value)} sx={{ mb: 1.5, minWidth: 280 }} />
+
       <Paper variant="outlined">
         {ambientes.isLoading && <LinearProgress />}
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>Nombre</TableCell>
-              <TableCell>Proyecto</TableCell>
+              <EncabezadoOrdenable clave="nombre" ordenActual={ordenarPor} descendente={descendente} onOrdenar={ordenar}>Nombre</EncabezadoOrdenable>
+              <EncabezadoOrdenable clave="proyecto" ordenActual={ordenarPor} descendente={descendente} onOrdenar={ordenar}>Proyecto</EncabezadoOrdenable>
               <TableCell>URL</TableCell>
               <TableCell>Servidor</TableCell>
               <TableCell>Base de datos</TableCell>
-              <TableCell>Responsable</TableCell>
+              <EncabezadoOrdenable clave="responsable" ordenActual={ordenarPor} descendente={descendente} onOrdenar={ordenar}>Responsable</EncabezadoOrdenable>
               <TableCell />
             </TableRow>
           </TableHead>
           <TableBody>
-            {ambientes.data?.length === 0 && (
+            {ambientesOrdenados.length === 0 && (
               <TableRow>
                 <TableCell colSpan={7}>
                   <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: "center" }}>
@@ -95,7 +109,7 @@ export function AmbientesTab() {
                 </TableCell>
               </TableRow>
             )}
-            {ambientes.data?.map((a) => (
+            {ambientesOrdenados.map((a) => (
               <TableRow key={a.idAmbiente}>
                 <TableCell>{a.nombre}</TableCell>
                 <TableCell>{a.proyecto ?? "Global"}</TableCell>
@@ -116,23 +130,27 @@ export function AmbientesTab() {
         <DialogTitle>Nuevo ambiente</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
           <TextField size="small" required label="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} />
-          <FormControl size="small">
-            <InputLabel>Proyecto</InputLabel>
-            <Select label="Proyecto" value={idProyecto} onChange={(e) => setIdProyecto(e.target.value as number)}>
-              <MenuItem value="">Global</MenuItem>
-              {proyectos.data?.map((p) => <MenuItem key={p.idProyecto} value={p.idProyecto}>{p.clave}</MenuItem>)}
-            </Select>
-          </FormControl>
+          <ComboBuscable
+            label="Proyecto"
+            value={idProyecto}
+            onChange={(v) => setIdProyecto(v as number | "")}
+            opciones={[
+              { valor: "", etiqueta: "Global" },
+              ...(proyectos.data ?? []).map((p) => ({ valor: p.idProyecto, etiqueta: p.clave })),
+            ]}
+          />
           <TextField size="small" label="URL" value={url} onChange={(e) => setUrl(e.target.value)} />
           <TextField size="small" label="Servidor" value={servidor} onChange={(e) => setServidor(e.target.value)} />
           <TextField size="small" label="Base de datos" value={baseDatos} onChange={(e) => setBaseDatos(e.target.value)} />
-          <FormControl size="small">
-            <InputLabel>Responsable</InputLabel>
-            <Select label="Responsable" value={idResponsable} onChange={(e) => setIdResponsable(e.target.value as number)}>
-              <MenuItem value="">Sin responsable</MenuItem>
-              {catalogos.data?.usuarios.map((u) => <MenuItem key={u.id} value={u.id}>{u.nombre}</MenuItem>)}
-            </Select>
-          </FormControl>
+          <ComboBuscable
+            label="Responsable"
+            value={idResponsable}
+            onChange={(v) => setIdResponsable(v as number | "")}
+            opciones={[
+              { valor: "", etiqueta: "Sin responsable" },
+              ...(catalogos.data?.usuarios ?? []).map((u) => ({ valor: u.id, etiqueta: u.nombre })),
+            ]}
+          />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setModal(false)}>Cancelar</Button>

@@ -18,6 +18,7 @@ public class WorkItemResponse
     public int IdPrioridad { get; set; }
     public string Prioridad { get; set; } = string.Empty;
     public int? IdComplejidad { get; set; }
+    public string? Complejidad { get; set; }
     public int? IdAsignado { get; set; }
     public string? Asignado { get; set; }
     public string? Solicitante { get; set; }

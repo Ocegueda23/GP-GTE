@@ -27,6 +27,10 @@ public partial class VwBandejaTrabajo
 
     public string Prioridad { get; set; } = null!;
 
+    public int? IdComplejidad { get; set; }
+
+    public string? Complejidad { get; set; }
+
     public int? IdAsignado { get; set; }
 
     public string? Asignado { get; set; }

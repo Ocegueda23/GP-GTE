@@ -15,16 +15,20 @@ export async function obtenerArchivos(idWorkItem: number) {
   return obtener<Archivo[]>(`/api/v1/workitems/${idWorkItem}/archivos`);
 }
 
+export async function obtenerArchivosSolicitud(idSolicitud: number) {
+  return obtener<Archivo[]>(`/api/v1/solicitudes/${idSolicitud}/archivos`);
+}
+
 /**
  * Content-Type se deja "undefined" a proposito: el default de la instancia es
  * application/json y pisaria el boundary multipart que el navegador calcula solo.
  */
-export async function subirArchivo(idWorkItem: number, archivo: File) {
+async function subirArchivoA(ruta: string, archivo: File) {
   const formulario = new FormData();
   formulario.append("archivo", archivo);
   try {
     const { data } = await http.post<ApiResponse<Archivo>>(
-      `/api/v1/workitems/${idWorkItem}/archivos`,
+      ruta,
       formulario,
       { headers: { "Content-Type": undefined } },
     );
@@ -36,6 +40,14 @@ export async function subirArchivo(idWorkItem: number, archivo: File) {
     if (error instanceof ErrorApi) throw error;
     lanzarErrorApi(error);
   }
+}
+
+export async function subirArchivo(idWorkItem: number, archivo: File) {
+  return subirArchivoA(`/api/v1/workitems/${idWorkItem}/archivos`, archivo);
+}
+
+export async function subirArchivoSolicitud(idSolicitud: number, archivo: File) {
+  return subirArchivoA(`/api/v1/solicitudes/${idSolicitud}/archivos`, archivo);
 }
 
 export async function eliminarArchivoVinculo(idArchivoVinculo: number) {

@@ -63,6 +63,7 @@ public class ArchivosApiTests(WebApplicationFactory<Program> fabricaApp)
             idTipoWorkItem = 3,
             titulo = "Item para archivos",
             idPrioridad = 3,
+            idComplejidad = await FabricaApiAutenticada.ObtenerOCrearComplejidadAsync(),
             fechaCompromiso = DateTime.Today.AddDays(5)
         });
         respuesta.EnsureSuccessStatusCode();

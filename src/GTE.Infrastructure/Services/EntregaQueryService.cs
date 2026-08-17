@@ -2,6 +2,8 @@ using System.Text;
 using GTE.Application.DTOs.Responses.Entregas;
 using GTE.Application.Interfaces;
 using GTE.Domain.Entregas;
+using GTE.Domain.Exceptions;
+using GTE.Domain.WorkItems;
 using GTE.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -25,6 +27,24 @@ public class EntregaQueryService(FabricaContexto fabrica) : IEntregaQueryService
         }
 
         return await consulta.OrderByDescending(r => r.IdRelease).ToListAsync(cancellationToken);
+    }
+
+    /// <summary>Mismo criterio que IncidenteQueryService.ObtenerRelevantesAsync: proyectos donde el usuario es responsable.</summary>
+    public async Task<IReadOnlyList<ReleaseResponse>> ObtenerRelevantesAsync(
+        int idUsuario, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
+
+        var idsProyectosResponsable = await contexto.TblProyecto.AsNoTracking()
+            .Where(p => p.IdResponsable == idUsuario)
+            .Select(p => p.IdProyecto)
+            .ToListAsync(cancellationToken);
+
+        return await Proyectar(contexto)
+            .Where(r => r.IdEstatus != EstatusRelease.Liberado && r.IdEstatus != EstatusRelease.Cancelado
+                        && idsProyectosResponsable.Contains(r.IdProyecto))
+            .OrderByDescending(r => r.IdRelease)
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<ReleaseDetalleResponse?> ObtenerDetalleAsync(
@@ -227,6 +247,79 @@ public class EntregaQueryService(FabricaContexto fabrica) : IEntregaQueryService
         }
 
         return texto.ToString().TrimEnd();
+    }
+
+    public async Task<CoberturaReleaseSprintResponse> ObtenerCoberturaReleaseSprintAsync(
+        int idSprint, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
+
+        var sprint = await contexto.TblSprint.AsNoTracking()
+            .Where(s => s.IdSprint == idSprint)
+            .Select(s => s.Nombre)
+            .FirstOrDefaultAsync(cancellationToken)
+            ?? throw new NotFoundException("Sprint", idSprint);
+
+        // Terminados de este sprint que aun no tienen release: candidatos (RN-REL-01 los
+        // separa entre disponibles y bloqueados por hallazgos, igual que AgregarContenido).
+        var items = await (
+            from w in contexto.TblWorkItem.AsNoTracking()
+            join p in contexto.TblProyecto.AsNoTracking() on w.IdProyecto equals p.IdProyecto
+            where w.IdSprint == idSprint && w.Activo
+                  && w.IdEstatusWorkItem == EstatusWorkItem.Terminado && w.IdRelease == null
+            select new
+            {
+                w.IdWorkItem,
+                w.Folio,
+                w.Titulo,
+                w.IdProyecto,
+                ClaveProyecto = p.Clave,
+                Proyecto = p.Nombre,
+                HallazgosPendientes = contexto.TblRevision
+                    .Count(r => r.IdWorkItem == w.IdWorkItem && !r.Corregido && r.Activo)
+            }).ToListAsync(cancellationToken);
+
+        var idsProyecto = items.Select(i => i.IdProyecto).Distinct().ToList();
+
+        // Normalmente hay a lo mas un release En Preparacion por proyecto a la vez.
+        var releasesAbiertos = await contexto.TblRelease.AsNoTracking()
+            .Where(r => idsProyecto.Contains(r.IdProyecto)
+                        && r.IdEstatusRelease == EstatusRelease.EnPreparacion && r.Activo)
+            .Select(r => new { r.IdProyecto, r.IdRelease, r.Version, r.Folio })
+            .ToListAsync(cancellationToken);
+
+        var proyectos = items
+            .GroupBy(i => new { i.IdProyecto, i.ClaveProyecto, i.Proyecto })
+            .Select(g =>
+            {
+                var releaseAbierto = releasesAbiertos.FirstOrDefault(r => r.IdProyecto == g.Key.IdProyecto);
+                return new ProyectoCoberturaResponse
+                {
+                    IdProyecto = g.Key.IdProyecto,
+                    ClaveProyecto = g.Key.ClaveProyecto,
+                    Proyecto = g.Key.Proyecto,
+                    Disponibles = g.Where(i => i.HallazgosPendientes == 0)
+                        .Select(i => new ItemCoberturaResponse
+                        { IdWorkItem = i.IdWorkItem, Folio = i.Folio, Titulo = i.Titulo })
+                        .ToList(),
+                    Bloqueados = g.Where(i => i.HallazgosPendientes > 0)
+                        .Select(i => new ItemCoberturaResponse
+                        { IdWorkItem = i.IdWorkItem, Folio = i.Folio, Titulo = i.Titulo })
+                        .ToList(),
+                    IdReleaseEnPreparacion = releaseAbierto?.IdRelease,
+                    VersionEnPreparacion = releaseAbierto?.Version,
+                    FolioReleaseEnPreparacion = releaseAbierto?.Folio
+                };
+            })
+            .OrderBy(p => p.ClaveProyecto)
+            .ToList();
+
+        return new CoberturaReleaseSprintResponse
+        {
+            IdSprint = idSprint,
+            Sprint = sprint,
+            Proyectos = proyectos
+        };
     }
 
     private static IQueryable<ReleaseResponse> Proyectar(DbContextGTE contexto)

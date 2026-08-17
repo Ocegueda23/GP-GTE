@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent,
-  DialogTitle, FormControl, IconButton, InputLabel, Menu, MenuItem, Paper, Select,
+  DialogTitle, IconButton, Menu, MenuItem, Paper,
   Snackbar, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   TextField, Tooltip, Typography,
 } from "@mui/material";
@@ -11,6 +11,8 @@ import BuildIcon from "@mui/icons-material/Build";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link as RouterLink } from "react-router-dom";
 import { ErrorApi } from "../../shared/api/http";
+import { ComboBuscable } from "../../shared/components/ComboBuscable";
+import { EncabezadoOrdenable } from "../../shared/components/EncabezadoOrdenable";
 import { obtenerCatalogosBandeja, type AccionDisponible, type CatalogosBandeja } from "../../shared/api/workitems";
 import {
   cambiarEstatusIncidente, cambiarSeveridadIncidente, colorEstatusIncidente, colorSeveridad,
@@ -41,7 +43,14 @@ export function BandejaIncidentesPage() {
   const [fechaOcurrencia, setFechaOcurrencia] = useState(fechaLocalAhora());
   const [fechaDeteccion, setFechaDeteccion] = useState("");
   const [enviando, setEnviando] = useState(false);
+  const [ordenarPor, setOrdenarPor] = useState<string | null>(null);
+  const [ordenDescendente, setOrdenDescendente] = useState(false);
   const clienteQuery = useQueryClient();
+
+  const manejarOrden = (clave: string) => {
+    if (ordenarPor === clave) setOrdenDescendente((d) => !d);
+    else { setOrdenarPor(clave); setOrdenDescendente(false); }
+  };
 
   const catalogos = useQuery({
     queryKey: ["catalogos-bandeja"],
@@ -49,8 +58,10 @@ export function BandejaIncidentesPage() {
     staleTime: 5 * 60_000,
   });
   const bandeja = useQuery({
-    queryKey: ["bandeja-incidentes", texto],
-    queryFn: () => obtenerBandejaIncidentes({ ...filtroBandejaIncidentesInicial, texto }),
+    queryKey: ["bandeja-incidentes", texto, ordenarPor, ordenDescendente],
+    queryFn: () => obtenerBandejaIncidentes({
+      ...filtroBandejaIncidentesInicial, texto, ordenarPor, ordenDescendente,
+    }),
     placeholderData: (anterior) => anterior,
   });
 
@@ -107,13 +118,13 @@ export function BandejaIncidentesPage() {
           <Table size="small">
             <TableHead>
               <TableRow sx={{ "& th": { fontWeight: 700, whiteSpace: "nowrap" } }}>
-                <TableCell>Folio</TableCell>
-                <TableCell>Titulo</TableCell>
-                <TableCell>Proyecto</TableCell>
-                <TableCell>Severidad</TableCell>
-                <TableCell>Estatus</TableCell>
-                <TableCell>Ocurrencia</TableCell>
-                <TableCell>Resolucion</TableCell>
+                <EncabezadoOrdenable clave="folio" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Folio</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="titulo" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Titulo</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="proyecto" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Proyecto</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="severidad" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Severidad</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="estatus" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Estatus</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="fechaOcurrencia" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Ocurrencia</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="fechaResolucion" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Resolucion</EncabezadoOrdenable>
                 <TableCell align="center">Acciones</TableCell>
               </TableRow>
             </TableHead>
@@ -167,22 +178,20 @@ export function BandejaIncidentesPage() {
       <Dialog open={modal} onClose={() => setModal(false)} fullWidth maxWidth="sm">
         <DialogTitle>Nuevo incidente</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
-          <FormControl size="small" required>
-            <InputLabel>Proyecto</InputLabel>
-            <Select label="Proyecto" value={idProyecto} onChange={(e) => setIdProyecto(e.target.value as number | "")}>
-              {catalogos.data?.proyectos.map((p) => (
-                <MenuItem key={p.id} value={p.id}>{p.clave} - {p.nombre}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl size="small" required>
-            <InputLabel>Severidad</InputLabel>
-            <Select label="Severidad" value={idSeveridad} onChange={(e) => setIdSeveridad(e.target.value as number | "")}>
-              {catalogos.data?.severidades.map((s) => (
-                <MenuItem key={s.id} value={s.id}>{s.nombre}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <ComboBuscable
+            label="Proyecto"
+            required
+            value={idProyecto}
+            onChange={(v) => setIdProyecto(v as number | "")}
+            opciones={(catalogos.data?.proyectos ?? []).map((p) => ({ valor: p.id, etiqueta: `${p.clave} - ${p.nombre}` }))}
+          />
+          <ComboBuscable
+            label="Severidad"
+            required
+            value={idSeveridad}
+            onChange={(v) => setIdSeveridad(v as number | "")}
+            opciones={(catalogos.data?.severidades ?? []).map((s) => ({ valor: s.id, etiqueta: s.nombre }))}
+          />
           <TextField size="small" required label="Titulo" value={titulo}
             onChange={(e) => setTitulo(e.target.value)} slotProps={{ htmlInput: { maxLength: 200 } }} />
           <TextField size="small" type="datetime-local" required label="Fecha de ocurrencia" value={fechaOcurrencia}
@@ -345,14 +354,13 @@ function MenuAccionesIncidente({ incidente, catalogos, alExito, alError }: Props
       <Dialog open={dialogoSeveridad} onClose={() => setDialogoSeveridad(false)} fullWidth maxWidth="xs">
         <DialogTitle>Cambiar severidad de {incidente.folio}</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
-          <FormControl size="small" fullWidth required>
-            <InputLabel>Severidad</InputLabel>
-            <Select label="Severidad" value={nuevaSeveridad} onChange={(e) => setNuevaSeveridad(e.target.value as number | "")}>
-              {catalogos?.severidades.map((s) => (
-                <MenuItem key={s.id} value={s.id}>{s.nombre}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <ComboBuscable
+            label="Severidad"
+            required
+            value={nuevaSeveridad}
+            onChange={(v) => setNuevaSeveridad(v as number | "")}
+            opciones={(catalogos?.severidades ?? []).map((s) => ({ valor: s.id, etiqueta: s.nombre }))}
+          />
           <TextField size="small" fullWidth multiline minRows={2} label="Motivo (obligatorio)"
             value={motivoSeveridad} onChange={(e) => setMotivoSeveridad(e.target.value)} />
         </DialogContent>
@@ -368,23 +376,22 @@ function MenuAccionesIncidente({ incidente, catalogos, alExito, alError }: Props
       <Dialog open={dialogoCorrectivo} onClose={() => setDialogoCorrectivo(false)} fullWidth maxWidth="xs">
         <DialogTitle>Vincular correctivo a {incidente.folio}</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
-          <FormControl size="small" fullWidth required>
-            <InputLabel>Prioridad</InputLabel>
-            <Select label="Prioridad" value={idPrioridad} onChange={(e) => setIdPrioridad(e.target.value as number | "")}>
-              {catalogos?.prioridades.map((p) => (
-                <MenuItem key={p.id} value={p.id}>{p.nombre}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl size="small" fullWidth>
-            <InputLabel>Asignado (opcional)</InputLabel>
-            <Select label="Asignado (opcional)" value={idAsignado} onChange={(e) => setIdAsignado(e.target.value as number | "")}>
-              <MenuItem value="">Sin asignar</MenuItem>
-              {catalogos?.usuarios.map((u) => (
-                <MenuItem key={u.id} value={u.id}>{u.nombre}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <ComboBuscable
+            label="Prioridad"
+            required
+            value={idPrioridad}
+            onChange={(v) => setIdPrioridad(v as number | "")}
+            opciones={(catalogos?.prioridades ?? []).map((p) => ({ valor: p.id, etiqueta: p.nombre }))}
+          />
+          <ComboBuscable
+            label="Asignado (opcional)"
+            value={idAsignado}
+            onChange={(v) => setIdAsignado(v as number | "")}
+            opciones={[
+              { valor: "", etiqueta: "Sin asignar" },
+              ...(catalogos?.usuarios ?? []).map((u) => ({ valor: u.id, etiqueta: u.nombre })),
+            ]}
+          />
           <TextField size="small" type="date" label="Compromiso (opcional)" value={fechaCompromiso}
             onChange={(e) => setFechaCompromiso(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
         </DialogContent>
