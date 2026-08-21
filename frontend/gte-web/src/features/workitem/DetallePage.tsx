@@ -18,6 +18,7 @@ import { ModalEditarWorkItem } from "./ModalEditarWorkItem";
 import { PanelRevisiones } from "./PanelRevisiones";
 import { PanelAdjuntos } from "./PanelAdjuntos";
 import { PanelComentarios } from "./PanelComentarios";
+import { PanelPruebas } from "./PanelPruebas";
 import { PanelSubtareas } from "./PanelSubtareas";
 
 const ESTATUS_TERMINADO = 6;
@@ -136,6 +137,7 @@ export function DetallePage() {
             <Tab label={item.revisionesPendientes > 0
               ? `Revisiones (${item.revisionesPendientes})`
               : "Revisiones"} />
+            <Tab label="Pruebas" />
             <Tab label="Adjuntos" />
             <Tab label="Subtareas" />
           </Tabs>
@@ -222,6 +224,15 @@ export function DetallePage() {
           )}
 
           {pestana === 3 && (
+            <PanelPruebas
+              idWorkItem={item.idWorkItem}
+              idProyecto={item.idProyecto}
+              alExito={(mensaje) => setAviso({ tipo: "success", mensaje })}
+              alError={(mensaje) => setAviso({ tipo: "error", mensaje })}
+            />
+          )}
+
+          {pestana === 4 && (
             <PanelAdjuntos
               idWorkItem={item.idWorkItem}
               alExito={(mensaje) => setAviso({ tipo: "success", mensaje })}
@@ -229,7 +240,7 @@ export function DetallePage() {
             />
           )}
 
-          {pestana === 4 && (
+          {pestana === 5 && (
             <PanelSubtareas
               idWorkItem={item.idWorkItem}
               folio={item.folio}

@@ -19,6 +19,10 @@ export async function obtenerArchivosSolicitud(idSolicitud: number) {
   return obtener<Archivo[]>(`/api/v1/solicitudes/${idSolicitud}/archivos`);
 }
 
+export async function obtenerArchivosRevision(idRevision: number) {
+  return obtener<Archivo[]>(`/api/v1/revisiones/${idRevision}/archivos`);
+}
+
 /**
  * Content-Type se deja "undefined" a proposito: el default de la instancia es
  * application/json y pisaria el boundary multipart que el navegador calcula solo.
@@ -48,6 +52,10 @@ export async function subirArchivo(idWorkItem: number, archivo: File) {
 
 export async function subirArchivoSolicitud(idSolicitud: number, archivo: File) {
   return subirArchivoA(`/api/v1/solicitudes/${idSolicitud}/archivos`, archivo);
+}
+
+export async function subirArchivoRevision(idRevision: number, archivo: File) {
+  return subirArchivoA(`/api/v1/revisiones/${idRevision}/archivos`, archivo);
 }
 
 export async function eliminarArchivoVinculo(idArchivoVinculo: number) {

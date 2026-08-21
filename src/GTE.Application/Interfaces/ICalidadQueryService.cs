@@ -4,18 +4,11 @@ namespace GTE.Application.Interfaces;
 
 public interface ICalidadQueryService
 {
-    Task<IReadOnlyList<PlanPruebaResponse>> ObtenerPlanesAsync(
-        int? idProyecto, CancellationToken cancellationToken = default);
+    /// <summary>Catalogo de casos reutilizables de un proyecto, para el selector de "usar caso existente".</summary>
+    Task<IReadOnlyList<CasoPruebaResponse>> ObtenerCasosDisponiblesAsync(
+        int idProyecto, CancellationToken cancellationToken = default);
 
-    Task<PlanPruebaResponse?> ObtenerPlanAsync(int idPlanPrueba, CancellationToken cancellationToken = default);
-
-    Task<IReadOnlyList<CicloPruebaResponse>> ObtenerCiclosAsync(
-        int idPlanPrueba, CancellationToken cancellationToken = default);
-
-    /// <summary>Casos del plan con el resultado de su ultima ejecucion en el ciclo indicado.</summary>
-    Task<IReadOnlyList<CasoPruebaResponse>> ObtenerCasosAsync(
-        int idPlanPrueba, int? idCicloPrueba, CancellationToken cancellationToken = default);
-
-    Task<IReadOnlyList<TrazabilidadResponse>> ObtenerTrazabilidadAsync(
-        int idPlanPrueba, CancellationToken cancellationToken = default);
+    /// <summary>Casos asignados a un WorkItem, con el resultado de su ultima ejecucion contra el.</summary>
+    Task<IReadOnlyList<CasoAsignadoResponse>> ObtenerCasosAsignadosAsync(
+        int idWorkItem, CancellationToken cancellationToken = default);
 }

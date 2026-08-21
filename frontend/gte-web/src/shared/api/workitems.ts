@@ -280,14 +280,19 @@ export interface Revision {
   corregido: boolean;
   fechaCorreccion: string | null;
   fechaRegistro: string;
+  idSeveridad: number | null;
+  severidad: string | null;
+  bloqueante: boolean;
+  idEjecucionPrueba: number | null;
+  casoPrueba: string | null;
 }
 
 export async function obtenerRevisiones(idWorkItem: number) {
   return obtener<Revision[]>(`/api/v1/workitems/${idWorkItem}/revisiones`);
 }
 
-export async function crearRevision(idWorkItem: number, comentarios: string) {
-  return enviar<Revision>("post", `/api/v1/workitems/${idWorkItem}/revisiones`, { comentarios });
+export async function crearRevision(idWorkItem: number, datos: { comentarios: string; idSeveridad: number }) {
+  return enviar<Revision>("post", `/api/v1/workitems/${idWorkItem}/revisiones`, datos);
 }
 
 export async function corregirRevision(

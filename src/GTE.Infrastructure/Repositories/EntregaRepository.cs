@@ -114,7 +114,8 @@ public class EntregaRepository(FabricaContexto fabrica, AuditContext auditoria)
             .Where(w => w.IdWorkItem == idWorkItem && w.Activo)
             .Select(w => new CandidatoRelease(
                 w.IdWorkItem, w.Folio, w.Titulo, w.IdEstatusWorkItem, w.Revisado,
-                contexto.TblRevision.Count(r => r.IdWorkItem == w.IdWorkItem && !r.Corregido && r.Activo)))
+                contexto.TblRevision.Count(r => r.IdWorkItem == w.IdWorkItem && !r.Corregido && r.Activo
+                    && r.IdSeveridad != null && r.IdSeveridad <= Severidad.S2Alta)))
             .FirstOrDefaultAsync(cancellationToken);
     }
 
@@ -374,61 +375,22 @@ public class EntregaRepository(FabricaContexto fabrica, AuditContext auditoria)
 
     /* ---------- Calidad del release ---------- */
 
-    public async Task<IReadOnlyList<string>> ObtenerFallasSinBugAsync(
+    public async Task<IReadOnlyList<string>> ObtenerHallazgosCriticosAbiertosAsync(
         int idRelease, CancellationToken cancellationToken = default)
     {
         await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
 
-        // Ultima ejecucion de cada caso de los planes ligados al release
-        var ultimas = await (
-            from e in contexto.TblEjecucionPrueba.AsNoTracking()
-            join c in contexto.TblCasoPrueba.AsNoTracking() on e.IdCasoPrueba equals c.IdCasoPrueba
-            join p in contexto.TblPlanPrueba.AsNoTracking() on c.IdPlanPrueba equals p.IdPlanPrueba
-            where p.IdRelease == idRelease && p.Activo && c.Activo
-            group new { e.IdEjecucionPrueba, e.IdResultadoPrueba, c.Titulo, c.Folio }
-                by e.IdCasoPrueba into g
-            select g.OrderByDescending(x => x.IdEjecucionPrueba).First()
-            ).ToListAsync(cancellationToken);
-
-        var fallas = ultimas.Where(u => u.IdResultadoPrueba == ResultadoPrueba.Falla).ToList();
-        if (fallas.Count == 0)
-        {
-            return [];
-        }
-
-        var idsEjecucion = fallas.Select(f => f.IdEjecucionPrueba).ToList();
-        var conBug = await contexto.TblWorkItem.AsNoTracking()
-            .Where(w => w.IdEjecucionPruebaOrigen != null
-                        && idsEjecucion.Contains(w.IdEjecucionPruebaOrigen.Value) && w.Activo)
-            .Select(w => w.IdEjecucionPruebaOrigen!.Value)
-            .ToListAsync(cancellationToken);
-
-        return fallas
-            .Where(f => !conBug.Contains(f.IdEjecucionPrueba))
-            .Select(f => $"{f.Folio ?? "caso"} - {f.Titulo}")
-            .ToList();
-    }
-
-    public async Task<IReadOnlyList<string>> ObtenerBugsCriticosAbiertosAsync(
-        int idRelease, CancellationToken cancellationToken = default)
-    {
-        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
-
-        // Bugs abiertos del proyecto del release con prioridad Critica o Alta
-        var idProyecto = await contexto.TblRelease.AsNoTracking()
-            .Where(r => r.IdRelease == idRelease)
-            .Select(r => r.IdProyecto)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        return await contexto.TblWorkItem.AsNoTracking()
-            .Where(w => w.IdProyecto == idProyecto
-                        && w.IdTipoWorkItem == 5                    // Bug
-                        && w.IdPrioridad <= 2                       // Critica o Alta
-                        && w.IdEstatusWorkItem != EstatusWorkItem.Terminado
-                        && w.IdEstatusWorkItem != EstatusWorkItem.Cancelado
-                        && w.Activo)
-            .Select(w => $"{w.Folio} - {w.Titulo}")
-            .ToListAsync(cancellationToken);
+        // WorkItems del contenido del release con un hallazgo S1/S2 sin corregir. La
+        // cobertura de pruebas (si el item se probo o no) la decide QA al aprobar la fase
+        // En Pruebas del propio item -- este gate solo mira defectos ya encontrados.
+        return await (
+            from r in contexto.TblRevision.AsNoTracking()
+            join w in contexto.TblWorkItem.AsNoTracking() on r.IdWorkItem equals w.IdWorkItem
+            where w.IdRelease == idRelease && w.Activo
+                  && !r.Corregido && r.Activo
+                  && r.IdSeveridad != null && r.IdSeveridad <= Severidad.S2Alta
+            select $"{w.Folio} - {w.Titulo}"
+            ).Distinct().ToListAsync(cancellationToken);
     }
 
     private void MarcarMovimiento(TblRelease entidad)

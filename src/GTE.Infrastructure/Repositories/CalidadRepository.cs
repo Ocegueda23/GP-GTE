@@ -10,36 +10,6 @@ namespace GTE.Infrastructure.Repositories;
 public class CalidadRepository(FabricaContexto fabrica, AuditContext auditoria)
     : RepositoryBase(fabrica, auditoria), ICalidadRepository
 {
-    public async Task<int> CrearPlanAsync(PlanPruebaNuevo datos, CancellationToken cancellationToken = default)
-    {
-        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
-
-        var entidad = new TblPlanPrueba
-        {
-            IdProyecto = datos.IdProyecto,
-            IdRelease = datos.IdRelease,
-            Nombre = datos.Nombre,
-            Descripcion = datos.Descripcion,
-            UsuarioRegistro = Auditoria.Usuario,
-            Activo = true
-        };
-        contexto.TblPlanPrueba.Add(entidad);
-        await contexto.SaveChangesAsync(cancellationToken);
-
-        await RegistrarBitacoraAsync("PlanPrueba", entidad.IdPlanPrueba, "CREAR", datos.Nombre, cancellationToken);
-        return entidad.IdPlanPrueba;
-    }
-
-    public async Task<EstadoPlan?> ObtenerEstadoPlanAsync(
-        int idPlanPrueba, CancellationToken cancellationToken = default)
-    {
-        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
-        return await contexto.TblPlanPrueba.AsNoTracking()
-            .Where(p => p.IdPlanPrueba == idPlanPrueba)
-            .Select(p => new EstadoPlan(p.IdPlanPrueba, p.IdProyecto, p.IdRelease, p.Nombre, p.Activo))
-            .FirstOrDefaultAsync(cancellationToken);
-    }
-
     public async Task<int> CrearCasoAsync(CasoPruebaNuevo datos, CancellationToken cancellationToken = default)
     {
         await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
@@ -47,12 +17,12 @@ public class CalidadRepository(FabricaContexto fabrica, AuditContext auditoria)
         var entidad = new TblCasoPrueba
         {
             Folio = datos.Folio,
-            IdPlanPrueba = datos.IdPlanPrueba,
+            IdProyecto = datos.IdProyecto,
             Titulo = datos.Titulo,
             Precondiciones = datos.Precondiciones,
             ResultadoEsperado = datos.ResultadoEsperado,
             IdTipoPrueba = datos.IdTipoPrueba,
-            IdWorkItem = datos.IdWorkItem,
+            Reutilizable = datos.Reutilizable,
             UsuarioRegistro = Auditoria.Usuario,
             Activo = true
         };
@@ -75,7 +45,7 @@ public class CalidadRepository(FabricaContexto fabrica, AuditContext auditoria)
             await contexto.SaveChangesAsync(cancellationToken);
         }
 
-        await RegistrarBitacoraAsync("CasoPrueba", entidad.IdCasoPrueba, "CREAR", datos.Folio, cancellationToken);
+        await RegistrarBitacoraAsync("CasoPrueba", entidad.IdCasoPrueba, "CREAR", datos.Titulo, cancellationToken);
         return entidad.IdCasoPrueba;
     }
 
@@ -83,41 +53,113 @@ public class CalidadRepository(FabricaContexto fabrica, AuditContext auditoria)
         int idCasoPrueba, CancellationToken cancellationToken = default)
     {
         await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
-        return await (
-            from c in contexto.TblCasoPrueba.AsNoTracking()
-            join p in contexto.TblPlanPrueba.AsNoTracking() on c.IdPlanPrueba equals p.IdPlanPrueba
-            where c.IdCasoPrueba == idCasoPrueba
-            select new EstadoCaso(c.IdCasoPrueba, c.IdPlanPrueba, p.IdProyecto, c.Titulo, c.IdWorkItem, c.Activo)
-            ).FirstOrDefaultAsync(cancellationToken);
+        return await contexto.TblCasoPrueba.AsNoTracking()
+            .Where(c => c.IdCasoPrueba == idCasoPrueba)
+            .Select(c => new EstadoCaso(c.IdCasoPrueba, c.IdProyecto, c.Titulo, c.Activo))
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
-    public async Task<int> CrearCicloAsync(CicloPruebaNuevo datos, CancellationToken cancellationToken = default)
+    public async Task ActualizarCasoAsync(CasoPruebaEdicion datos, CancellationToken cancellationToken = default)
     {
         await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
+        var entidad = await contexto.TblCasoPrueba
+            .FirstOrDefaultAsync(c => c.IdCasoPrueba == datos.IdCasoPrueba, cancellationToken)
+            ?? throw new InvalidOperationException($"CasoPrueba {datos.IdCasoPrueba} no existe.");
 
-        var entidad = new TblCicloPrueba
+        entidad.Titulo = datos.Titulo;
+        entidad.Precondiciones = datos.Precondiciones;
+        entidad.ResultadoEsperado = datos.ResultadoEsperado;
+        entidad.IdTipoPrueba = datos.IdTipoPrueba;
+        entidad.UsuarioMovto = Recortar(Auditoria.Usuario);
+        entidad.FechaMovto = DateTime.Now;
+
+        var pasosPrevios = await contexto.TblCasoPruebaPaso
+            .Where(p => p.IdCasoPrueba == datos.IdCasoPrueba)
+            .ToListAsync(cancellationToken);
+        contexto.TblCasoPruebaPaso.RemoveRange(pasosPrevios);
+
+        foreach (var paso in datos.Pasos)
         {
-            IdPlanPrueba = datos.IdPlanPrueba,
-            Nombre = datos.Nombre,
-            FechaInicio = datos.FechaInicio,
-            FechaFin = datos.FechaFin,
-            UsuarioRegistro = Auditoria.Usuario,
-            Activo = true
-        };
-        contexto.TblCicloPrueba.Add(entidad);
+            contexto.TblCasoPruebaPaso.Add(new TblCasoPruebaPaso
+            {
+                IdCasoPrueba = datos.IdCasoPrueba,
+                NumeroPaso = paso.NumeroPaso,
+                Accion = paso.Accion,
+                ResultadoEsperado = paso.ResultadoEsperado,
+                UsuarioRegistro = Auditoria.Usuario
+            });
+        }
+
         await contexto.SaveChangesAsync(cancellationToken);
 
-        await RegistrarBitacoraAsync("CicloPrueba", entidad.IdCicloPrueba, "CREAR", datos.Nombre, cancellationToken);
-        return entidad.IdCicloPrueba;
+        await RegistrarBitacoraAsync("CasoPrueba", datos.IdCasoPrueba, "EDITAR", datos.Titulo, cancellationToken);
     }
 
-    public async Task<bool> ExisteCicloEnPlanAsync(
-        int idCicloPrueba, int idPlanPrueba, CancellationToken cancellationToken = default)
+    public async Task RetirarCasoAsync(int idCasoPrueba, CancellationToken cancellationToken = default)
     {
         await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
-        return await contexto.TblCicloPrueba.AsNoTracking()
-            .AnyAsync(c => c.IdCicloPrueba == idCicloPrueba && c.IdPlanPrueba == idPlanPrueba && c.Activo,
+        var entidad = await contexto.TblCasoPrueba
+            .FirstOrDefaultAsync(c => c.IdCasoPrueba == idCasoPrueba, cancellationToken)
+            ?? throw new InvalidOperationException($"CasoPrueba {idCasoPrueba} no existe.");
+
+        entidad.Activo = false;
+        entidad.UsuarioMovto = Recortar(Auditoria.Usuario);
+        entidad.FechaMovto = DateTime.Now;
+        await contexto.SaveChangesAsync(cancellationToken);
+
+        await RegistrarBitacoraAsync("CasoPrueba", idCasoPrueba, "RETIRAR", null, cancellationToken);
+    }
+
+    public async Task AsignarCasoAsync(
+        int idWorkItem, int idCasoPrueba, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
+        contexto.TblWorkItemCasoPrueba.Add(new TblWorkItemCasoPrueba
+        {
+            IdWorkItem = idWorkItem,
+            IdCasoPrueba = idCasoPrueba,
+            UsuarioRegistro = Auditoria.Usuario,
+            Activo = true
+        });
+        await contexto.SaveChangesAsync(cancellationToken);
+
+        await RegistrarBitacoraAsync("WorkItemCasoPrueba", idWorkItem, "ASIGNAR",
+            $"Caso {idCasoPrueba}", cancellationToken);
+    }
+
+    public async Task<bool> ExisteAsignacionActivaAsync(
+        int idWorkItem, int idCasoPrueba, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
+        return await contexto.TblWorkItemCasoPrueba.AsNoTracking()
+            .AnyAsync(a => a.IdWorkItem == idWorkItem && a.IdCasoPrueba == idCasoPrueba && a.Activo,
                 cancellationToken);
+    }
+
+    public async Task<int?> ObtenerIdWorkItemDeAsignacionAsync(
+        int idWorkItemCasoPrueba, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
+        return await contexto.TblWorkItemCasoPrueba.AsNoTracking()
+            .Where(a => a.IdWorkItemCasoPrueba == idWorkItemCasoPrueba)
+            .Select(a => (int?)a.IdWorkItem)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task RetirarAsignacionAsync(
+        int idWorkItemCasoPrueba, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
+        var entidad = await contexto.TblWorkItemCasoPrueba
+            .FirstOrDefaultAsync(a => a.IdWorkItemCasoPrueba == idWorkItemCasoPrueba, cancellationToken)
+            ?? throw new InvalidOperationException($"WorkItemCasoPrueba {idWorkItemCasoPrueba} no existe.");
+
+        entidad.Activo = false;
+        entidad.UsuarioMovto = Recortar(Auditoria.Usuario);
+        entidad.FechaMovto = DateTime.Now;
+        await contexto.SaveChangesAsync(cancellationToken);
+
+        await RegistrarBitacoraAsync("WorkItemCasoPrueba", idWorkItemCasoPrueba, "RETIRAR", null, cancellationToken);
     }
 
     public async Task<int> RegistrarEjecucionAsync(
@@ -128,7 +170,7 @@ public class CalidadRepository(FabricaContexto fabrica, AuditContext auditoria)
         var entidad = new TblEjecucionPrueba
         {
             IdCasoPrueba = datos.IdCasoPrueba,
-            IdCicloPrueba = datos.IdCicloPrueba,
+            IdWorkItem = datos.IdWorkItem,
             IdEjecutor = datos.IdEjecutor,
             IdResultadoPrueba = datos.IdResultadoPrueba,
             FechaEjecucion = DateTime.Now,
@@ -150,37 +192,11 @@ public class CalidadRepository(FabricaContexto fabrica, AuditContext auditoria)
         return await (
             from e in contexto.TblEjecucionPrueba.AsNoTracking()
             join c in contexto.TblCasoPrueba.AsNoTracking() on e.IdCasoPrueba equals c.IdCasoPrueba
-            join p in contexto.TblPlanPrueba.AsNoTracking() on c.IdPlanPrueba equals p.IdPlanPrueba
             where e.IdEjecucionPrueba == idEjecucion
             select new EstadoEjecucion(
-                e.IdEjecucionPrueba, e.IdCasoPrueba, e.IdCicloPrueba, e.IdResultadoPrueba,
-                p.IdProyecto, c.Titulo, e.Observaciones)
+                e.IdEjecucionPrueba, e.IdCasoPrueba, e.IdWorkItem ?? 0, e.IdResultadoPrueba, c.Titulo)
             ).FirstOrDefaultAsync(cancellationToken);
     }
 
-    public async Task VincularBugAsync(
-        int idEjecucion, int idWorkItemBug, CancellationToken cancellationToken = default)
-    {
-        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
-
-        var bug = await contexto.TblWorkItem
-            .FirstOrDefaultAsync(w => w.IdWorkItem == idWorkItemBug, cancellationToken)
-            ?? throw new InvalidOperationException($"WorkItem {idWorkItemBug} no existe.");
-
-        bug.IdEjecucionPruebaOrigen = idEjecucion;
-        await contexto.SaveChangesAsync(cancellationToken);
-
-        await RegistrarBitacoraAsync("EjecucionPrueba", idEjecucion, "VINCULAR_BUG",
-            $"WorkItem {idWorkItemBug}", cancellationToken);
-    }
-
-    public async Task<int?> ObtenerBugDeEjecucionAsync(
-        int idEjecucion, CancellationToken cancellationToken = default)
-    {
-        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
-        return await contexto.TblWorkItem.AsNoTracking()
-            .Where(w => w.IdEjecucionPruebaOrigen == idEjecucion && w.Activo)
-            .Select(w => (int?)w.IdWorkItem)
-            .FirstOrDefaultAsync(cancellationToken);
-    }
+    private static string Recortar(string usuario) => usuario.Length > 50 ? usuario[..50] : usuario;
 }

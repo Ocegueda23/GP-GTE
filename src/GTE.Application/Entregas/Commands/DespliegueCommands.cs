@@ -100,14 +100,16 @@ public class CambiarEstatusReleaseHandler(
                 new { scripts = sinRollback });
         }
 
-        // RN-QA-01: calidad del release
-        var fallasSinBug = await repositorio.ObtenerFallasSinBugAsync(idRelease, cancellationToken);
-        var bugsCriticos = await repositorio.ObtenerBugsCriticosAbiertosAsync(idRelease, cancellationToken);
-        if (fallasSinBug.Count > 0 || bugsCriticos.Count > 0)
+        // RN-QA-01: calidad del release -- ningun item del contenido puede tener un
+        // hallazgo (QA o code review) de severidad S1/S2 sin corregir. La cobertura de
+        // pruebas es responsabilidad de QA al aprobar la fase En Pruebas de cada item,
+        // no de este gate.
+        var hallazgosCriticos = await repositorio.ObtenerHallazgosCriticosAbiertosAsync(idRelease, cancellationToken);
+        if (hallazgosCriticos.Count > 0)
         {
             throw new ConflictException(
                 "El release no cumple los criterios de calidad para aprobacion.",
-                new { fallasSinBug, bugsCriticos });
+                new { hallazgosCriticos });
         }
     }
 }

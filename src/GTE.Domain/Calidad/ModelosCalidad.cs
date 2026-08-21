@@ -1,37 +1,33 @@
 namespace GTE.Domain.Calidad;
 
-public record PlanPruebaNuevo(int IdProyecto, int? IdRelease, string Nombre, string? Descripcion);
+public record PasoCaso(int NumeroPaso, string Accion, string? ResultadoEsperado);
 
+/// <summary>
+/// Crea un caso nuevo. Si Reutilizable es false, el caso solo existe para esta
+/// asignacion puntual y no aparece en el selector de "usar caso existente" de otros
+/// WorkItems del proyecto.
+/// </summary>
 public record CasoPruebaNuevo(
+    int IdProyecto,
     string? Folio,
-    int IdPlanPrueba,
     string Titulo,
     string? Precondiciones,
     string? ResultadoEsperado,
     int IdTipoPrueba,
-    int? IdWorkItem,
+    bool Reutilizable,
     IReadOnlyList<PasoCaso> Pasos);
 
-public record PasoCaso(int NumeroPaso, string Accion, string? ResultadoEsperado);
-
-public record CicloPruebaNuevo(int IdPlanPrueba, string Nombre, DateOnly? FechaInicio, DateOnly? FechaFin);
-
-public record EjecucionNueva(
+public record CasoPruebaEdicion(
     int IdCasoPrueba,
-    int IdCicloPrueba,
-    int IdEjecutor,
-    int IdResultadoPrueba,
-    string? Observaciones);
+    string Titulo,
+    string? Precondiciones,
+    string? ResultadoEsperado,
+    int IdTipoPrueba,
+    IReadOnlyList<PasoCaso> Pasos);
 
-public record EstadoPlan(int IdPlanPrueba, int IdProyecto, int? IdRelease, string Nombre, bool Activo);
+public record EstadoCaso(int IdCasoPrueba, int? IdProyecto, string Titulo, bool Activo);
 
-public record EstadoCaso(int IdCasoPrueba, int IdPlanPrueba, int IdProyecto, string Titulo, int? IdWorkItem, bool Activo);
+/// <summary>Registra el resultado de correr un caso contra un WorkItem concreto.</summary>
+public record EjecucionNueva(int IdCasoPrueba, int IdWorkItem, int IdEjecutor, int IdResultadoPrueba, string? Observaciones);
 
-public record EstadoEjecucion(
-    int IdEjecucionPrueba,
-    int IdCasoPrueba,
-    int IdCicloPrueba,
-    int IdResultado,
-    int IdProyecto,
-    string TituloCaso,
-    string? Observaciones);
+public record EstadoEjecucion(int IdEjecucionPrueba, int IdCasoPrueba, int IdWorkItem, int IdResultado, string TituloCaso);

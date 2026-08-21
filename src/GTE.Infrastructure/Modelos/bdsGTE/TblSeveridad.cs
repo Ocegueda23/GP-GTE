@@ -20,4 +20,6 @@ public partial class TblSeveridad
     public bool Activo { get; set; }
 
     public virtual ICollection<TblIncidente> TblIncidente { get; set; } = new List<TblIncidente>();
+
+    public virtual ICollection<TblRevision> TblRevision { get; set; } = new List<TblRevision>();
 }

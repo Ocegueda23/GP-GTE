@@ -1,4 +1,5 @@
 using GTE.Application.Common;
+using GTE.Domain.Calidad;
 using GTE.Domain.Interfaces;
 using GTE.Domain.WorkItems;
 using GTE.Infrastructure.Modelos.bdsGTE;
@@ -161,10 +162,12 @@ public class WorkItemRepository(FabricaContexto fabrica, AuditContext auditoria)
                            && w.IdEstatusWorkItem == EstatusWorkItem.Terminado
                            && w.Activo, cancellationToken);
 
+        // Solo un hallazgo S1/S2 bloquea el cierre; uno S3/S4 queda registrado sin bloquear.
         var revisiones = await (
             from r in contexto.TblRevision.AsNoTracking()
             join u in contexto.TblUsuario.AsNoTracking() on r.IdRevisor equals u.IdUsuario
             where r.IdWorkItem == idWorkItem && !r.Corregido && r.Activo
+                  && r.IdSeveridad != null && r.IdSeveridad <= Severidad.S2Alta
             select new RevisionPendiente(r.IdRevision, u.Nombre, r.Comentarios)
             ).ToListAsync(cancellationToken);
 

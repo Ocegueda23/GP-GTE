@@ -57,13 +57,13 @@ public partial class TblProyecto
 
     public virtual ICollection<TblAmbiente> TblAmbiente { get; set; } = new List<TblAmbiente>();
 
+    public virtual ICollection<TblCasoPrueba> TblCasoPrueba { get; set; } = new List<TblCasoPrueba>();
+
     public virtual ICollection<TblHito> TblHito { get; set; } = new List<TblHito>();
 
     public virtual ICollection<TblIncidente> TblIncidente { get; set; } = new List<TblIncidente>();
 
     public virtual ICollection<TblObjetivoOkr> TblObjetivoOkr { get; set; } = new List<TblObjetivoOkr>();
-
-    public virtual ICollection<TblPlanPrueba> TblPlanPrueba { get; set; } = new List<TblPlanPrueba>();
 
     public virtual ICollection<TblPresupuestoProyecto> TblPresupuestoProyecto { get; set; } = new List<TblPresupuestoProyecto>();
 

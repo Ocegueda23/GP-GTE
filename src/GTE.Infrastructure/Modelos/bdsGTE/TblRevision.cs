@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace GTE.Infrastructure.Modelos.bdsGTE;
@@ -15,6 +15,10 @@ public partial class TblRevision
 
     public int IdEstatusRevision { get; set; }
 
+    public int? IdSeveridad { get; set; }
+
+    public int? IdEjecucionPrueba { get; set; }
+
     public bool Corregido { get; set; }
 
     public DateTime? FechaCorreccion { get; set; }
@@ -29,9 +33,13 @@ public partial class TblRevision
 
     public bool Activo { get; set; }
 
+    public virtual TblEjecucionPrueba? IdEjecucionPruebaNavigation { get; set; }
+
     public virtual TblEstatusRevision IdEstatusRevisionNavigation { get; set; } = null!;
 
     public virtual TblUsuario IdRevisorNavigation { get; set; } = null!;
+
+    public virtual TblSeveridad? IdSeveridadNavigation { get; set; }
 
     public virtual TblWorkItem IdWorkItemNavigation { get; set; } = null!;
 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace GTE.Infrastructure.Modelos.bdsGTE;
@@ -9,7 +9,7 @@ public partial class TblEjecucionPrueba
 
     public int IdCasoPrueba { get; set; }
 
-    public int IdCicloPrueba { get; set; }
+    public int? IdWorkItem { get; set; }
 
     public int IdEjecutor { get; set; }
 
@@ -25,11 +25,11 @@ public partial class TblEjecucionPrueba
 
     public virtual TblCasoPrueba IdCasoPruebaNavigation { get; set; } = null!;
 
-    public virtual TblCicloPrueba IdCicloPruebaNavigation { get; set; } = null!;
-
     public virtual TblUsuario IdEjecutorNavigation { get; set; } = null!;
 
     public virtual TblResultadoPrueba IdResultadoPruebaNavigation { get; set; } = null!;
 
-    public virtual ICollection<TblWorkItem> TblWorkItem { get; set; } = new List<TblWorkItem>();
+    public virtual TblWorkItem? IdWorkItemNavigation { get; set; }
+
+    public virtual ICollection<TblRevision> TblRevision { get; set; } = new List<TblRevision>();
 }

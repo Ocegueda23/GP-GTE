@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace GTE.Infrastructure.Modelos.bdsGTE;
@@ -53,8 +53,6 @@ public partial class TblWorkItem
 
     public bool Revisado { get; set; }
 
-    public int? IdEjecucionPruebaOrigen { get; set; }
-
     public string? ClaveJira { get; set; }
 
     public DateTime FechaRegistro { get; set; }
@@ -74,8 +72,6 @@ public partial class TblWorkItem
     public virtual TblUsuario? IdAsignadoNavigation { get; set; }
 
     public virtual TblComplejidad? IdComplejidadNavigation { get; set; }
-
-    public virtual TblEjecucionPrueba? IdEjecucionPruebaOrigenNavigation { get; set; }
 
     public virtual TblEquipo? IdEquipoNavigation { get; set; }
 
@@ -101,9 +97,9 @@ public partial class TblWorkItem
 
     public virtual ICollection<TblWorkItem> InverseIdPadreNavigation { get; set; } = new List<TblWorkItem>();
 
-    public virtual ICollection<TblCasoPrueba> TblCasoPrueba { get; set; } = new List<TblCasoPrueba>();
-
     public virtual ICollection<TblCommitWorkItem> TblCommitWorkItem { get; set; } = new List<TblCommitWorkItem>();
+
+    public virtual ICollection<TblEjecucionPrueba> TblEjecucionPrueba { get; set; } = new List<TblEjecucionPrueba>();
 
     public virtual ICollection<TblIncidente> TblIncidente { get; set; } = new List<TblIncidente>();
 
@@ -114,6 +110,8 @@ public partial class TblWorkItem
     public virtual ICollection<TblRevision> TblRevision { get; set; } = new List<TblRevision>();
 
     public virtual ICollection<TblTicket> TblTicket { get; set; } = new List<TblTicket>();
+
+    public virtual ICollection<TblWorkItemCasoPrueba> TblWorkItemCasoPrueba { get; set; } = new List<TblWorkItemCasoPrueba>();
 
     public virtual ICollection<TblWorkItemVinculo> TblWorkItemVinculoIdWorkItemDestinoNavigation { get; set; } = new List<TblWorkItemVinculo>();
 

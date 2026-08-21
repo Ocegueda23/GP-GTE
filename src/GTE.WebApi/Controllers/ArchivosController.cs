@@ -68,6 +68,32 @@ public class ArchivosController(IMediator mediator) : ControllerBase
         return Ok(ApiResponse<ArchivoResponse>.Exito(resultado, $"{resultado.NombreArchivo} adjuntado."));
     }
 
+    [HttpGet("revisiones/{idRevision:int}/archivos")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<ArchivoResponse>>>> ObtenerPorRevision(
+        int idRevision, CancellationToken cancellationToken)
+    {
+        var resultado = await mediator.Send(new ObtenerArchivosRevisionQuery(idRevision), cancellationToken);
+        return Ok(ApiResponse<IReadOnlyList<ArchivoResponse>>.Exito(resultado));
+    }
+
+    /// <summary>Tamano y extension se validan en el comando; este limite solo evita leer de mas del body.</summary>
+    [HttpPost("revisiones/{idRevision:int}/archivos")]
+    [RequestSizeLimit(ConstantesArchivos.TamanoMaximoBytes)]
+    public async Task<ActionResult<ApiResponse<ArchivoResponse>>> SubirARevision(
+        int idRevision, IFormFile archivo, CancellationToken cancellationToken)
+    {
+        var nombreArchivo = Path.GetFileName(archivo.FileName);
+        if (nombreArchivo.Length > 200)
+        {
+            nombreArchivo = nombreArchivo[..200];
+        }
+
+        await using var contenido = archivo.OpenReadStream();
+        var resultado = await mediator.Send(
+            new SubirArchivoRevisionCommand(idRevision, contenido, nombreArchivo, archivo.Length), cancellationToken);
+        return Ok(ApiResponse<ArchivoResponse>.Exito(resultado, $"{resultado.NombreArchivo} adjuntado."));
+    }
+
     /// <summary>Reemplaza la foto de perfil del usuario (desvincula la anterior si habia una).</summary>
     [HttpPost("usuarios/{idUsuario:int}/foto")]
     [RequestSizeLimit(ConstantesArchivos.TamanoMaximoBytes)]

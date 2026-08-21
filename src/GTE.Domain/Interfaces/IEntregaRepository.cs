@@ -60,9 +60,10 @@ public interface IEntregaRepository
 
     /* Calidad del release (RN-QA-01) */
 
-    /// <summary>Casos con resultado Falla en el ultimo ciclo que no tienen bug asociado.</summary>
-    Task<IReadOnlyList<string>> ObtenerFallasSinBugAsync(int idRelease, CancellationToken cancellationToken = default);
-
-    /// <summary>Bugs de severidad S1 o S2 abiertos ligados al contenido del release.</summary>
-    Task<IReadOnlyList<string>> ObtenerBugsCriticosAbiertosAsync(int idRelease, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// WorkItems del contenido del release con un hallazgo (QA o code review) de severidad
+    /// S1/S2 todavia sin corregir. Un item nunca probado no aparece aqui -- esa cobertura la
+    /// decide QA al aprobar la fase En Pruebas del propio item, no este gate.
+    /// </summary>
+    Task<IReadOnlyList<string>> ObtenerHallazgosCriticosAbiertosAsync(int idRelease, CancellationToken cancellationToken = default);
 }

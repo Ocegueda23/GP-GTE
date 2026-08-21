@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Manual de usuario — GTE (Gestor Tecnológico Empresarial)</title>
-<meta name="description" content="Manual de usuario de GTE, la plataforma de gestión del departamento de desarrollo de Interflo.">
+<meta name="description" content="Manual de usuario de GTE, la plataforma de gestión del departamento de desarrollo de software.">
 <style>
 :root{
   --primary:#334155;
@@ -212,7 +212,7 @@ table.ref-table tr:nth-child(even) td{background:#fafbfc;}
     <div class="brand-badge">GTE</div>
     <div class="brand-text">
       <strong>Manual de usuario</strong>
-      <span>GTE — Gestor Tecnológico Empresarial · Interflo</span>
+      <span>GTE — Gestor Tecnológico Empresarial</span>
     </div>
   </div>
   <div class="search-box">
@@ -249,7 +249,7 @@ table.ref-table tr:nth-child(even) td{background:#fafbfc;}
     <ul>
       <li><a href="#revision-solicitudes">Revisión de solicitudes</a></li>
       <li><a href="#planeacion">Planeación (backlog, sprints, tablero)</a></li>
-      <li><a href="#calidad">Calidad (QA) y revisiones</a></li>
+      <li><a href="#calidad">Calidad (QA) y hallazgos</a></li>
       <li><a href="#entregas">Entregas (Releases)</a></li>
       <li><a href="#portafolio">Portafolio: costos y OKR</a></li>
       <li><a href="#incidentes">Incidentes</a></li>
@@ -290,13 +290,13 @@ table.ref-table tr:nth-child(even) td{background:#fafbfc;}
       <div class="portada">
         <h1>Manual de usuario de GTE</h1>
         <p class="lead">Gestor Tecnológico Empresarial — la plataforma donde el departamento de
-          desarrollo de Interflo registra, da seguimiento y cierra solicitudes, tareas, proyectos,
+          desarrollo de software registra, da seguimiento y cierra solicitudes, tareas, proyectos,
           pruebas, versiones y soporte. Esta guía explica cómo usarla, paso a paso, sin necesidad
           de conocimientos técnicos.</p>
         <div class="meta-table">
           <div><span class="k">Producto</span><span class="v">GTE (sucesor del Gestor de Proyectos)</span></div>
-          <div><span class="k">Versión del manual</span><span class="v">1.3</span></div>
-          <div><span class="k">Fecha de emisión</span><span class="v">13 de agosto de 2026</span></div>
+          <div><span class="k">Versión del manual</span><span class="v">1.4</span></div>
+          <div><span class="k">Fecha de emisión</span><span class="v">21 de agosto de 2026</span></div>
           <div><span class="k">Audiencia</span><span class="v">Usuarios generales, líderes y administradores</span></div>
           <div><span class="k">Estado</span><span class="v">Documento vivo — se actualiza junto con el sistema</span></div>
         </div>
@@ -350,7 +350,7 @@ table.ref-table tr:nth-child(even) td{background:#fafbfc;}
         <p>GTE es una aplicación web: no requiere instalar nada. Solo necesitas:</p>
         <ul>
           <li>Un navegador moderno (Chrome, Edge o Firefox actualizados).</li>
-          <li>Conexión a la red interna de Interflo (o VPN, si trabajas fuera de oficina).</li>
+          <li>Conexión a la red interna de tu organización (o VPN, si trabajas fuera de oficina).</li>
           <li>Una cuenta creada por tu administrador, con usuario y contraseña.</li>
         </ul>
         <p>La dirección exacta te la proporciona el equipo que administra GTE en tu organización.</p>
@@ -636,29 +636,88 @@ table.ref-table tr:nth-child(even) td{background:#fafbfc;}
       </section>
 
       <section class="doc-section" id="calidad">
-        <h2>16. Calidad (QA) y revisiones <span class="badge badge-ok">Disponible</span></h2>
+        <h2>16. Calidad (QA) y hallazgos <span class="badge badge-ok">Disponible</span></h2>
         <span class="role-tag">Líderes · Equipo de QA</span>
-        <h3>Planes y casos de prueba</h3>
-        <ul>
-          <li>Un <strong>plan de pruebas</strong> agrupa los casos a ejecutar para un proyecto o
-            versión.</li>
-          <li>Cada <strong>caso de prueba</strong> tiene folio, precondiciones, pasos y resultado
-            esperado, y puede ligarse al requisito que cubre.</li>
-          <li>Los casos se ejecutan en <strong>ciclos</strong> (por ejemplo "Regresión
-            pre-release"), registrando resultado: Pasa, Falla, Bloqueado o No aplica.</li>
-          <li>Si un caso Falla, el botón <strong>Crear bug</strong> abre un elemento de trabajo
-            tipo Bug ya precargado con la evidencia.</li>
-          <li>La <strong>matriz de trazabilidad</strong> muestra qué requisitos no tienen ningún
-            caso que los cubra.</li>
-        </ul>
-        <h3>Revisiones (hallazgos de código o de resultado)</h3>
-        <p>Al revisar el trabajo de alguien más, se registra un <strong>hallazgo</strong>. Mientras
-          exista un hallazgo sin marcar como corregido, el elemento no puede cerrarse: vuelve
-          automáticamente a la fase de corrección. Solo un líder puede reabrir un hallazgo ya
-          corregido.</p>
+
+        <h3>¿Qué es "hacer pruebas" en GTE?</h3>
+        <p>Las pruebas de un elemento se hacen y se registran <strong>dentro del propio
+          elemento</strong> que se está probando (pestañas <strong>Pruebas</strong> y
+          <strong>Revisiones</strong> de su detalle) — no en una pantalla aparte. La idea es
+          simple: si algo sale mal mientras se prueba, todavía no se pierde nada moviéndolo a
+          otro lado; el defecto queda anotado ahí mismo, como un <strong>hallazgo</strong>, hasta
+          que se corrige. Solo cuando la falla es real y ya pasó a producción (no durante las
+          pruebas) se abre un elemento de trabajo aparte — ver <a href="#incidentes">Incidentes</a>.</p>
+
+        <table class="ref-table">
+          <tr><th>Concepto</th><th>Qué es</th></tr>
+          <tr><td>Caso de prueba</td><td>Una prueba puntual y repetible: título, pasos a seguir y
+            el resultado que se espera obtener. Vive en el catálogo del proyecto y puede
+            asignarse a cualquier elemento de ese proyecto — por ejemplo "Registrar orden de
+            compra papelería" sirve tanto hoy como la próxima vez que se toque ese flujo.</td></tr>
+          <tr><td>Caso libre</td><td>Un caso capturado al vuelo para probar un elemento puntual,
+            sin guardarlo en el catálogo — para algo que no se va a repetir.</td></tr>
+          <tr><td>Ejecución</td><td>El resultado real de correr un caso contra un elemento: Pasa,
+            Falla, Bloqueado o No aplica, con observaciones. El mismo caso puede volver a
+            ejecutarse más adelante (por ejemplo para reprobarlo después de una corrección).</td></tr>
+          <tr><td>Hallazgo</td><td>Lo que se anota cuando algo no pasa la prueba (o cuando alguien
+            revisa el código y encuentra un problema). No es un elemento de trabajo nuevo: es una
+            nota sobre el mismo elemento, con una severidad que decide si bloquea su cierre.</td></tr>
+        </table>
+
+        <h3>Asignar y ejecutar casos de prueba</h3>
+        <ol class="steps">
+          <li>Abre el elemento de trabajo y ve a la pestaña <strong>Pruebas</strong>.</li>
+          <li>Pulsa <strong>Usar caso existente</strong> para elegir uno ya registrado en el
+            catálogo del proyecto, o <strong>Nuevo caso</strong> para capturar uno — marca
+            "Guardar en el catálogo" si quieres poder reutilizarlo después, o déjalo sin marcar si
+            es un caso libre de un solo uso.</li>
+          <li>Para cada caso asignado, pulsa <strong>Registrar</strong> y elige el resultado:
+            <strong>Pasa</strong>, <strong>Falla</strong>, <strong>Bloqueado</strong> o
+            <strong>No aplica</strong>.</li>
+          <li>Si el resultado es Falla o Bloqueado, describe en Observaciones qué pasó — puedes
+            pegar una captura directo desde el portapapeles o adjuntar un archivo con el botón
+            correspondiente.</li>
+        </ol>
         <div class="note">
-          Aprobar o rechazar la fase de pruebas de un elemento no puede hacerlo la misma persona
-          que lo trabajó — evita autoaprobaciones.
+          <strong>Una Falla crea el hallazgo sola, en el mismo paso</strong>: no hay que abrir
+          nada aparte. Por eso una Falla exige elegir la <strong>severidad</strong> del hallazgo
+          al capturar el resultado.
+        </div>
+
+        <h3>Hallazgos: severidad, cierre y reapertura</h3>
+        <p>La pestaña <strong>Revisiones</strong> del elemento junta todos los hallazgos, vengan
+          de una prueba o de revisar el código directamente (botón <strong>Reportar
+          hallazgo</strong>). Cada uno lleva una <strong>severidad</strong>:</p>
+        <ul>
+          <li><strong>S1 Crítica / S2 Alta</strong>: bloquean — el elemento no puede marcarse
+            Terminado mientras sigan pendientes, y si ya estaba Terminado, regresa solo a
+            Corrección en cuanto se reporta el hallazgo.</li>
+          <li><strong>S3 Media / S4 Baja</strong>: quedan registrados para seguimiento, pero no
+            impiden cerrar el elemento.</li>
+        </ul>
+        <p>Cuando ya se corrigió, pulsa <strong>Marcar corregido</strong>. Volver a abrirlo
+          (<strong>Reabrir</strong>) es facultad de un líder y siempre pide explicar por qué no
+          quedó resuelto.</p>
+        <div class="note">
+          <strong>Severidad no es lo mismo que prioridad.</strong> La severidad mide qué tan grave
+          es el problema en sí (S1 a S4); la prioridad (que usan otros elementos, no los
+          hallazgos) es solo el orden en que se atiende algo. Un release
+          <strong>no se puede mandar a aprobación</strong> si alguno de sus elementos tiene un
+          hallazgo S1/S2 todavía pendiente — ver <a href="#entregas">Entregas</a>.
+        </div>
+
+        <h3>Adjuntar evidencia</h3>
+        <p>Tanto en <strong>Pruebas</strong> como en <strong>Revisiones</strong> puedes agregar
+          evidencia de dos formas: pegar una imagen directo desde el portapapeles dentro del
+          cuadro de texto, o pulsar <strong>Adjuntar archivo</strong> para seleccionar cualquier
+          archivo desde tu equipo. Ambas quedan guardadas junto con el hallazgo.</p>
+
+        <div class="note">
+          Aprobar o rechazar la fase de pruebas de un elemento (paso <strong>En
+          Pruebas</strong> del flujo normal) no puede hacerlo la misma persona que lo trabajó —
+          evita autoaprobaciones. Esto es independiente de los hallazgos: un elemento sin ningún
+          caso de prueba ejecutado igual puede aprobarse en ese paso si quien revisa decide que
+          está listo.
         </div>
       </section>
 
@@ -679,6 +738,13 @@ table.ref-table tr:nth-child(even) td{background:#fafbfc;}
         </ol>
         <p>Las notas de versión se generan automáticamente a partir del contenido incluido, y
           pueden editarse antes de publicarse.</p>
+        <div class="note">
+          <strong>Antes de poder solicitar la aprobación</strong>, GTE revisa la calidad del
+          release: si algún elemento de su contenido tiene un hallazgo de severidad Crítica (S1)
+          o Alta (S2) todavía pendiente, el botón "Solicitar aprobación" se rechaza y te dice
+          cuáles son. Corrige y marca el hallazgo como corregido desde la pestaña
+          <a href="#calidad">Revisiones</a> del elemento antes de reintentar.
+        </div>
         <div class="note">
           Publicar la generación automática de notas con inteligencia artificial y el aviso al
           canal de Teams están <span class="badge badge-plan">planeados</span>.
@@ -953,6 +1019,55 @@ table.ref-table tr:nth-child(even) td{background:#fafbfc;}
       <!-- ===================== GLOSARIO ===================== -->
       <section class="doc-section" id="glosario">
         <h2>28. Glosario de términos</h2>
+
+        <h3>Tipos de elemento de trabajo (WorkItem)</h3>
+        <p>Todo lo que se rastrea en GTE —desde una iniciativa grande hasta el defecto más
+          pequeño— es un <strong>WorkItem</strong> con folio propio (por ejemplo
+          <code>GTE-0042</code>). Lo que cambia entre un tipo y otro es su propósito y, en algunos
+          casos, cómo se crea. Cuatro de ellos forman una jerarquía de planeación (uno se
+          descompone en el siguiente); los otros cinco resuelven un defecto o una petición puntual
+          y pueden ir sueltos o colgados de cualquiera de los anteriores:</p>
+        <p><code>Épica → Feature → Historia → Tarea</code><br>
+          <code>Bug · Cambio · Mejora · Soporte · Corrección</code> (sueltos o como hijos)</p>
+        <table class="ref-table">
+          <tr><th>Tipo</th><th>Definición y caso de uso</th></tr>
+          <tr><td>Épica</td><td>Iniciativa grande que agrupa varias Features y suele abarcar
+            varios sprints o meses. <em>Ejemplo:</em> "Rediseño del portal de autoservicio",
+            que después se reparte en Features más chicas.</td></tr>
+          <tr><td>Feature</td><td>Una funcionalidad completa y entregable, hija de una Épica o
+            capturada directamente si el alcance no necesita una iniciativa mayor.
+            <em>Ejemplo:</em> "Inicio de sesión con Entra ID" dentro del rediseño del portal.</td></tr>
+          <tr><td>Historia (historia de usuario)</td><td>Un requisito descrito desde el punto de
+            vista de quien lo va a usar, normalmente hijo de una Feature. <em>Ejemplo:</em> "Como
+            solicitante, quiero ver el estatus de mi ticket sin tener que llamar a soporte."</td></tr>
+          <tr><td>Tarea</td><td>El trabajo técnico concreto en que se descompone una Historia (o
+            cualquier otro tipo) para poder asignarlo a una persona y medirle tiempo.
+            <em>Ejemplo:</em> "Crear el endpoint que regresa el estatus del ticket."</td></tr>
+          <tr><td>Bug</td><td>Un defecto capturado como elemento de trabajo independiente,
+            normalmente para algo que ya llegó a producción (ver <a href="#incidentes">Incidentes</a>).
+            Un defecto encontrado <em>durante las pruebas</em> de un elemento no genera un Bug
+            aparte: se registra como <a href="#calidad">hallazgo</a> sobre el mismo elemento, para
+            no perder la trazabilidad. <em>Ejemplo:</em> "El botón Guardar no responde en Firefox"
+            reportado por un usuario ya en producción.</td></tr>
+          <tr><td>Cambio</td><td>Una modificación pedida sobre algo que ya funciona como se
+            diseñó — configuración, parámetro o proceso — sin que sea ni un defecto ni una
+            funcionalidad nueva. <em>Ejemplo:</em> "Actualizar el catálogo de prioridades de un
+            proyecto."</td></tr>
+          <tr><td>Mejora</td><td>Un ajuste sobre una funcionalidad que ya existe, de alcance más
+            chico que una Feature nueva. <em>Ejemplo:</em> "Agregar un filtro por fecha a un
+            reporte que ya existe."</td></tr>
+          <tr><td>Soporte</td><td>Trabajo de desarrollo que nace al escalar un ticket de
+            <a href="#mesa-ayuda">Mesa de ayuda</a> cuando no basta con atención de soporte. Se
+            crea automáticamente al escalar el ticket, y queda vinculado a él.
+            <em>Ejemplo:</em> "Un reporte truena solo para un usuario en particular" — se escala
+            el ticket y nace el WorkItem Soporte para investigarlo.</td></tr>
+          <tr><td>Corrección</td><td>El trabajo que resuelve un <a href="#incidentes">Incidente</a>
+            de producción (una falla real, no un hallazgo de prueba). Se crea automáticamente al
+            vincular un correctivo desde el incidente. <em>Ejemplo:</em> "El servicio de
+            notificaciones dejó de enviar correos en producción" (incidente S1) — la Corrección es
+            el trabajo para arreglarlo.</td></tr>
+        </table>
+
         <table class="ref-table">
           <tr><th>Término</th><th>Significado</th></tr>
           <tr><td>WorkItem (elemento de trabajo)</td><td>Nombre genérico de cualquier unidad de trabajo rastreable: historia, tarea, bug, cambio, mejora o soporte.</td></tr>
@@ -963,7 +1078,9 @@ table.ref-table tr:nth-child(even) td{background:#fafbfc;}
           <tr><td>Sprint</td><td>Ciclo de trabajo con fechas y objetivo, usado para planear qué se hará en ese periodo.</td></tr>
           <tr><td>Kanban / Tablero</td><td>Vista de columnas por estatus para visualizar el flujo de trabajo del equipo.</td></tr>
           <tr><td>Release (versión)</td><td>Conjunto de elementos de trabajo terminados que se empaqueta, aprueba y despliega junto.</td></tr>
-          <tr><td>Hallazgo / Revisión</td><td>Observación registrada al revisar el trabajo de alguien; bloquea el cierre hasta que se marque como corregida.</td></tr>
+          <tr><td>Hallazgo / Revisión</td><td>Observación registrada al revisar el trabajo de alguien (a mano o desde una prueba). Su severidad decide si bloquea el cierre: S1/S2 sí, S3/S4 solo quedan registrados.</td></tr>
+          <tr><td>Caso de prueba</td><td>Una prueba puntual y repetible (título, pasos, resultado esperado) guardada en el catálogo de un proyecto, asignable a cualquier elemento de ese proyecto. Un caso "libre" no se guarda en el catálogo, solo sirve para esa prueba puntual.</td></tr>
+          <tr><td>Severidad</td><td>Qué tan grave es un hallazgo en sí (S1 Crítica a S4 Baja) — distinto de la prioridad, que es el orden en que se atiende. Un hallazgo S1/S2 abierto bloquea el cierre del elemento y la aprobación del release que lo incluya.</td></tr>
           <tr><td>SLA</td><td>Tiempo límite de respuesta y resolución comprometido para un ticket, según su prioridad.</td></tr>
           <tr><td>Ticket</td><td>Solicitud de soporte o ayuda, distinta de una solicitud de requerimiento.</td></tr>
           <tr><td>Incidente</td><td>Falla real detectada en producción, con severidad de S1 (crítica) a S4 (menor).</td></tr>
@@ -1010,6 +1127,13 @@ table.ref-table tr:nth-child(even) td{background:#fafbfc;}
               otra persona y no tienes permiso para modificar trabajo ajeno.</div>
           </details>
           <details>
+            <summary>No puedo solicitar la aprobación de un release</summary>
+            <div class="faq-a">GTE bloquea esa acción si algún elemento del contenido del release
+              tiene un hallazgo de severidad Crítica (S1) o Alta (S2) todavía pendiente. El
+              mensaje de error lista cuáles son; entra a cada elemento, corrige el hallazgo y
+              márcalo como corregido en su pestaña Revisiones, y vuelve a intentar.</div>
+          </details>
+          <details>
             <summary>Rechazaron o devolvieron mi solicitud, ¿qué hago?</summary>
             <div class="faq-a">Si la devolvieron, revisa el motivo y vuelve a enviarla con la
               información que faltaba. Si la rechazaron, el motivo queda registrado en la propia
@@ -1044,8 +1168,8 @@ table.ref-table tr:nth-child(even) td{background:#fafbfc;}
           es el resto del catálogo de automatizaciones de fábrica.</p>
 
         <h3>Base de conocimiento <span class="badge badge-plan">Planeada</span></h3>
-        <p>Artículos de ayuda con búsqueda, incluyendo la migración completa del Glosario actual
-          de Interflo con sus imágenes; sugerencia automática de artículos al capturar un ticket.</p>
+        <p>Artículos de ayuda con búsqueda, incluyendo la migración completa del glosario actual
+          con sus imágenes; sugerencia automática de artículos al capturar un ticket.</p>
 
         <h3>Inteligencia artificial asistiva <span class="badge badge-plan">Planeada</span></h3>
         <p>Siempre como propuesta editable, nunca automática sin confirmación humana:</p>
@@ -1099,6 +1223,18 @@ table.ref-table tr:nth-child(even) td{background:#fafbfc;}
             Indicadores ejecutivos (P18, vista de equipo/proyecto con DORA, costo y OKR) y el
             catálogo de 14 Reportes exportables a Excel. Ajustada la sección Próximamente para
             quitar lo que ya se liberó.</td></tr>
+          <tr><td>1.4</td><td>2026-08-21</td><td>Rediseñada la sección Calidad (QA): las pruebas
+            de un elemento se registran directamente en su propio detalle (pestañas Pruebas y
+            Revisiones), asignando casos del catálogo del proyecto o capturando uno libre. Una
+            falla ya no crea un Bug aparte: genera un hallazgo sobre el mismo elemento, con
+            severidad — S1/S2 bloquean el cierre y la aprobación de un release, S3/S4 solo quedan
+            registrados. Documentada la opción de adjuntar evidencia (pegar del portapapeles o
+            seleccionar un archivo) en Pruebas y en Revisiones. Actualizada la nota de Entregas y
+            la pregunta de Preguntas frecuentes sobre el bloqueo de aprobación para reflejar la
+            regla nueva. Glosario: actualizados Hallazgo/Revisión, Caso de prueba, Severidad y
+            Bug; agregada la tabla de los 9 tipos de elemento de trabajo (Épica, Feature,
+            Historia, Tarea, Bug, Cambio, Mejora, Soporte y Corrección) con su definición y un
+            caso de uso concreto para cada uno.</td></tr>
         </table>
         <p>Este manual es un documento vivo: se actualizará conforme el sistema evolucione. Para
           reportar un error en el manual, pedir una aclaración o notificar que una funcionalidad

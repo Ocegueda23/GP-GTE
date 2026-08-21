@@ -44,8 +44,6 @@ public partial class DbContextGTE : DbContext
 
     public virtual DbSet<TblCategoriaTicket> TblCategoriaTicket { get; set; }
 
-    public virtual DbSet<TblCicloPrueba> TblCicloPrueba { get; set; }
-
     public virtual DbSet<TblComentario> TblComentario { get; set; }
 
     public virtual DbSet<TblCommit> TblCommit { get; set; }
@@ -127,8 +125,6 @@ public partial class DbContextGTE : DbContext
     public virtual DbSet<TblPermiso> TblPermiso { get; set; }
 
     public virtual DbSet<TblPipelineEjecucion> TblPipelineEjecucion { get; set; }
-
-    public virtual DbSet<TblPlanPrueba> TblPlanPrueba { get; set; }
 
     public virtual DbSet<TblPlantillaNotificacion> TblPlantillaNotificacion { get; set; }
 
@@ -213,6 +209,8 @@ public partial class DbContextGTE : DbContext
     public virtual DbSet<TblVersionSistema> TblVersionSistema { get; set; }
 
     public virtual DbSet<TblWorkItem> TblWorkItem { get; set; }
+
+    public virtual DbSet<TblWorkItemCasoPrueba> TblWorkItemCasoPrueba { get; set; }
 
     public virtual DbSet<TblWorkItemVinculo> TblWorkItemVinculo { get; set; }
 
@@ -500,8 +498,6 @@ public partial class DbContextGTE : DbContext
 
             entity.ToTable("tblCasoPrueba");
 
-            entity.HasIndex(e => e.IdWorkItem, "IX_tblCasoPrueba_WorkItem").HasFilter("([IdWorkItem] IS NOT NULL)");
-
             entity.HasIndex(e => e.Folio, "UQ_tblCasoPrueba_Folio")
                 .IsUnique()
                 .HasFilter("([Folio] IS NOT NULL)");
@@ -510,23 +506,19 @@ public partial class DbContextGTE : DbContext
             entity.Property(e => e.FechaMovto).HasColumnType("datetime");
             entity.Property(e => e.FechaRegistro).HasDefaultValueSql("(sysdatetime())");
             entity.Property(e => e.Folio).HasMaxLength(50);
+            entity.Property(e => e.Reutilizable).HasDefaultValue(true);
             entity.Property(e => e.Titulo).HasMaxLength(200);
             entity.Property(e => e.UsuarioMovto).HasMaxLength(50);
             entity.Property(e => e.UsuarioRegistro).HasMaxLength(200);
 
-            entity.HasOne(d => d.IdPlanPruebaNavigation).WithMany(p => p.TblCasoPrueba)
-                .HasForeignKey(d => d.IdPlanPrueba)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_tblCasoPrueba_tblPlanPrueba");
+            entity.HasOne(d => d.IdProyectoNavigation).WithMany(p => p.TblCasoPrueba)
+                .HasForeignKey(d => d.IdProyecto)
+                .HasConstraintName("FK_tblCasoPrueba_tblProyecto");
 
             entity.HasOne(d => d.IdTipoPruebaNavigation).WithMany(p => p.TblCasoPrueba)
                 .HasForeignKey(d => d.IdTipoPrueba)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_tblCasoPrueba_tblTipoPrueba");
-
-            entity.HasOne(d => d.IdWorkItemNavigation).WithMany(p => p.TblCasoPrueba)
-                .HasForeignKey(d => d.IdWorkItem)
-                .HasConstraintName("FK_tblCasoPrueba_tblWorkItem");
         });
 
         modelBuilder.Entity<TblCasoPruebaPaso>(entity =>
@@ -575,25 +567,6 @@ public partial class DbContextGTE : DbContext
             entity.Property(e => e.Nombre).HasMaxLength(100);
             entity.Property(e => e.UsuarioMovto).HasMaxLength(50);
             entity.Property(e => e.UsuarioRegistro).HasMaxLength(200);
-        });
-
-        modelBuilder.Entity<TblCicloPrueba>(entity =>
-        {
-            entity.HasKey(e => e.IdCicloPrueba);
-
-            entity.ToTable("tblCicloPrueba");
-
-            entity.Property(e => e.Activo).HasDefaultValue(true);
-            entity.Property(e => e.FechaMovto).HasColumnType("datetime");
-            entity.Property(e => e.FechaRegistro).HasDefaultValueSql("(sysdatetime())");
-            entity.Property(e => e.Nombre).HasMaxLength(200);
-            entity.Property(e => e.UsuarioMovto).HasMaxLength(50);
-            entity.Property(e => e.UsuarioRegistro).HasMaxLength(200);
-
-            entity.HasOne(d => d.IdPlanPruebaNavigation).WithMany(p => p.TblCicloPrueba)
-                .HasForeignKey(d => d.IdPlanPrueba)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_tblCicloPrueba_tblPlanPrueba");
         });
 
         modelBuilder.Entity<TblComentario>(entity =>
@@ -750,7 +723,7 @@ public partial class DbContextGTE : DbContext
 
             entity.ToTable("tblEjecucionPrueba");
 
-            entity.HasIndex(e => e.IdCicloPrueba, "IX_tblEjecucionPrueba_Ciclo");
+            entity.HasIndex(e => e.IdWorkItem, "IX_tblEjecucionPrueba_WorkItem");
 
             entity.Property(e => e.FechaEjecucion).HasDefaultValueSql("(sysdatetime())");
             entity.Property(e => e.FechaRegistro).HasDefaultValueSql("(sysdatetime())");
@@ -761,10 +734,9 @@ public partial class DbContextGTE : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_tblEjecucionPrueba_tblCasoPrueba");
 
-            entity.HasOne(d => d.IdCicloPruebaNavigation).WithMany(p => p.TblEjecucionPrueba)
-                .HasForeignKey(d => d.IdCicloPrueba)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_tblEjecucionPrueba_tblCicloPrueba");
+            entity.HasOne(d => d.IdWorkItemNavigation).WithMany(p => p.TblEjecucionPrueba)
+                .HasForeignKey(d => d.IdWorkItem)
+                .HasConstraintName("FK_tblEjecucionPrueba_tblWorkItem");
 
             entity.HasOne(d => d.IdEjecutorNavigation).WithMany(p => p.TblEjecucionPrueba)
                 .HasForeignKey(d => d.IdEjecutor)
@@ -1330,30 +1302,6 @@ public partial class DbContextGTE : DbContext
                 .HasConstraintName("FK_tblPipelineEjecucion_tblRepositorio");
         });
 
-        modelBuilder.Entity<TblPlanPrueba>(entity =>
-        {
-            entity.HasKey(e => e.IdPlanPrueba);
-
-            entity.ToTable("tblPlanPrueba");
-
-            entity.Property(e => e.Activo).HasDefaultValue(true);
-            entity.Property(e => e.Descripcion).HasMaxLength(500);
-            entity.Property(e => e.FechaMovto).HasColumnType("datetime");
-            entity.Property(e => e.FechaRegistro).HasDefaultValueSql("(sysdatetime())");
-            entity.Property(e => e.Nombre).HasMaxLength(200);
-            entity.Property(e => e.UsuarioMovto).HasMaxLength(50);
-            entity.Property(e => e.UsuarioRegistro).HasMaxLength(200);
-
-            entity.HasOne(d => d.IdProyectoNavigation).WithMany(p => p.TblPlanPrueba)
-                .HasForeignKey(d => d.IdProyecto)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_tblPlanPrueba_tblProyecto");
-
-            entity.HasOne(d => d.IdReleaseNavigation).WithMany(p => p.TblPlanPrueba)
-                .HasForeignKey(d => d.IdRelease)
-                .HasConstraintName("FK_tblPlanPrueba_tblRelease");
-        });
-
         modelBuilder.Entity<TblPlantillaNotificacion>(entity =>
         {
             entity.HasKey(e => e.IdPlantillaNotificacion);
@@ -1767,6 +1715,10 @@ public partial class DbContextGTE : DbContext
             entity.Property(e => e.UsuarioMovto).HasMaxLength(50);
             entity.Property(e => e.UsuarioRegistro).HasMaxLength(200);
 
+            entity.HasOne(d => d.IdEjecucionPruebaNavigation).WithMany(p => p.TblRevision)
+                .HasForeignKey(d => d.IdEjecucionPrueba)
+                .HasConstraintName("FK_tblRevision_tblEjecucionPrueba");
+
             entity.HasOne(d => d.IdEstatusRevisionNavigation).WithMany(p => p.TblRevision)
                 .HasForeignKey(d => d.IdEstatusRevision)
                 .OnDelete(DeleteBehavior.ClientSetNull)
@@ -1776,6 +1728,10 @@ public partial class DbContextGTE : DbContext
                 .HasForeignKey(d => d.IdRevisor)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_tblRevision_tblUsuario");
+
+            entity.HasOne(d => d.IdSeveridadNavigation).WithMany(p => p.TblRevision)
+                .HasForeignKey(d => d.IdSeveridad)
+                .HasConstraintName("FK_tblRevision_tblSeveridad");
 
             entity.HasOne(d => d.IdWorkItemNavigation).WithMany(p => p.TblRevision)
                 .HasForeignKey(d => d.IdWorkItem)
@@ -2369,10 +2325,6 @@ public partial class DbContextGTE : DbContext
                 .HasForeignKey(d => d.IdComplejidad)
                 .HasConstraintName("FK_tblWorkItem_tblComplejidad");
 
-            entity.HasOne(d => d.IdEjecucionPruebaOrigenNavigation).WithMany(p => p.TblWorkItem)
-                .HasForeignKey(d => d.IdEjecucionPruebaOrigen)
-                .HasConstraintName("FK_tblWorkItem_tblEjecucionPrueba");
-
             entity.HasOne(d => d.IdEquipoNavigation).WithMany(p => p.TblWorkItem)
                 .HasForeignKey(d => d.IdEquipo)
                 .HasConstraintName("FK_tblWorkItem_tblEquipo");
@@ -2420,6 +2372,33 @@ public partial class DbContextGTE : DbContext
             entity.HasOne(d => d.IdUsuarioSolicitanteNavigation).WithMany(p => p.TblWorkItem)
                 .HasForeignKey(d => d.IdUsuarioSolicitante)
                 .HasConstraintName("FK_tblWorkItem_tblUsuarioSolicitanteCatalogo");
+        });
+
+        modelBuilder.Entity<TblWorkItemCasoPrueba>(entity =>
+        {
+            entity.HasKey(e => e.IdWorkItemCasoPrueba);
+
+            entity.ToTable("tblWorkItemCasoPrueba");
+
+            entity.HasIndex(e => new { e.IdWorkItem, e.IdCasoPrueba }, "UQ_tblWorkItemCasoPrueba_ItemCaso")
+                .IsUnique()
+                .HasFilter("([Activo]=(1))");
+
+            entity.Property(e => e.Activo).HasDefaultValue(true);
+            entity.Property(e => e.FechaMovto).HasColumnType("datetime");
+            entity.Property(e => e.FechaRegistro).HasDefaultValueSql("(sysdatetime())");
+            entity.Property(e => e.UsuarioMovto).HasMaxLength(50);
+            entity.Property(e => e.UsuarioRegistro).HasMaxLength(200);
+
+            entity.HasOne(d => d.IdCasoPruebaNavigation).WithMany(p => p.TblWorkItemCasoPrueba)
+                .HasForeignKey(d => d.IdCasoPrueba)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_tblWorkItemCasoPrueba_tblCasoPrueba");
+
+            entity.HasOne(d => d.IdWorkItemNavigation).WithMany(p => p.TblWorkItemCasoPrueba)
+                .HasForeignKey(d => d.IdWorkItem)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_tblWorkItemCasoPrueba_tblWorkItem");
         });
 
         modelBuilder.Entity<TblWorkItemVinculo>(entity =>

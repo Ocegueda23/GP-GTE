@@ -26,7 +26,6 @@ import { DetalleIncidentePage } from "./features/operacion/DetalleIncidentePage"
 import { PortafolioPage } from "./features/portafolio/PortafolioPage";
 import { BacklogPage } from "./features/planeacion/BacklogPage";
 import { TableroPage } from "./features/planeacion/TableroPage";
-import { QaPage } from "./features/calidad/QaPage";
 import { ReleasesPage } from "./features/entregas/ReleasesPage";
 import { GuardiaSesion } from "./features/sesion/GuardiaSesion";
 import { DashboardEjecutivoPage } from "./features/dashboard/DashboardEjecutivoPage";
@@ -61,7 +60,6 @@ const NAVEGACION: { ruta: string; etiqueta: string; permiso: string | string[] |
   { ruta: "/trabajo", etiqueta: "Trabajo", permiso: null },
   { ruta: "/tablero", etiqueta: "Tablero", permiso: null },
   { ruta: "/backlog", etiqueta: "Backlog", permiso: "PLA.GestionarSprints" },
-  { ruta: "/qa", etiqueta: "QA", permiso: "QA.Ejecutar" },
   { ruta: "/releases", etiqueta: "Releases", permiso: "REL.Crear" },
   { ruta: "/solicitudes", etiqueta: "Solicitudes", permiso: null },
   { ruta: "/triage", etiqueta: "Revision de solicitudes", permiso: "SOL.Triage" },
@@ -260,7 +258,6 @@ export default function App() {
                 <Route path="/wi/:folio" element={<DetallePage />} />
                 <Route path="/tablero" element={<TableroPage />} />
                 <Route path="/backlog" element={<BacklogPage />} />
-                <Route path="/qa" element={<QaPage />} />
                 <Route path="/releases" element={<ReleasesPage />} />
                 <Route path="/solicitudes" element={<PortalPage />} />
                 <Route path="/triage" element={<TriagePage />} />
