@@ -432,7 +432,7 @@ export function ReleasesPage() {
             helperText="Versionado semantico" />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setModalNuevo(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setModalNuevo(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || idProyectoNuevo === "" || !version.trim()}
             onClick={() => { setModalNuevo(false); void manejar(() => crearRelease({
               idProyecto: idProyectoNuevo as number, version: version.trim(), fechaPlan: null,
@@ -459,7 +459,7 @@ export function ReleasesPage() {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setModalContenido(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setModalContenido(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || seleccionados.length === 0}
             onClick={() => { setModalContenido(false); void manejar(
               () => agregarContenido(r!.idRelease, seleccionados).then((res) => {
@@ -493,7 +493,7 @@ export function ReleasesPage() {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setModalArtefacto(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setModalArtefacto(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || !nombreArtefacto.trim()}
             onClick={() => { setModalArtefacto(false); void manejar(
               () => agregarArtefacto(r!.idRelease, {
@@ -531,7 +531,7 @@ export function ReleasesPage() {
             value={bitacora} onChange={(e) => setBitacora(e.target.value)} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setModalDespliegue(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setModalDespliegue(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || idAmbiente === ""}
             onClick={() => { setModalDespliegue(false); void manejar(
               () => registrarDespliegue(r!.idRelease, {
@@ -556,7 +556,7 @@ export function ReleasesPage() {
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setModalRechazo(null)}>Cancelar</Button>
+          <Button color="error" onClick={() => setModalRechazo(null)}>Cancelar</Button>
           <Button variant="contained" color="error"
             disabled={enviando || !comentario.trim()}
             onClick={() => { const id = modalRechazo!; setModalRechazo(null); void manejar(
@@ -581,7 +581,7 @@ export function ReleasesPage() {
             value={motivoReabrir} onChange={(e) => setMotivoReabrir(e.target.value)} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setModalReabrir(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setModalReabrir(false)}>Cancelar</Button>
           <Button variant="contained" color="warning"
             disabled={enviando || !motivoReabrir.trim()}
             onClick={() => { setModalReabrir(false); void manejar(

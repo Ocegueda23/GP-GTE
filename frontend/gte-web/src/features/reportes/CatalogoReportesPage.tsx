@@ -14,6 +14,7 @@ import { EncabezadoOrdenable } from "../../shared/components/EncabezadoOrdenable
 import { useOrdenTabla } from "../../shared/hooks/useOrdenTabla";
 import { useSesion } from "../../shared/api/sesion";
 import { obtenerCatalogosBandeja } from "../../shared/api/workitems";
+import { useColorSerie } from "../../shared/graficas/coloresGrafica";
 import {
   descargarReporteExcel,
   obtenerReporteBugsDefectos, obtenerReporteCargaTrabajo, obtenerReporteCostos,
@@ -536,6 +537,7 @@ function ReporteSla() {
 }
 
 function ReporteKpis() {
+  const colorSerie = useColorSerie();
   const [anio, setAnio] = useState(new Date().getFullYear());
   const [anioComparativo, setAnioComparativo] = useState<number | "">(anio - 1);
   const consulta = useQuery({
@@ -567,7 +569,7 @@ function ReporteKpis() {
                   <YAxis tick={{ fontSize: 10 }} />
                   <RechartsTooltip />
                   <Legend />
-                  <Line type="monotone" dataKey="actual" name={String(anio)} stroke="#334155" dot={false} />
+                  <Line type="monotone" dataKey="actual" name={String(anio)} stroke={colorSerie("#334155")} dot={false} />
                   {anioComparativo !== "" && <Line type="monotone" dataKey="comparativo" name={String(anioComparativo)} stroke="#94a3b8" strokeDasharray="4 4" dot={false} />}
                 </LineChart>
               </ResponsiveContainer>
@@ -623,6 +625,7 @@ function ReporteCarga() {
 }
 
 function ReporteFlujo() {
+  const colorSerie = useColorSerie();
   const [desde, setDesde] = useState(primerDiaMes());
   const [hasta, setHasta] = useState(hoyIso());
   const [idProyecto, setIdProyecto] = useState<number | "">("");
@@ -657,8 +660,8 @@ function ReporteFlujo() {
                 <Legend />
                 {consulta.data.estatus.map((e, i) => (
                   <Area key={e} type="monotone" dataKey={e} stackId="1"
-                    stroke={["#0f766e", "#334155", "#f59e0b", "#ef4444", "#94a3b8", "#8b5cf6", "#22c55e"][i % 7]}
-                    fill={["#0f766e", "#334155", "#f59e0b", "#ef4444", "#94a3b8", "#8b5cf6", "#22c55e"][i % 7]} />
+                    stroke={colorSerie(["#0f766e", "#334155", "#f59e0b", "#ef4444", "#94a3b8", "#8b5cf6", "#22c55e"][i % 7])}
+                    fill={colorSerie(["#0f766e", "#334155", "#f59e0b", "#ef4444", "#94a3b8", "#8b5cf6", "#22c55e"][i % 7])} />
                 ))}
               </AreaChart>
             </ResponsiveContainer>

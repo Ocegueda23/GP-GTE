@@ -145,6 +145,7 @@ builder.Services.AddScoped<GTE.Application.Interfaces.IDashboardQueryService, GT
 builder.Services.AddScoped<GTE.Domain.Interfaces.IIndicadoresEjecutivosRepository, GTE.Infrastructure.Repositories.IndicadoresEjecutivosRepository>();
 builder.Services.AddScoped<GTE.Application.Interfaces.IIndicadoresEjecutivosQueryService, GTE.Infrastructure.Services.IndicadoresEjecutivosQueryService>();
 builder.Services.AddScoped<SnapshotKpiJob>();
+builder.Services.AddScoped<PurgaArchivosBorradorJob>();
 
 // Modulo Workflow (P21, editor de transiciones)
 builder.Services.AddScoped<GTE.Domain.Interfaces.IWorkflowRepository, GTE.Infrastructure.Repositories.WorkflowRepository>();
@@ -245,6 +246,11 @@ if (!hangfireDeshabilitado)
     {
         app.Services.GetRequiredService<IRecurringJobManager>().AddOrUpdate<SnapshotKpiJob>(
             "snapshot-kpi-diario", job => job.EjecutarAsync(CancellationToken.None), Cron.Daily(1));
+
+        // Recoge las imagenes que se pegaron en un alta que despues se cancelo: sin vinculo
+        // ya no pueden adjuntarse a nada. 02:00, despues del snapshot.
+        app.Services.GetRequiredService<IRecurringJobManager>().AddOrUpdate<PurgaArchivosBorradorJob>(
+            "purga-archivos-borrador", job => job.EjecutarAsync(CancellationToken.None), Cron.Daily(2));
     }
     catch (Exception ex)
     {

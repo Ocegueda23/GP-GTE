@@ -322,7 +322,7 @@ function MenuAccionesTicket({ ticket, catalogos, alExito, alError }: PropsAccion
             onChange={(e) => setMotivo(e.target.value)} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAccionConMotivo(null)}>Cancelar</Button>
+          <Button color="error" onClick={() => setAccionConMotivo(null)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || motivo.trim().length === 0}
             onClick={() => accionConMotivo && void ejecutar(accionConMotivo.accion, motivo.trim())}>
             Confirmar
@@ -342,7 +342,7 @@ function MenuAccionesTicket({ ticket, catalogos, alExito, alError }: PropsAccion
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDialogoAsignar(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setDialogoAsignar(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || idAsignado === ""}
             onClick={() => void ejecutar("ASIGNAR", undefined, idAsignado as number)}>
             Asignar
@@ -361,7 +361,7 @@ function MenuAccionesTicket({ ticket, catalogos, alExito, alError }: PropsAccion
             slotProps={{ htmlInput: { min: 1 } }} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDialogoResolver(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setDialogoResolver(false)}>Cancelar</Button>
           <Button variant="contained"
             disabled={enviando || solucion.trim().length === 0 || minutosSolucion === "" || minutosSolucion <= 0}
             onClick={() => void ejecutar("RESOLVER", undefined, undefined, solucion.trim(), minutosSolucion as number)}>
@@ -394,7 +394,7 @@ function MenuAccionesTicket({ ticket, catalogos, alExito, alError }: PropsAccion
             slotProps={{ inputLabel: { shrink: true } }} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDialogoEscalar(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setDialogoEscalar(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || idProyecto === ""} onClick={() => void escalar()}>
             Escalar
           </Button>

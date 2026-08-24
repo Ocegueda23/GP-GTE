@@ -128,7 +128,7 @@ export function ModalEditarWorkItem({ abierto, item, catalogos, alCerrar, alExit
         />
       </DialogContent>
       <DialogActions>
-        <Button onClick={alCerrar}>Cancelar</Button>
+        <Button color="error" onClick={alCerrar}>Cancelar</Button>
         <Button variant="contained" disabled={enviando || !valido} onClick={() => void guardar()}>
           Guardar
         </Button>

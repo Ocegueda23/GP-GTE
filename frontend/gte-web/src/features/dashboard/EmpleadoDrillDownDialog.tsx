@@ -10,6 +10,7 @@ import {
 } from "recharts";
 import { AvatarUsuario } from "../../shared/components/AvatarUsuario";
 import { obtenerIndicadoresEmpleado } from "../../shared/api/dashboard";
+import { useColorSerie } from "../../shared/graficas/coloresGrafica";
 
 const NOMBRES_MES = [
   "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic",
@@ -36,6 +37,7 @@ const EXPLICACION_DIMENSION: Record<string, string> = {
 export function EmpleadoDrillDownDialog({ idUsuario, anio, mes, onClose }: {
   idUsuario: number | null; anio: number; mes: number; onClose: () => void;
 }) {
+  const colorSerie = useColorSerie();
   const indicadores = useQuery({
     queryKey: ["dashboard-empleado", idUsuario, anio, mes],
     queryFn: () => obtenerIndicadoresEmpleado(idUsuario as number, anio, mes),
@@ -137,7 +139,7 @@ export function EmpleadoDrillDownDialog({ idUsuario, anio, mes, onClose }: {
                   <XAxis type="number" domain={[0, 130]} />
                   <YAxis type="category" dataKey="dimension" width={130} tick={{ fontSize: 12 }} />
                   <RechartsTooltip formatter={(v) => Number(v).toFixed(1)} />
-                  <Bar dataKey="valor" name="Puntaje" fill="#0f766e" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="valor" name="Puntaje" fill={colorSerie("#0f766e")} radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
               <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", rowGap: 1, mt: 1 }}>
@@ -161,7 +163,7 @@ export function EmpleadoDrillDownDialog({ idUsuario, anio, mes, onClose }: {
                   <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
                   <YAxis domain={[0, 130]} />
                   <RechartsTooltip />
-                  <Line type="monotone" dataKey="puntaje" stroke="#334155" strokeWidth={2} connectNulls dot={{ r: 3 }} />
+                  <Line type="monotone" dataKey="puntaje" stroke={colorSerie("#334155")} strokeWidth={2} connectNulls dot={{ r: 3 }} />
                 </LineChart>
               </ResponsiveContainer>
             </Box>

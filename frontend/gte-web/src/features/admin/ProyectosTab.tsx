@@ -263,7 +263,7 @@ export function ProyectosTab() {
             label="Proyecto administrado (solo con acceso especial crea o elimina tareas)" />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setModal(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setModal(false)}>Cancelar</Button>
           <Button variant="contained" disabled={!valido} onClick={() => void guardar()}>Crear</Button>
         </DialogActions>
       </Dialog>
@@ -310,7 +310,7 @@ export function ProyectosTab() {
             label="Proyecto administrado (solo con acceso especial crea o elimina tareas)" />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setProyectoEditar(null)}>Cancelar</Button>
+          <Button color="error" onClick={() => setProyectoEditar(null)}>Cancelar</Button>
           <Button variant="contained" disabled={!validoEditar} onClick={() => void guardarEdicion()}>Guardar</Button>
         </DialogActions>
       </Dialog>

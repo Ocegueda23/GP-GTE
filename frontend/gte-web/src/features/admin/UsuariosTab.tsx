@@ -307,7 +307,7 @@ export function UsuariosTab() {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setModalNuevo(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setModalNuevo(false)}>Cancelar</Button>
           <Button variant="contained" disabled={dominio.trim().length === 0 || nombre.trim().length === 0}
             onClick={() => void crear()}>
             Crear
@@ -435,7 +435,7 @@ export function UsuariosTab() {
             )}
           </Stack>
           <Stack direction="row" spacing={1}>
-            <Button onClick={() => setUsuarioEditar(null)}>Cancelar</Button>
+            <Button color="error" onClick={() => setUsuarioEditar(null)}>Cancelar</Button>
             <Button variant="contained" onClick={() => void guardarEdicion()}>Guardar</Button>
           </Stack>
         </DialogActions>
@@ -473,7 +473,7 @@ export function UsuariosTab() {
           {erroSuplantacion && <Alert severity="error">{erroSuplantacion}</Alert>}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setSuplantarUsuario(null)}>Cancelar</Button>
+          <Button color="error" onClick={() => setSuplantarUsuario(null)}>Cancelar</Button>
           <Button
             variant="contained" disabled={enviandoSuplantacion || passwordPropia.trim().length === 0}
             onClick={() => void confirmarSuplantacion()}

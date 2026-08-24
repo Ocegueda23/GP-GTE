@@ -5,6 +5,7 @@ using GTE.Application.DTOs.Responses.Revisiones;
 using GTE.Application.Interfaces;
 using GTE.Domain.Calidad;
 using GTE.Domain.Exceptions;
+using GTE.Domain.Archivos;
 using GTE.Domain.Interfaces;
 using GTE.Domain.Revisiones;
 using GTE.Domain.WorkItems;
@@ -38,7 +39,8 @@ public class CrearRevisionHandler(
     IWorkItemRepository workItems,
     IMotorWorkflow motor,
     IProveedorUsuarioActual proveedorUsuario,
-    ISanitizadorHtml sanitizador) : IRequestHandler<CrearRevisionCommand, RevisionResponse>
+    ISanitizadorHtml sanitizador,
+    IArchivoRepository archivos) : IRequestHandler<CrearRevisionCommand, RevisionResponse>
 {
     public async Task<RevisionResponse> Handle(CrearRevisionCommand command, CancellationToken cancellationToken)
     {
@@ -76,6 +78,11 @@ public class CrearRevisionHandler(
             await workItems.AplicarEfectosTransicionAsync(
                 command.IdWorkItem, AccionesWorkItem.RechazarQa, cancellationToken);
         }
+
+        // Las imagenes pegadas durante el alta se subieron en borrador (sin vinculo, porque la
+        // entidad aun no tenia Id): ahora que existe, se adjuntan.
+        await archivos.VincularBorradoresAsync(
+            "Revision", idRevision, ReferenciasImagenes.ObtenerGuids(comentarios), cancellationToken);
 
         return await consultas.ObtenerPorIdAsync(idRevision, cancellationToken)
             ?? throw new NotFoundException("Revision", idRevision);

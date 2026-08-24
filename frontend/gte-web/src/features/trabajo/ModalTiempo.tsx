@@ -88,7 +88,7 @@ export function ModalTiempo({ abierto, item, alCerrar, alExito, alError }: Props
         />
       </DialogContent>
       <DialogActions>
-        <Button onClick={alCerrar}>Cancelar</Button>
+        <Button color="error" onClick={alCerrar}>Cancelar</Button>
         <Button variant="contained" disabled={enviando || !minutosValidos} onClick={() => void guardar()}>
           Guardar
         </Button>

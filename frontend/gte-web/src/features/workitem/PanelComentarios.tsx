@@ -124,7 +124,7 @@ export function PanelComentarios({ idWorkItem, idTicket, alError }: Props) {
               onEnviar={(html) => void publicar(html, comentario.idComentario)}
               onError={(mensaje) => alError(mensaje)}
             />
-            <Button size="small" sx={{ mt: 0.5 }} onClick={() => setRespondiendoA(null)}>Cancelar</Button>
+            <Button color="error" size="small" sx={{ mt: 0.5 }} onClick={() => setRespondiendoA(null)}>Cancelar</Button>
           </Box>
         )}
       </Box>

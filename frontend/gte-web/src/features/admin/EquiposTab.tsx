@@ -200,7 +200,7 @@ export function EquiposTab() {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setModalEquipo(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setModalEquipo(false)}>Cancelar</Button>
           <Button variant="contained" disabled={nombre.trim().length === 0} onClick={() => void guardarEquipo()}>
             Crear
           </Button>
@@ -222,7 +222,7 @@ export function EquiposTab() {
             slotProps={{ htmlInput: { min: 1, max: 100 } }} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setModalMiembro(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setModalMiembro(false)}>Cancelar</Button>
           <Button variant="contained" disabled={idUsuarioNuevo === ""} onClick={() => void agregarMiembro()}>
             Agregar
           </Button>

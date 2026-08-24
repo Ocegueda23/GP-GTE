@@ -301,7 +301,7 @@ export function PortalPage() {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setModal(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setModal(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || !valido} onClick={() => void guardar()}>
             Enviar
           </Button>
@@ -357,7 +357,7 @@ export function PortalPage() {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setSolicitudEditar(null)}>Cancelar</Button>
+          <Button color="error" onClick={() => setSolicitudEditar(null)}>Cancelar</Button>
           <Button variant="contained" disabled={guardandoEdicion || !validoEditar} onClick={() => void guardarEdicion()}>
             Guardar
           </Button>

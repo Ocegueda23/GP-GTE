@@ -282,7 +282,7 @@ export function PanelRevisiones({ idWorkItem, folio, alExito, alError }: Props) 
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setModalNuevo(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setModalNuevo(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || comentariosVacio || idSeveridad === ""}
             onClick={() => void reportar()}>
             Reportar
@@ -301,7 +301,7 @@ export function PanelRevisiones({ idWorkItem, folio, alExito, alError }: Props) 
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setReabrir(null)}>Cancelar</Button>
+          <Button color="error" onClick={() => setReabrir(null)}>Cancelar</Button>
           <Button variant="contained" color="warning"
             disabled={enviando || motivo.trim().length === 0}
             onClick={() => void confirmarReapertura()}>

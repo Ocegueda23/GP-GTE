@@ -46,6 +46,38 @@ async function subirArchivoA(ruta: string, archivo: File) {
   }
 }
 
+/** Imagen en borrador: todavia no hay entidad, asi que solo vuelve el GUID. */
+export interface ArchivoBorrador {
+  guidArchivo: string;
+  nombreArchivo: string;
+  tamanoBytes: number;
+}
+
+/**
+ * Sube una imagen pegada en un formulario de ALTA, cuando la entidad destino todavia no
+ * tiene Id. Queda sin vincular y a nombre de quien la subio; el comando de alta la adjunta
+ * al guardar, a partir del GUID que quedo en el contenido. Si el alta se cancela, el job
+ * de purga del backend la recoge.
+ */
+export async function subirArchivoBorrador(archivo: File) {
+  const formulario = new FormData();
+  formulario.append("archivo", archivo);
+  try {
+    const { data } = await http.post<ApiResponse<ArchivoBorrador>>(
+      "/api/v1/archivos/borrador",
+      formulario,
+      { headers: { "Content-Type": undefined } },
+    );
+    if (!data.success || !data.response) {
+      throw new ErrorApi(data.userMessage, data.code);
+    }
+    return { dato: data.response, mensaje: data.userMessage };
+  } catch (error) {
+    if (error instanceof ErrorApi) throw error;
+    lanzarErrorApi(error);
+  }
+}
+
 export async function subirArchivo(idWorkItem: number, archivo: File) {
   return subirArchivoA(`/api/v1/workitems/${idWorkItem}/archivos`, archivo);
 }

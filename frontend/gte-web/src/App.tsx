@@ -51,6 +51,13 @@ import {
 
 const CLAVE_TEMA = "gte.tema";
 
+/** Los tres inputs nativos de fecha/hora que dibujan su propio icono de calendario. */
+const SELECTOR_ICONO_CALENDARIO = [
+  "input[type=date]::-webkit-calendar-picker-indicator",
+  "input[type=datetime-local]::-webkit-calendar-picker-indicator",
+  "input[type=time]::-webkit-calendar-picker-indicator",
+].join(", ");
+
 /**
  * primary/secondary quedan fijos en ambos modos (MUI ya resuelve un contrastText legible
  * para cada uno); solo se fija background.default en claro para no perder el fondo actual
@@ -68,6 +75,27 @@ function construirTema(modo: PaletteMode) {
         // superficies en oscuro), y el default de MUI deja paper == default (#121212
         // ambos) -- sin esto, tablas/tarjetas se funden con el fondo de la pagina.
         : { default: "#0f172a", paper: "#1e293b" },   // slate 900 / slate 800
+      // Colores de fuente del modo oscuro tomados del esquema Dark+ del editor: el gris
+      // azulado anterior (slate 100/400) se leia lavado sobre el fondo. Solo se tocan los
+      // colores de texto/divisor; fondos, primary y secondary quedan igual.
+      ...(modo === "dark"
+        ? {
+          text: { primary: "#e6e6e6", secondary: "#9d9d9d", disabled: "#6d6d6d" },
+          // Los cuatro semanticos son tonos claros del Dark+ pensados para LEERSE sobre
+          // el fondo oscuro (variantes text/outlined de Button, Chip, Alert). Como son
+          // claros, contrastText se fija a mano al fondo oscuro: si se deja que MUI lo
+          // calcule, la variante contained termina con texto blanco sobre relleno claro
+          // y el texto del boton se pierde.
+          info: { main: "#4fc1ff", contrastText: "#0f172a" },    // azul
+          success: { main: "#89d185", contrastText: "#0f172a" }, // verde
+          warning: { main: "#ce9178", contrastText: "#0f172a" }, // naranja
+          error: { main: "#f48771", contrastText: "#0f172a" },   // rojo
+          // primary/secondary son oscuros: su texto va en blanco, tambien explicito.
+          primary: { main: "#334155", contrastText: "#ffffff" },
+          secondary: { main: "#0f766e", contrastText: "#ffffff" },
+          divider: "#3e3e42",
+        }
+        : {}),
     },
     typography: {
       fontSize: 13.5,
@@ -75,6 +103,124 @@ function construirTema(modo: PaletteMode) {
     },
     components: {
       MuiPaper: { defaultProps: { elevation: 0 } },
+      // Los titulos en oscuro van con el azul claro de identificadores del Dark+ para
+      // separarlos del cuerpo de texto sin bajar el contraste. h6 queda fuera: lo usan
+      // el titulo del AppBar y los encabezados de dialogo, que van sobre primary.
+      ...(modo === "dark"
+        ? {
+          MuiTypography: {
+            styleOverrides: {
+              h1: { color: "#9cdcfe" },
+              h2: { color: "#9cdcfe" },
+              h3: { color: "#9cdcfe" },
+              h4: { color: "#9cdcfe" },
+              h5: { color: "#9cdcfe" },
+            },
+          },
+          // Botones text/outlined: MUI pinta la etiqueta con el `main` del color, y
+          // primary (#334155) / secondary (#0f766e) son tonos oscuros pensados para
+          // RELLENO (AppBar, contained) -- sobre el fondo #0f172a la etiqueta quedaba
+          // practicamente invisible. En oscuro se sustituyen por los tonos claros del
+          // Dark+: azul para las acciones normales, verde azulado para secondary. Las
+          // variantes con color error/success/warning ya heredan el rojo/verde/naranja
+          // claros de la paleta, asi que no necesitan override.
+          // Se usa `variants` (y no los slots textPrimary/outlinedPrimary): MUI 9 ya no
+          // genera esas clases compuestas, los overrides con ese nombre no aplican.
+          MuiButton: {
+            variants: [
+              {
+                props: { variant: "text", color: "primary" },
+                style: {
+                  color: "#4fc1ff",
+                  "&:hover": { backgroundColor: "rgba(79, 193, 255, 0.10)" },
+                },
+              },
+              {
+                props: { variant: "outlined", color: "primary" },
+                style: {
+                  color: "#4fc1ff",
+                  borderColor: "rgba(79, 193, 255, 0.5)",
+                  "&:hover": {
+                    borderColor: "#4fc1ff",
+                    backgroundColor: "rgba(79, 193, 255, 0.10)",
+                  },
+                },
+              },
+              {
+                props: { variant: "text", color: "secondary" },
+                style: {
+                  color: "#4ec9b0",
+                  "&:hover": { backgroundColor: "rgba(78, 201, 176, 0.10)" },
+                },
+              },
+              {
+                props: { variant: "outlined", color: "secondary" },
+                style: {
+                  color: "#4ec9b0",
+                  borderColor: "rgba(78, 201, 176, 0.5)",
+                  "&:hover": {
+                    borderColor: "#4ec9b0",
+                    backgroundColor: "rgba(78, 201, 176, 0.10)",
+                  },
+                },
+              },
+            ],
+          },
+          // IconButton color="primary" tiene el mismo problema (slate sobre fondo oscuro).
+          MuiIconButton: {
+            variants: [
+              { props: { color: "primary" }, style: { color: "#4fc1ff" } },
+              { props: { color: "secondary" }, style: { color: "#4ec9b0" } },
+            ],
+          },
+          // Chip outlined: igual que los botones, la etiqueta se pinta con el `main` del
+          // color y primary/secondary son tonos de relleno, ilegibles sobre el fondo.
+          MuiChip: {
+            variants: [
+              {
+                props: { variant: "outlined", color: "primary" },
+                style: { color: "#4fc1ff", borderColor: "rgba(79, 193, 255, 0.5)" },
+              },
+              {
+                props: { variant: "outlined", color: "secondary" },
+                style: { color: "#4ec9b0", borderColor: "rgba(78, 201, 176, 0.5)" },
+              },
+            ],
+          },
+          // Tabs: la pestana activa y su subrayado usan primary.main (#334155), que sobre
+          // el fondo oscuro no se distingue de las inactivas. Van al azul del Dark+.
+          MuiTabs: { styleOverrides: { indicator: { backgroundColor: "#4fc1ff" } } },
+          MuiTab: {
+            styleOverrides: {
+              root: {
+                color: "#9d9d9d",
+                "&.Mui-selected": { color: "#4fc1ff" },
+              },
+            },
+          },
+          // Triangulo desplegable de los combos (Select y Autocomplete) en el mismo azul.
+          MuiSelect: { styleOverrides: { icon: { color: "#4fc1ff" } } },
+          MuiNativeSelect: { styleOverrides: { icon: { color: "#4fc1ff" } } },
+          MuiAutocomplete: {
+            styleOverrides: {
+              popupIndicator: { color: "#4fc1ff" },
+              clearIndicator: { color: "#9d9d9d" },
+            },
+          },
+          // El icono de calendario de <input type="date"> lo dibuja el navegador y sale
+          // negro (no hereda color); solo se puede recolorear con filter. La cadena
+          // aproxima el azul #4fc1ff sobre el glifo negro original.
+          MuiCssBaseline: {
+            styleOverrides: {
+              [SELECTOR_ICONO_CALENDARIO]: {
+                cursor: "pointer",
+                filter: "invert(72%) sepia(41%) saturate(1352%) hue-rotate(174deg) "
+                  + "brightness(103%) contrast(101%)",
+              },
+            },
+          },
+        }
+        : {}),
       // Los folios/titulos enlazados se pintan como texto normal en muchas pantallas
       // (Typography+RouterLink con color explicito propio); el <Link> de MUI sin color
       // usa "primary" por default, que en modo oscuro (slate 700 sobre fondo casi negro)

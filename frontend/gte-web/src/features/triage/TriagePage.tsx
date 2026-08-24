@@ -324,7 +324,7 @@ function MenuAccionesSolicitud({ solicitud, catalogos, alExito, alError }: Props
             onChange={(e) => setMotivo(e.target.value)} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAccionConMotivo(null)}>Cancelar</Button>
+          <Button color="error" onClick={() => setAccionConMotivo(null)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || motivo.trim().length === 0}
             onClick={() => accionConMotivo && void ejecutar(accionConMotivo.accion, motivo.trim())}>
             Confirmar
@@ -345,7 +345,7 @@ function MenuAccionesSolicitud({ solicitud, catalogos, alExito, alError }: Props
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDialogoAprobar(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setDialogoAprobar(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || idProyecto === ""}
             onClick={() => void ejecutar("APROBAR", undefined, idProyecto as number)}>
             Aprobar
@@ -411,7 +411,7 @@ function MenuAccionesSolicitud({ solicitud, catalogos, alExito, alError }: Props
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDialogoConvertir(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setDialogoConvertir(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || !conversionValida}
             onClick={() => void convertir()}>
             Convertir

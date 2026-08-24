@@ -208,7 +208,7 @@ export function CasosPruebaTab() {
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setCasoEditar(null)}>Cancelar</Button>
+          <Button color="error" onClick={() => setCasoEditar(null)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || !tituloEditar.trim()} onClick={() => void guardarEdicion()}>
             Guardar
           </Button>
@@ -227,7 +227,7 @@ export function CasosPruebaTab() {
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setCasoRetirar(null)}>Cancelar</Button>
+          <Button color="error" onClick={() => setCasoRetirar(null)}>Cancelar</Button>
           <Button variant="contained" color="error" disabled={enviando} onClick={() => void confirmarRetiro()}>
             Retirar
           </Button>

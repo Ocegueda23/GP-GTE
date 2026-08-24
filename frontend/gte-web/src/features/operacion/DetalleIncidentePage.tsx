@@ -192,7 +192,7 @@ function BotonesAccionesIncidente({ idIncidente, folio, acciones, alExito, alErr
             label="Motivo (obligatorio)" value={motivo} onChange={(e) => setMotivo(e.target.value)} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAccionConMotivo(null)}>Cancelar</Button>
+          <Button color="error" onClick={() => setAccionConMotivo(null)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || motivo.trim().length === 0}
             onClick={() => accionConMotivo && void ejecutar(accionConMotivo.accion, motivo.trim())}>
             Confirmar
@@ -258,7 +258,7 @@ function BotonEditar({ incidente, alExito, alError }: {
             onChange={(e) => setMinutos(e.target.value)} slotProps={{ htmlInput: { min: 0 } }} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAbierto(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setAbierto(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || titulo.trim().length === 0} onClick={() => void guardar()}>
             Guardar
           </Button>
@@ -311,7 +311,7 @@ function BotonSeveridad({ idIncidente, folio, idSeveridadActual, severidades, al
             value={motivo} onChange={(e) => setMotivo(e.target.value)} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAbierto(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setAbierto(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || idSeveridad === "" || motivo.trim().length === 0}
             onClick={() => void cambiar()}>
             Confirmar
@@ -379,7 +379,7 @@ function BotonCorrectivo({ idIncidente, folio, prioridades, usuarios, alExito, a
             onChange={(e) => setFechaCompromiso(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAbierto(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setAbierto(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || idPrioridad === ""} onClick={() => void vincular()}>
             Vincular
           </Button>
@@ -429,7 +429,7 @@ function BotonReleaseCausante({ idIncidente, folio, releases, alExito, alError }
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAbierto(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setAbierto(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || idRelease === ""} onClick={() => void vincular()}>
             Vincular
           </Button>

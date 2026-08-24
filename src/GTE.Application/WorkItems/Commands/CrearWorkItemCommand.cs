@@ -4,6 +4,7 @@ using GTE.Application.DTOs.Responses.WorkItems;
 using GTE.Application.Interfaces;
 using GTE.Domain.Administracion;
 using GTE.Domain.Exceptions;
+using GTE.Domain.Archivos;
 using GTE.Domain.Interfaces;
 using GTE.Domain.WorkItems;
 using MediatR;
@@ -36,7 +37,8 @@ public class CrearWorkItemHandler(
     IGeneradorFolios folios,
     IVerificadorPermisos permisos,
     ISanitizadorHtml sanitizador,
-    IProveedorUsuarioActual proveedorUsuario) : IRequestHandler<CrearWorkItemCommand, WorkItemResponse>
+    IProveedorUsuarioActual proveedorUsuario,
+    IArchivoRepository archivos) : IRequestHandler<CrearWorkItemCommand, WorkItemResponse>
 {
     public async Task<WorkItemResponse> Handle(CrearWorkItemCommand command, CancellationToken cancellationToken)
     {
@@ -106,6 +108,11 @@ public class CrearWorkItemHandler(
             datos.Titulo.Trim(), descripcion, datos.CriteriosAceptacion, datos.IdPrioridad,
             idComplejidadEfectiva, datos.IdAsignado, datos.IdSolicitante, puntosHistoria,
             minutosPresupuesto, datos.FechaCompromiso, datos.IdUsuarioSolicitante), cancellationToken);
+
+        // Las imagenes pegadas durante el alta se subieron en borrador (sin vinculo, porque la
+        // entidad aun no tenia Id): ahora que existe, se adjuntan.
+        await archivos.VincularBorradoresAsync(
+            "WorkItem", idWorkItem, ReferenciasImagenes.ObtenerGuids(descripcion), cancellationToken);
 
         return await consultas.ObtenerPorIdAsync(idWorkItem, cancellationToken)
             ?? throw new NotFoundException("WorkItem", idWorkItem);

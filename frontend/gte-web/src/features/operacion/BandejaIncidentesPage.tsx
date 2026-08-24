@@ -258,7 +258,7 @@ export function BandejaIncidentesPage() {
             value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setModal(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setModal(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || !valido} onClick={() => void guardar()}>
             Registrar
           </Button>
@@ -399,7 +399,7 @@ function MenuAccionesIncidente({ incidente, catalogos, alExito, alError }: Props
             label="Motivo (obligatorio)" value={motivo} onChange={(e) => setMotivo(e.target.value)} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAccionConMotivo(null)}>Cancelar</Button>
+          <Button color="error" onClick={() => setAccionConMotivo(null)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || motivo.trim().length === 0}
             onClick={() => accionConMotivo && void ejecutar(accionConMotivo.accion, motivo.trim())}>
             Confirmar
@@ -421,7 +421,7 @@ function MenuAccionesIncidente({ incidente, catalogos, alExito, alError }: Props
             value={motivoSeveridad} onChange={(e) => setMotivoSeveridad(e.target.value)} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDialogoSeveridad(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setDialogoSeveridad(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || nuevaSeveridad === "" || motivoSeveridad.trim().length === 0}
             onClick={() => void cambiarSeveridad()}>
             Confirmar
@@ -452,7 +452,7 @@ function MenuAccionesIncidente({ incidente, catalogos, alExito, alError }: Props
             onChange={(e) => setFechaCompromiso(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDialogoCorrectivo(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setDialogoCorrectivo(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || idPrioridad === ""} onClick={() => void vincular()}>
             Vincular
           </Button>

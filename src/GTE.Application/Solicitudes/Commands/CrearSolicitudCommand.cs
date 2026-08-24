@@ -3,6 +3,7 @@ using GTE.Application.DTOs.Request.Solicitudes;
 using GTE.Application.DTOs.Responses.Solicitudes;
 using GTE.Application.Interfaces;
 using GTE.Domain.Exceptions;
+using GTE.Domain.Archivos;
 using GTE.Domain.Interfaces;
 using GTE.Domain.Solicitudes;
 using MediatR;
@@ -36,7 +37,8 @@ public class CrearSolicitudHandler(
     IGeneradorFolios folios,
     IMotorWorkflow motor,
     ISanitizadorHtml sanitizador,
-    IProveedorUsuarioActual proveedorUsuario) : IRequestHandler<CrearSolicitudCommand, SolicitudResponse>
+    IProveedorUsuarioActual proveedorUsuario,
+    IArchivoRepository archivos) : IRequestHandler<CrearSolicitudCommand, SolicitudResponse>
 {
     public async Task<SolicitudResponse> Handle(CrearSolicitudCommand command, CancellationToken cancellationToken)
     {
@@ -57,6 +59,11 @@ public class CrearSolicitudHandler(
         await motor.EjecutarAccionAsync(
             "Solicitud", idSolicitud, AccionesSolicitud.Enviar, null, null, cancellationToken);
         await repositorio.AplicarEfectosTransicionAsync(idSolicitud, AccionesSolicitud.Enviar, cancellationToken);
+
+        // Las imagenes pegadas durante el alta se subieron en borrador (sin vinculo, porque la
+        // entidad aun no tenia Id): ahora que existe, se adjuntan.
+        await archivos.VincularBorradoresAsync(
+            "Solicitud", idSolicitud, ReferenciasImagenes.ObtenerGuids(descripcion), cancellationToken);
 
         return await consultas.ObtenerPorIdAsync(idSolicitud, cancellationToken)
             ?? throw new NotFoundException("Solicitud", idSolicitud);

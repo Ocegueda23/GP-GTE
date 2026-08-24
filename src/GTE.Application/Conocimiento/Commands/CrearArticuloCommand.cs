@@ -2,6 +2,7 @@ using FluentValidation;
 using GTE.Application.DTOs.Request.Conocimiento;
 using GTE.Application.DTOs.Responses.Conocimiento;
 using GTE.Application.Interfaces;
+using GTE.Domain.Archivos;
 using GTE.Domain.Conocimiento;
 using GTE.Domain.Exceptions;
 using GTE.Domain.Interfaces;
@@ -29,7 +30,8 @@ public class CrearArticuloHandler(
     IConocimientoRepository repositorio,
     IConocimientoQueryService consultas,
     IVerificadorPermisos permisos,
-    ISanitizadorHtml sanitizador) : IRequestHandler<CrearArticuloCommand, ArticuloResponse>
+    ISanitizadorHtml sanitizador,
+    IArchivoRepository archivos) : IRequestHandler<CrearArticuloCommand, ArticuloResponse>
 {
     public async Task<ArticuloResponse> Handle(CrearArticuloCommand command, CancellationToken cancellationToken)
     {
@@ -50,6 +52,13 @@ public class CrearArticuloHandler(
         var idArticulo = await repositorio.CrearAsync(
             new ArticuloNuevo(titulo, contenido, command.Datos.EsGlosario, command.Datos.EsPublico),
             cancellationToken);
+
+        // Las imagenes pegadas durante el alta se subieron en borrador (sin vinculo, porque el
+        // articulo aun no tenia Id): ahora que existe, se adjuntan. Asi el alta con imagen
+        // queda en una sola version, sin obligar a guardar, reabrir y volver a guardar.
+        await archivos.VincularBorradoresAsync(
+            ConstantesConocimiento.EntidadArchivo, idArticulo,
+            ReferenciasImagenes.ObtenerGuids(contenido), cancellationToken);
 
         return await consultas.ObtenerPorIdAsync(idArticulo, cancellationToken)
             ?? throw new NotFoundException("ArticuloConocimiento", idArticulo);

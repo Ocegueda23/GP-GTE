@@ -180,7 +180,7 @@ export function CatalogoFormModal({ clave, config, registro, onClose, onGuardado
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose} disabled={guardando}>Cancelar</Button>
+        <Button color="error" onClick={onClose} disabled={guardando}>Cancelar</Button>
         <Button variant="contained" onClick={() => void guardar()} disabled={guardando}>Guardar</Button>
       </DialogActions>
     </Dialog>

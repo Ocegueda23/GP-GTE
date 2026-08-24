@@ -200,7 +200,7 @@ export function DetalleArticuloPage() {
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirmandoBaja(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setConfirmandoBaja(false)}>Cancelar</Button>
           <Button variant="contained" color="error" onClick={() => void eliminar()}>Eliminar</Button>
         </DialogActions>
       </Dialog>

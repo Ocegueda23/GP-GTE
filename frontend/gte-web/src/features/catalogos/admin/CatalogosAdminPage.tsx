@@ -59,7 +59,7 @@ function NuevoCatalogoDialog({ onClose, onCreado }: { onClose: () => void; onCre
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose} disabled={guardando}>Cancelar</Button>
+        <Button color="error" onClick={onClose} disabled={guardando}>Cancelar</Button>
         <Button variant="contained" onClick={() => void crear()} disabled={guardando}>Crear</Button>
       </DialogActions>
     </Dialog>

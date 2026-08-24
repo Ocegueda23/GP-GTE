@@ -273,7 +273,7 @@ function SeccionTarifas({ tarifas, niveles, puedeGestionar, alExito, alError }: 
               onChange={(e) => setVigenciaDesde(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setModal(false)}>Cancelar</Button>
+            <Button color="error" onClick={() => setModal(false)}>Cancelar</Button>
             <Button variant="contained" disabled={idNivel === "" || !costoHora || !vigenciaDesde} onClick={() => void guardar()}>
               Guardar
             </Button>
@@ -385,7 +385,7 @@ function SeccionPresupuesto({ idProyecto, anio, presupuestos, puedeGestionar, al
               onChange={(e) => setHoras(e.target.value)} slotProps={{ htmlInput: { min: 0, step: 0.5 } }} />
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setModal(false)}>Cancelar</Button>
+            <Button color="error" onClick={() => setModal(false)}>Cancelar</Button>
             <Button variant="contained" disabled={!monto || !horas} onClick={() => void guardar()}>Guardar</Button>
           </DialogActions>
         </Dialog>

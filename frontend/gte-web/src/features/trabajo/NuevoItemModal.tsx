@@ -173,7 +173,7 @@ export function NuevoItemModal({ abierto, catalogos, alCerrar, alExito, alError,
         />
       </DialogContent>
       <DialogActions>
-        <Button onClick={alCerrar}>Cancelar</Button>
+        <Button color="error" onClick={alCerrar}>Cancelar</Button>
         <Button variant="contained" disabled={enviando || !valido} onClick={() => void guardar()}>
           Crear
         </Button>

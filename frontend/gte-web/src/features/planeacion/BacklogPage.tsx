@@ -444,7 +444,7 @@ export function BacklogPage() {
             slotProps={{ inputLabel: { shrink: true } }} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setModalSprint(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setModalSprint(false)}>Cancelar</Button>
           <Button variant="contained" onClick={() => void guardarSprint()}
             disabled={idEquipoNuevo === "" || nombre.trim().length === 0 || !fechaInicio || !fechaFin}>
             Crear
@@ -467,7 +467,7 @@ export function BacklogPage() {
             slotProps={{ inputLabel: { shrink: true } }} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setModalEditar(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setModalEditar(false)}>Cancelar</Button>
           <Button variant="contained" onClick={() => void guardarEdicionSprint()}
             disabled={nombreEditar.trim().length === 0 || !fechaInicioEditar || !fechaFinEditar}>
             Guardar
@@ -491,7 +491,7 @@ export function BacklogPage() {
           </FormControl>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setModalCierre(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setModalCierre(false)}>Cancelar</Button>
           <Button variant="contained" onClick={() => {
             setModalCierre(false);
             void manejar(() => cambiarEstatusSprint(sprintActual!, {

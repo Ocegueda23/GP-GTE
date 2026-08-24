@@ -219,7 +219,7 @@ export function PortalTicketsPage() {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setModal(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setModal(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || !valido} onClick={() => void guardar()}>
             Enviar
           </Button>
@@ -299,7 +299,7 @@ function FilaTicket({ ticket, alExito, alError }: {
             value={comentario} onChange={(e) => setComentario(e.target.value)} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setCalificando(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setCalificando(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || !calificacion} onClick={() => void calificar()}>
             Enviar
           </Button>

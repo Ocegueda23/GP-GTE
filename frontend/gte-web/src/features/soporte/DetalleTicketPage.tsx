@@ -263,7 +263,7 @@ function BotonesAccionesTicket({ idTicket, folio, acciones, alExito, alError }: 
             label="Motivo (obligatorio)" value={motivo} onChange={(e) => setMotivo(e.target.value)} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAccionConMotivo(null)}>Cancelar</Button>
+          <Button color="error" onClick={() => setAccionConMotivo(null)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || motivo.trim().length === 0}
             onClick={() => accionConMotivo && void ejecutar(accionConMotivo.accion, motivo.trim())}>
             Confirmar
@@ -283,7 +283,7 @@ function BotonesAccionesTicket({ idTicket, folio, acciones, alExito, alError }: 
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDialogoAsignar(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setDialogoAsignar(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || idAsignado === ""}
             onClick={() => void ejecutar("ASIGNAR", undefined, idAsignado as number)}>
             Asignar
@@ -302,7 +302,7 @@ function BotonesAccionesTicket({ idTicket, folio, acciones, alExito, alError }: 
             slotProps={{ htmlInput: { min: 1 } }} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDialogoResolver(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setDialogoResolver(false)}>Cancelar</Button>
           <Button variant="contained"
             disabled={enviando || solucion.trim().length === 0 || minutosSolucion === "" || minutosSolucion <= 0}
             onClick={() => void ejecutar("RESOLVER", undefined, undefined, solucion.trim(), minutosSolucion as number)}>
@@ -373,7 +373,7 @@ function BotonEscalar({ idTicket, folio, proyectos, usuarios, alExito, alError }
             onChange={(e) => setFechaCompromiso(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAbierto(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setAbierto(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || idProyecto === ""} onClick={() => void escalar()}>
             Escalar
           </Button>

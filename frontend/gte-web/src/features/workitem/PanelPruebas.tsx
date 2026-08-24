@@ -232,7 +232,7 @@ export function PanelPruebas({ idWorkItem, idProyecto, alExito, alError }: Props
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setModalAsignar(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setModalAsignar(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || idCasoAsignar === ""} onClick={() => void asignarExistente()}>
             Asignar
           </Button>
@@ -270,7 +270,7 @@ export function PanelPruebas({ idWorkItem, idProyecto, alExito, alError }: Props
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setModalNuevo(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setModalNuevo(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || !tituloNuevo.trim()} onClick={() => void crearNuevo()}>
             Crear
           </Button>
@@ -336,7 +336,7 @@ export function PanelPruebas({ idWorkItem, idProyecto, alExito, alError }: Props
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setModalResultado(null)}>Cancelar</Button>
+          <Button color="error" onClick={() => setModalResultado(null)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || (idResultado === 2 && idSeveridad === "")}
             onClick={() => void guardarResultado()}>
             Guardar

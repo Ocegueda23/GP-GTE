@@ -153,7 +153,7 @@ export function AmbientesTab() {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setModal(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setModal(false)}>Cancelar</Button>
           <Button variant="contained" disabled={nombre.trim().length === 0} onClick={() => void guardar()}>
             Crear
           </Button>

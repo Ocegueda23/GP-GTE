@@ -173,7 +173,7 @@ export function MenuAcciones({ item, catalogos, alExito, alError }: Props) {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAccionConMotivo(null)}>Cancelar</Button>
+          <Button color="error" onClick={() => setAccionConMotivo(null)}>Cancelar</Button>
           <Button
             variant="contained"
             disabled={enviando || motivo.trim().length === 0}

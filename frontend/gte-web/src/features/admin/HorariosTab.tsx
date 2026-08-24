@@ -221,7 +221,7 @@ export function HorariosTab() {
             onChange={(e) => setNombreHorario(e.target.value)} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setModalHorario(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setModalHorario(false)}>Cancelar</Button>
           <Button variant="contained" disabled={nombreHorario.trim().length === 0}
             onClick={() => void crearNuevoHorario()}>
             Crear
@@ -246,7 +246,7 @@ export function HorariosTab() {
           </FormControl>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setModalFestivo(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setModalFestivo(false)}>Cancelar</Button>
           <Button variant="contained" disabled={!fechaFestivo || descripcionFestivo.trim().length === 0}
             onClick={() => void agregarFestivo()}>
             Agregar

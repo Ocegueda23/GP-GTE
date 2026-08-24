@@ -24,10 +24,10 @@ interface Props {
  * el mismo editor de la Descripcion de WorkItem: trae formato basico y pegado de
  * imagenes del portapapeles.
  *
- * Pegar una imagen exige que el articulo YA exista (necesita un IdEntidad al que
- * adjuntar el archivo), asi que en el alta el editor rechaza el pegado con un aviso
- * y la subida queda disponible al reabrir para editar -- mismo comportamiento que
- * los demas formularios del sistema.
+ * Pegar imagenes funciona tambien en el alta: el editor las sube en borrador (sin
+ * vinculo, porque el articulo aun no tiene Id) y el comando de alta las adjunta al
+ * guardar. Antes habia que guardar, reabrir y volver a guardar, y eso dejaba el
+ * articulo recien creado en la version 2.
  */
 export function ArticuloModal({ abierto, articulo, onCerrar, onExito }: Props) {
   const [titulo, setTitulo] = useState("");
@@ -127,12 +127,13 @@ export function ArticuloModal({ abierto, articulo, onCerrar, onExito }: Props) {
           />
         ) : (
           <Typography variant="caption" color="text.secondary">
-            Guarda el articulo para poder adjuntar archivos y pegar imagenes.
+            Guarda el articulo para poder adjuntar archivos. Las imagenes pegadas en el
+            contenido si se guardan junto con esta alta.
           </Typography>
         )}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onCerrar}>Cancelar</Button>
+        <Button color="error" onClick={onCerrar}>Cancelar</Button>
         <Button variant="contained" disabled={enviando || !valido} onClick={() => void guardar()}>
           Guardar
         </Button>

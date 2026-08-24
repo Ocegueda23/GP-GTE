@@ -205,7 +205,7 @@ function FilaResultadoClave({ idObjetivoOkr, resultado, alExito, alError }: {
             onChange={(e) => setClaveKpi(e.target.value)} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setModal(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setModal(false)}>Cancelar</Button>
           <Button variant="contained" disabled={!nombre.trim() || !valorMeta} onClick={() => void guardar()}>
             Guardar
           </Button>
@@ -243,7 +243,7 @@ function ModalNuevoResultado({ abierto, idObjetivoOkr, onCerrar, alExito, alErro
         <TextField size="small" label="Clave KPI (opcional)" value={claveKpi} onChange={(e) => setClaveKpi(e.target.value)} />
       </DialogContent>
       <DialogActions>
-        <Button onClick={onCerrar}>Cancelar</Button>
+        <Button color="error" onClick={onCerrar}>Cancelar</Button>
         <Button variant="contained" disabled={!nombre.trim() || !valorMeta} onClick={() => void guardar()}>
           Agregar
         </Button>
@@ -331,7 +331,7 @@ function ModalNuevoObjetivo({ abierto, proyectos, equipos, anioSugerido, onCerra
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onCerrar}>Cancelar</Button>
+        <Button color="error" onClick={onCerrar}>Cancelar</Button>
         <Button variant="contained" disabled={!valido} onClick={() => void guardar()}>Crear</Button>
       </DialogActions>
     </Dialog>

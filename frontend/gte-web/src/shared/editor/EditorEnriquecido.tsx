@@ -9,7 +9,7 @@ import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import { useQueryClient } from "@tanstack/react-query";
-import { subirArchivo, type Archivo } from "../api/archivos";
+import { subirArchivo, subirArchivoBorrador, type Archivo } from "../api/archivos";
 import { ImagenProtegida } from "./ImagenProtegida";
 import { FontSize } from "./FontSize";
 import { normalizarHtmlLegado } from "./textoPlano";
@@ -22,7 +22,7 @@ interface Props {
   label?: string;
   placeholder?: string;
   minHeight?: number;
-  /** Si no se da (ni onSubirImagen), pegar una imagen se rechaza (no hay a que WorkItem adjuntarla todavia). */
+  /** WorkItem al que adjuntar las imagenes pegadas cuando el item ya existe. */
   idWorkItemParaAdjuntos?: number;
   /**
    * Subida de imagen generica para entidades distintas a WorkItem (ej. Solicitud): recibe el
@@ -45,8 +45,14 @@ export function EditorEnriquecido({
   value, onChange, label, placeholder, minHeight = 80, idWorkItemParaAdjuntos, onSubirImagen, onError, onVacioChange,
 }: Props) {
   const clienteQuery = useQueryClient();
+  // Sin entidad destino (formulario de alta) la imagen se sube en borrador: queda sin vinculo
+  // y el comando de alta la adjunta al guardar, leyendo el GUID del contenido. Antes aqui se
+  // rechazaba el pegado, lo que obligaba a guardar, reabrir y volver a guardar -- y en la base
+  // de conocimiento eso dejaba el articulo en version 2 recien creado.
   const subir = onSubirImagen
-    ?? (idWorkItemParaAdjuntos ? (archivo: File) => subirArchivo(idWorkItemParaAdjuntos, archivo) : null);
+    ?? (idWorkItemParaAdjuntos
+      ? (archivo: File) => subirArchivo(idWorkItemParaAdjuntos, archivo)
+      : (archivo: File) => subirArchivoBorrador(archivo));
 
   const editor = useEditor({
     extensions: [
@@ -65,10 +71,6 @@ export function EditorEnriquecido({
         if (!archivo) return false;
 
         event.preventDefault();
-        if (!subir) {
-          onError?.("Guarda el elemento antes de poder pegar imagenes aqui.");
-          return true;
-        }
         subir(archivo)
           .then((resultado) => {
             if (!resultado) return;
