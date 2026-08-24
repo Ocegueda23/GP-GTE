@@ -3,6 +3,7 @@ import {
   Badge, Box, Chip, Link, Paper, Table, TableBody, TableCell, TableContainer,
   TableHead, TablePagination, TableRow, TableSortLabel, Tooltip, Typography,
 } from "@mui/material";
+import { alpha, type Theme } from "@mui/material/styles";
 import { Link as RouterLink } from "react-router-dom";
 import RateReviewIcon from "@mui/icons-material/RateReview";
 import type { ResultadoPaginado } from "../../shared/api/http";
@@ -20,10 +21,15 @@ interface Props {
   alError: (mensaje: string) => void;
 }
 
-/** Semantica visual heredada del GT: vencida en rojo suave, En Proceso en verde suave. */
-function fondoFila(item: BandejaItem): string | undefined {
-  if (item.esVencida) return "#fdecea";
-  if (item.idEstatus === 2) return "#eaf6ec";
+/**
+ * Semantica visual heredada del GT: vencida en rojo suave, En Proceso en verde suave.
+ * Con alpha() sobre los colores del theme en vez de hex fijos, para que el tinte se vea
+ * bien tanto en modo claro como oscuro (un pastel solido se rompe contra fondo oscuro).
+ */
+function fondoFila(item: BandejaItem, theme: Theme): string | undefined {
+  const intensidad = theme.palette.mode === "dark" ? 0.18 : 0.08;
+  if (item.esVencida) return alpha(theme.palette.error.main, intensidad);
+  if (item.idEstatus === 2) return alpha(theme.palette.success.main, intensidad);
   return undefined;
 }
 
@@ -105,9 +111,10 @@ export function TablaBandeja({ datos, cargando, catalogos, alExito, alError }: P
               </TableRow>
             )}
             {datos?.items.map((item) => (
-              <TableRow key={item.idWorkItem} hover sx={{ backgroundColor: fondoFila(item) }}>
+              <TableRow key={item.idWorkItem} hover
+                sx={(theme) => ({ backgroundColor: fondoFila(item, theme) })}>
                 <TableCell sx={{ whiteSpace: "nowrap", fontWeight: 600 }}>
-                  <Link component={RouterLink} to={`/wi/${item.folio}`} underline="hover">
+                  <Link component={RouterLink} to={`/wi/${item.folio}`} underline="hover" color="info">
                     {item.folio}
                   </Link>
                 </TableCell>

@@ -34,7 +34,17 @@ public class PlaneacionController(IMediator mediator) : ControllerBase
         return Ok(ApiResponse<SprintResponse>.Exito(resultado, $"Sprint {resultado.Nombre} creado."));
     }
 
-    /// <summary>ACTIVAR o CERRAR. Al cerrar, destinoItemsAbiertos = Backlog o SiguienteSprint.</summary>
+    /// <summary>Editar nombre/objetivo/fechas. Un sprint Cerrado no se puede modificar.</summary>
+    [HttpPut("sprints/{id:int}")]
+    public async Task<ActionResult<ApiResponse<SprintResponse>>> EditarSprint(
+        int id, [FromBody] SprintEditarRequest request, CancellationToken cancellationToken)
+    {
+        var resultado = await mediator.Send(new EditarSprintCommand(id, request), cancellationToken);
+        return Ok(ApiResponse<SprintResponse>.Exito(resultado, "Sprint actualizado."));
+    }
+
+    /// <summary>ACTIVAR, CERRAR o VOLVER_PLANEADO (reversa Activo -&gt; Planeado).
+    /// Al cerrar, destinoItemsAbiertos = Backlog o SiguienteSprint.</summary>
     [HttpPut("sprints/{id:int}/estatus")]
     public async Task<ActionResult<ApiResponse<SprintResponse>>> CambiarEstatusSprint(
         int id, [FromBody] CambiarEstatusSprintRequest request, CancellationToken cancellationToken)

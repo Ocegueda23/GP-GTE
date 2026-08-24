@@ -123,6 +123,24 @@ public class ReleasesController(IMediator mediator) : ControllerBase
             $"Contenido enviado al release {resultado.Version} ({resultado.Folio})."));
     }
 
+    /// <summary>Cadena de aprobacion de releases configurada para el proyecto (vacia = usa el default fijo QA/Lider/Negocio).</summary>
+    [HttpGet("proyectos/{idProyecto:int}/cadena-aprobacion")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<string>>>> ObtenerCadenaAprobacion(
+        int idProyecto, CancellationToken cancellationToken)
+    {
+        var resultado = await mediator.Send(new ObtenerCadenaAprobacionQuery(idProyecto), cancellationToken);
+        return Ok(ApiResponse<IReadOnlyList<string>>.Exito(resultado));
+    }
+
+    /// <summary>Reemplaza la cadena de aprobacion del proyecto (ADM.Workflows). Lista vacia para volver al default.</summary>
+    [HttpPut("proyectos/{idProyecto:int}/cadena-aprobacion")]
+    public async Task<ActionResult<ApiResponse<object>>> ConfigurarCadenaAprobacion(
+        int idProyecto, [FromBody] ConfigurarCadenaAprobacionRequest request, CancellationToken cancellationToken)
+    {
+        await mediator.Send(new ConfigurarCadenaAprobacionCommand(idProyecto, request.Roles), cancellationToken);
+        return Ok(ApiResponse<object>.Exito(new { }, "Cadena de aprobacion actualizada."));
+    }
+
     [HttpGet("ambientes/matriz")]
     public async Task<ActionResult<ApiResponse<IReadOnlyList<MatrizAmbienteResponse>>>> ObtenerMatriz(
         CancellationToken cancellationToken)

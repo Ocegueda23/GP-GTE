@@ -43,9 +43,36 @@ export const RESULTADOS = [
   { id: 4, nombre: "No aplica", color: "default" as const },
 ];
 
+export const TIPOS_PRUEBA = [
+  { id: 1, nombre: "Manual" },
+  { id: 2, nombre: "Automatizada" },
+  { id: 3, nombre: "Regresión" },
+];
+
+/** Caso del catalogo completo de un proyecto (incluye retirados y no reutilizables),
+ * para la pantalla de administracion del catalogo. */
+export interface CasoAdmin {
+  idCasoPrueba: number;
+  folio: string | null;
+  titulo: string;
+  precondiciones: string | null;
+  resultadoEsperado: string | null;
+  idTipoPrueba: number;
+  tipoPrueba: string;
+  reutilizable: boolean;
+  activo: boolean;
+  totalAsignaciones: number;
+  pasos: PasoCaso[];
+}
+
 /** Catalogo de casos reutilizables del proyecto, para el selector de "usar caso existente". */
 export async function obtenerCasosDisponibles(idProyecto: number) {
   return obtener<CasoPrueba[]>(`/api/v1/proyectos/${idProyecto}/casosprueba`);
+}
+
+/** Catalogo completo del proyecto (incluye retirados y no reutilizables), para administracion. */
+export async function obtenerCatalogoCasos(idProyecto: number) {
+  return obtener<CasoAdmin[]>(`/api/v1/proyectos/${idProyecto}/casosprueba/catalogo`);
 }
 
 export async function obtenerCasosAsignados(idWorkItem: number) {

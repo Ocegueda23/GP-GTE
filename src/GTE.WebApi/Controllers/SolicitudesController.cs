@@ -26,12 +26,13 @@ public class SolicitudesController(IMediator mediator) : ControllerBase
             $"Solicitud {resultado.Folio} enviada correctamente."));
     }
 
-    /// <summary>Solicitudes del usuario actual (portal).</summary>
+    /// <summary>Solicitudes del usuario actual (portal). Sin estatus = pendientes (Enviada,
+    /// En Analisis, Aprobada); estatus=-1 = todas.</summary>
     [HttpGet("mias")]
     public async Task<ActionResult<ApiResponse<IReadOnlyList<SolicitudResponse>>>> ObtenerMias(
-        CancellationToken cancellationToken)
+        [FromQuery(Name = "estatus")] int[]? estatus, CancellationToken cancellationToken)
     {
-        var resultado = await mediator.Send(new ObtenerMisSolicitudesQuery(), cancellationToken);
+        var resultado = await mediator.Send(new ObtenerMisSolicitudesQuery(estatus), cancellationToken);
         return Ok(ApiResponse<IReadOnlyList<SolicitudResponse>>.Exito(resultado));
     }
 

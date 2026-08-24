@@ -1,5 +1,6 @@
 using GTE.Application.Catalogos.Queries;
 using GTE.Application.DTOs.Responses.Catalogos;
+using GTE.Domain.Administracion;
 using GTE.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -35,8 +36,10 @@ public class CatalogosQueryService(FabricaContexto fabrica) : ICatalogosQuerySer
                 .Select(p => new CatalogoItemResponse { Id = p.Id, Nombre = p.Nombre })
                 .ToListAsync(cancellationToken),
             // Solo proyectos donde el usuario es responsable o pertenece al equipo asignado.
+            // Cerrados fuera: no tiene sentido crear/planear trabajo nuevo en un proyecto cerrado.
             Proyectos = await contexto.TblProyecto.AsNoTracking()
                 .Where(p => p.Activo)
+                .Where(p => p.IdEstatusProyecto != EstatusProyecto.Cerrado)
                 .Where(p => p.IdResponsable == idUsuario
                     || (p.IdEquipo != null && idsEquiposUsuario.Contains(p.IdEquipo.Value)))
                 .OrderBy(p => p.Nombre)

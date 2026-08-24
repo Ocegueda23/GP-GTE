@@ -125,4 +125,10 @@ public class AutenticacionRepository(FabricaContexto fabrica, AuditContext audit
         await RegistrarBitacoraAsync("Usuario", idUsuario, "REVOCAR_TODAS_SESIONES",
             $"{vigentes.Count} refresh token(s)", cancellationToken);
     }
+
+    public async Task RegistrarBitacoraSuplantacionAsync(
+        int idUsuarioSuplantado, string accion, string? detalle, CancellationToken cancellationToken = default)
+    {
+        await RegistrarBitacoraAsync("Usuario", idUsuarioSuplantado, accion, detalle, cancellationToken);
+    }
 }

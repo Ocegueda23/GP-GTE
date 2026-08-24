@@ -57,6 +57,8 @@ public partial class TblProyecto
 
     public virtual ICollection<TblAmbiente> TblAmbiente { get; set; } = new List<TblAmbiente>();
 
+    public virtual ICollection<TblCadenaAprobacionProyecto> TblCadenaAprobacionProyecto { get; set; } = new List<TblCadenaAprobacionProyecto>();
+
     public virtual ICollection<TblCasoPrueba> TblCasoPrueba { get; set; } = new List<TblCasoPrueba>();
 
     public virtual ICollection<TblHito> TblHito { get; set; } = new List<TblHito>();

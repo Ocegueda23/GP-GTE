@@ -1,10 +1,13 @@
 import {
-  AppBar, Badge, Box, Chip, CssBaseline, Divider, Drawer, IconButton, List, ListItemButton,
-  ListItemText, Menu, MenuItem, ThemeProvider, Toolbar, Tooltip, Typography, createTheme,
+  AppBar, Badge, Box, Button, Chip, CssBaseline, Divider, Drawer, IconButton, List,
+  ListItemButton, ListItemText, Menu, MenuItem, Stack, ThemeProvider, Toolbar, Tooltip,
+  Typography, createTheme, type PaletteMode,
 } from "@mui/material";
+import DarkModeIcon from "@mui/icons-material/DarkMode";
+import LightModeIcon from "@mui/icons-material/LightMode";
 import MenuIcon from "@mui/icons-material/Menu";
 import NotificationsIcon from "@mui/icons-material/Notifications";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   BrowserRouter, Link as RouterLink, Navigate, Route, Routes, useLocation, useNavigate,
 } from "react-router-dom";
@@ -34,23 +37,66 @@ import { ActividadUsuarioPage } from "./features/reportes/ActividadUsuarioPage";
 import { CatalogoReportesPage } from "./features/reportes/CatalogoReportesPage";
 import { AdminPage } from "./features/admin/AdminPage";
 import { WorkflowsPage } from "./features/admin/WorkflowsPage";
+import { CatalogosPage } from "./features/catalogos/CatalogosPage";
+import { CatalogosAdminPage } from "./features/catalogos/admin/CatalogosAdminPage";
 import { ManualUsuarioPage } from "./features/ayuda/ManualUsuarioPage";
-import { cerrarSesion, cerrarSesionServidor, useSesion } from "./shared/api/sesion";
+import { ConocimientoPage } from "./features/conocimiento/ConocimientoPage";
+import { DetalleArticuloPage } from "./features/conocimiento/DetalleArticuloPage";
+import { ConocimientoPublicoPage } from "./features/conocimiento/publico/ConocimientoPublicoPage";
+import { DetalleArticuloPublicoPage } from "./features/conocimiento/publico/DetalleArticuloPublicoPage";
+import {
+  cerrarSesion, cerrarSesionServidor, estaSuplantando, obtenerNombreSuplantador,
+  terminarSuplantacion, useSesion,
+} from "./shared/api/sesion";
 
-const tema = createTheme({
-  palette: {
-    primary: { main: "#334155" },   // slate 700
-    secondary: { main: "#0f766e" }, // teal 700
-    background: { default: "#f6f7f9" },
-  },
-  typography: {
-    fontSize: 13.5,
-    h5: { fontSize: "1.25rem" },
-  },
-  components: {
-    MuiPaper: { defaultProps: { elevation: 0 } },
-  },
-});
+const CLAVE_TEMA = "gte.tema";
+
+/**
+ * primary/secondary quedan fijos en ambos modos (MUI ya resuelve un contrastText legible
+ * para cada uno); solo se fija background.default en claro para no perder el fondo actual
+ * -- en oscuro se deja el default de MUI (#121212), ya pensado para contraste WCAG AA.
+ */
+function construirTema(modo: PaletteMode) {
+  return createTheme({
+    palette: {
+      mode: modo,
+      primary: { main: "#334155" },   // slate 700
+      secondary: { main: "#0f766e" }, // teal 700
+      background: modo === "light"
+        ? { default: "#f6f7f9" }
+        // MuiPaper fuerza elevation:0 (sin el overlay que MUI usaria para diferenciar
+        // superficies en oscuro), y el default de MUI deja paper == default (#121212
+        // ambos) -- sin esto, tablas/tarjetas se funden con el fondo de la pagina.
+        : { default: "#0f172a", paper: "#1e293b" },   // slate 900 / slate 800
+    },
+    typography: {
+      fontSize: 13.5,
+      h5: { fontSize: "1.25rem" },
+    },
+    components: {
+      MuiPaper: { defaultProps: { elevation: 0 } },
+      // Los folios/titulos enlazados se pintan como texto normal en muchas pantallas
+      // (Typography+RouterLink con color explicito propio); el <Link> de MUI sin color
+      // usa "primary" por default, que en modo oscuro (slate 700 sobre fondo casi negro)
+      // se pierde. "info" da buen contraste en ambos modos sin tocar primary/secondary,
+      // que siguen usandose para AppBar/botones.
+      MuiLink: { defaultProps: { color: "info" } },
+    },
+  });
+}
+
+function useModoTema() {
+  const [modo, setModo] = useState<PaletteMode>(
+    () => (localStorage.getItem(CLAVE_TEMA) === "dark" ? "dark" : "light"),
+  );
+  useEffect(() => {
+    localStorage.setItem(CLAVE_TEMA, modo);
+  }, [modo]);
+  return {
+    modo,
+    alternar: () => setModo((previo) => (previo === "light" ? "dark" : "light")),
+  };
+}
 
 const ANCHO_MENU = 220;
 
@@ -70,8 +116,12 @@ const NAVEGACION: { ruta: string; etiqueta: string; permiso: string | string[] |
   { ruta: "/indicadores-ejecutivos", etiqueta: "Indicadores ejecutivos", permiso: ["DASH.Ejecutivo", "DASH.VerDepartamento"] },
   { ruta: "/portafolio", etiqueta: "Portafolio", permiso: ["POR.GestionarCosteo", "POR.GestionarOkr", "RPT.Costos"] },
   { ruta: "/reportes", etiqueta: "Reportes", permiso: ["RPT.Ver", "RPT.Costos", "RPT.Auditoria", "RPT.Actividad"] },
+  { ruta: "/catalogos", etiqueta: "Catalogos", permiso: null },
+  { ruta: "/catalogos/admin", etiqueta: "Administrar catalogos", permiso: "ADM.CatalogoGenerico" },
   { ruta: "/admin", etiqueta: "Administracion", permiso: ["ADM.Usuarios", "ADM.Roles"] },
   { ruta: "/admin/workflows", etiqueta: "Workflows", permiso: "ADM.Workflows" },
+  // P23 es "Todos" en el Documento Maestro: leer no exige permiso (escribir si, CON.Administrar).
+  { ruta: "/conocimiento", etiqueta: "Base de conocimiento", permiso: null },
   { ruta: "/ayuda", etiqueta: "Ayuda", permiso: null },
 ];
 
@@ -108,7 +158,16 @@ function CampanaNotificaciones() {
 
   return (
     <>
-      <IconButton color="inherit" onClick={(e) => setAnclaNotificaciones(e.currentTarget)}>
+      <IconButton
+        color="inherit"
+        aria-label="Notificaciones"
+        onClick={(e) => {
+          setAnclaNotificaciones(e.currentTarget);
+          if ("Notification" in window && Notification.permission === "default") {
+            void Notification.requestPermission();
+          }
+        }}
+      >
         <Badge badgeContent={pendientes.length} color="error">
           <NotificationsIcon />
         </Badge>
@@ -166,7 +225,9 @@ function ListaNavegacion({ alNavegar }: { alNavegar?: () => void }) {
   );
 }
 
-function BarraSuperior({ alAbrirMenu }: { alAbrirMenu: () => void }) {
+function BarraSuperior({ alAbrirMenu, modo, alternarModo }: {
+  alAbrirMenu: () => void; modo: PaletteMode; alternarModo: () => void;
+}) {
   const { sesion, establecer } = useSesion();
   const [ancla, setAncla] = useState<HTMLElement | null>(null);
   useConexionTiempoReal();
@@ -178,13 +239,42 @@ function BarraSuperior({ alAbrirMenu }: { alAbrirMenu: () => void }) {
     setAncla(null);
   };
 
+  const salirDeSuplantacion = async () => {
+    await terminarSuplantacion();
+    window.location.href = "/";
+  };
+
   return (
     <AppBar position="fixed" sx={{ zIndex: (t) => t.zIndex.drawer + 1 }}>
       <Toolbar variant="dense">
-        <IconButton color="inherit" onClick={alAbrirMenu} sx={{ display: { sm: "none" }, mr: 1 }}>
+        <IconButton color="inherit" aria-label="Abrir menu" onClick={alAbrirMenu}
+          sx={{ display: { sm: "none" }, mr: 1 }}>
           <MenuIcon />
         </IconButton>
         <Typography variant="h6" sx={{ fontWeight: 700, letterSpacing: 1, flex: 1 }}>GTE</Typography>
+        {estaSuplantando() && (
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center", mr: 1 }}>
+            <Chip
+              color="warning"
+              size="small"
+              label={`Actuando como ${sesion?.nombre ?? ""}${
+                obtenerNombreSuplantador() ? ` · admin: ${obtenerNombreSuplantador()}` : ""
+              }`}
+            />
+            <Button
+              size="small" color="inherit" variant="outlined"
+              sx={{ borderColor: "rgba(255,255,255,0.5)" }}
+              onClick={() => void salirDeSuplantacion()}
+            >
+              Salir
+            </Button>
+          </Stack>
+        )}
+        <Tooltip title={modo === "light" ? "Tema oscuro" : "Tema claro"}>
+          <IconButton color="inherit" aria-label="Alternar tema claro/oscuro" onClick={alternarModo}>
+            {modo === "light" ? <DarkModeIcon /> : <LightModeIcon />}
+          </IconButton>
+        </Tooltip>
         <CampanaNotificaciones />
         <Tooltip title={`${sesion?.dominio} - ${sesion?.roles.join(", ")}`}>
           <Chip
@@ -207,16 +297,18 @@ function BarraSuperior({ alAbrirMenu }: { alAbrirMenu: () => void }) {
   );
 }
 
-export default function App() {
+/**
+ * Shell autenticado: exige sesion y monta el AppBar, el menu de modulos y sus rutas.
+ * El modo de tema llega por props (no llama a useModoTema): el hook guarda estado local,
+ * asi que una segunda instancia dejaria al ThemeProvider sin enterarse del cambio.
+ */
+function AplicacionAutenticada({ modo, alternarModo }: { modo: PaletteMode; alternarModo: () => void }) {
   const [menuMovilAbierto, setMenuMovilAbierto] = useState(false);
 
   return (
-    <ThemeProvider theme={tema}>
-      <CssBaseline />
-      <BrowserRouter>
         <GuardiaSesion>
           <Box sx={{ display: "flex" }}>
-            <BarraSuperior alAbrirMenu={() => setMenuMovilAbierto(true)} />
+            <BarraSuperior alAbrirMenu={() => setMenuMovilAbierto(true)} modo={modo} alternarModo={alternarModo} />
 
             {/* Menu lateral fijo (pantallas medianas o mas grandes) */}
             <Drawer
@@ -271,13 +363,39 @@ export default function App() {
                 <Route path="/portafolio" element={<PortafolioPage />} />
                 <Route path="/reportes" element={<CatalogoReportesPage />} />
                 <Route path="/reportes/actividad-usuario" element={<ActividadUsuarioPage />} />
+                <Route path="/catalogos" element={<CatalogosPage />} />
+                <Route path="/catalogos/admin" element={<CatalogosAdminPage />} />
                 <Route path="/admin" element={<AdminPage />} />
                 <Route path="/admin/workflows" element={<WorkflowsPage />} />
+                <Route path="/conocimiento" element={<ConocimientoPage />} />
+                <Route path="/conocimiento/:id" element={<DetalleArticuloPage />} />
                 <Route path="/ayuda" element={<ManualUsuarioPage />} />
               </Routes>
             </Box>
           </Box>
         </GuardiaSesion>
+  );
+}
+
+export default function App() {
+  const { modo, alternar } = useModoTema();
+  const tema = useMemo(() => construirTema(modo), [modo]);
+
+  return (
+    <ThemeProvider theme={tema}>
+      <CssBaseline />
+      <BrowserRouter>
+        <Routes>
+          {/*
+            Base de conocimiento PUBLICA: fuera de GuardiaSesion a proposito (son las
+            unicas rutas del SPA que se cargan sin sesion) y con su propio layout, que no
+            expone el menu de modulos internos. El backend es el que decide que articulos
+            son publicos; aqui solo se pinta lo que devuelve.
+          */}
+          <Route path="/publico/conocimiento" element={<ConocimientoPublicoPage />} />
+          <Route path="/publico/conocimiento/:id" element={<DetalleArticuloPublicoPage />} />
+          <Route path="/*" element={<AplicacionAutenticada modo={modo} alternarModo={alternar} />} />
+        </Routes>
       </BrowserRouter>
     </ThemeProvider>
   );

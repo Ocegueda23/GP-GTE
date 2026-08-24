@@ -7,6 +7,8 @@ public interface IPlaneacionRepository
 {
     Task<int> CrearSprintAsync(SprintNuevo datos, CancellationToken cancellationToken = default);
 
+    Task EditarSprintAsync(int idSprint, SprintEdicion datos, CancellationToken cancellationToken = default);
+
     Task<EstadoSprint?> ObtenerEstadoSprintAsync(int idSprint, CancellationToken cancellationToken = default);
 
     /// <summary>Sprint Activo del equipo (solo puede haber uno).</summary>

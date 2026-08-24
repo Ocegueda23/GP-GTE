@@ -30,12 +30,12 @@ public class TicketsController(IMediator mediator) : ControllerBase
             $"Ticket {resultado.Folio} registrado correctamente."));
     }
 
-    /// <summary>Tickets del usuario actual (portal).</summary>
+    /// <summary>Tickets del usuario actual (portal). Sin estatus = abiertos (todos menos Cerrado); estatus=-1 = todos.</summary>
     [HttpGet("mios")]
     public async Task<ActionResult<ApiResponse<IReadOnlyList<TicketResponse>>>> ObtenerMios(
-        CancellationToken cancellationToken)
+        [FromQuery(Name = "estatus")] int[]? estatus, CancellationToken cancellationToken)
     {
-        var resultado = await mediator.Send(new ObtenerMisTicketsQuery(), cancellationToken);
+        var resultado = await mediator.Send(new ObtenerMisTicketsQuery(estatus), cancellationToken);
         return Ok(ApiResponse<IReadOnlyList<TicketResponse>>.Exito(resultado));
     }
 

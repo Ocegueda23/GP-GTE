@@ -454,6 +454,7 @@ dotnet test GTE.sln    # 45 pruebas; las de integración se omiten si no hay Loc
 | **Solicitud/WorkItem: Usuario solicitante (2026-08-03)** | Mismo patrón que en Tickets, extendido a Solicitudes: `tblSolicitud.IdUsuarioSolicitante` (capturado opcionalmente al crear, SOLO visible para quien tiene `SOL.Triage` — un Líder registrando a nombre de otra persona) y `tblWorkItem.IdUsuarioSolicitante` (copiado automáticamente por `ConvertirSolicitudHandler` al convertir, mismo mecanismo con que ya se copian `IdSolicitante`/`IdSolicitud`) — script 21, mismo cuidado de nombrar el FK nuevo `FK_tblSolicitud_tblUsuarioSolicitanteCatalogo`/`FK_tblWorkItem_tblUsuarioSolicitanteCatalogo` para no chocar con el FK ya existente por rol (`FK_tblWorkItem_tblUsuarioSolicitante` es `IdSolicitante->tblUsuario`, verificado ANTES de escribir el script esta vez). Indicador "*" con tooltip en la bandeja de Triage cuando hay Usuario solicitante. Verificado en vivo extremo a extremo en LocalDB con datos reales migrados: Solicitud → Triage (Tomar/Aprobar a proyecto GTE) → Convertida en WorkItem, visible en su Detalle junto al Solicitante interno; confirmado que un usuario sin `SOL.Triage` no ve el campo. **Pendiente**: correr el script 21 en producción | Mis solicitudes (`/solicitudes`), Revisión de solicitudes (`/triage`), Detalle de WorkItem (`/wi/:folio`) |
 | **Incidentes** | Segundo módulo de Fase 4, construido 2026-08-02, verificado extremo a extremo en LocalDB (no solo compilado): alta de incidente (folio INC-año, estatus inicial Detectado) dentro de un proyecto con severidad S1-S4, bandeja + detalle con las 5 transiciones del proceso `Incidente` (atender, mitigar, resolver, cerrar -- sin reapertura, un incidente siempre concluye en Cerrado) vía el motor de workflow existente, RN-OPS-02 (cerrar con severidad S1/S2 exige causa raíz capturada, validado y probado en vivo: el cierre se rechaza sin causa raíz y procede tras capturarla), RN-OPS-03 (cambio de severidad como acción de negocio aparte -- no es una transición de `tblTransicion` -- con motivo obligatorio), vincular WorkItem correctivo (crea un WorkItem tipo Corrección igual patrón que el escalamiento de Tickets, probado: creó `HELPDESK-3395`), y vincular un release ya existente como causante (reutiliza `GET /api/v1/releases?idProyecto=X`, insumo futuro de DORA Change Failure Rate). El esquema de BD (`tblIncidente`, `tblEstatusIncidente`, `tblSeveridad`, el proceso `Incidente` en `tblProceso`/`tblTransicion`, el permiso `INC.Gestionar`, `tblProyecto.IdResponsable`) ya existía desde el despliegue inicial; esta sesión sembró `tblTransicionConfig` (script 13) y construyó las 4 capas de código + 2 pantallas nuevas. **Fuera de alcance de esta pasada**: RN-OPS-01 completo (notificación a "todos los canales" -- solo existe InApp -- y escalamiento automático a 30 min sin atención, necesita Hangfire/A4; tampoco se notifica "al líder" por falta de una consulta usuarios-por-rol ya establecida) -- sí se implementó la notificación InApp inmediata al responsable del proyecto en incidentes S1; disponibilidad/% uptime mensual (reporte, Fase 5); monitoreo con health checks (Hangfire + catálogo de sistemas, no existe); `tblBitacoraCambio` ("qué cambió ayer") sigue sin UI, es bitácora general de PROD no específica de Incidentes; sin pruebas automatizadas nuevas | Incidentes (`/operacion/incidentes`, bandeja), Detalle de incidente (`/operacion/incidentes/:folio`) |
 | **Portafolio: Costeo real y OKRs (A5, parcial)** | Construido 2026-08-02, verificado extremo a extremo en LocalDB: catálogo de tarifas por nivel con vigencia por fecha (alta/edición/baja lógica), presupuesto por proyecto/año, y reporte de costo real (`tblRegistroTiempo` × tarifa vigente del nivel del usuario a la fecha del registro, resuelta con `OUTER APPLY` en la vista `vwCostoRegistroTiempo` — nuevo patrón de vigencia, no existía uno previo en el código) comparado contra el presupuesto, con desglose por usuario. Probado en vivo contra datos históricos migrados reales del GT (proyecto PLANTILLA ANGULAR, usuario con 20h registradas × tarifa Junior $150/h = $3,000 exacto). OKRs: objetivos trimestrales por proyecto o equipo con resultados clave (meta/valor actual editado a mano, vínculo opcional a `ClaveKpi` para cuando exista el job de snapshot). Dos permisos nuevos sembrados (`POR.GestionarCosteo`, `POR.GestionarOkr`, módulo "Portafolio" en `tblPermiso`, script 14) — a diferencia de Tickets/Incidentes, este submódulo no tenía permiso previo. **Refinamiento 2026-08-02 (mismo día): ver tarifas/presupuesto/costo real ahora exige permiso aparte de administrarlos.** En vez de sembrar un tercer permiso redundante, se reutilizó `RPT.Costos` (ya sembrado en script 02, módulo "Indicadores", reservado para el futuro Dashboard Ejecutivo — su descripción "Ver reportes de costos y rentabilidad" calzaba exacto). Las 3 consultas de lectura (`ObtenerTarifasNivelQuery`, `ObtenerPresupuestosProyectoQuery`, `ObtenerCostoProyectoQuery`) exigen `RPT.Costos` **o** `POR.GestionarCosteo` (quien administra el catálogo también puede verlo); los Commands de alta/edición/baja siguen exigiendo solo `POR.GestionarCosteo` — ver no habilita editar. En el frontend, la pestaña Costeo se oculta completa si el usuario no tiene ninguno de los dos permisos (`PortafolioPage.tsx`, con mensaje "No tienes permiso para ver esta sección" en vez de dejar caer en una pestaña oculta al navegar directo a la URL — bug encontrado y corregido en el mismo repaso), y los botones de alta/edición/baja de tarifas y presupuesto se ocultan si falta específicamente `POR.GestionarCosteo` (`CosteoTab.tsx`, prop `puedeGestionar`). Verificado en vivo con dos cuentas reales: `aviramontes` (Administrador, tiene ambos permisos) ve y edita todo sin regresión; `lgarcia` (rol Desarrollador, sin ninguno de los dos) ve "No tienes permiso..." en la pantalla, el ítem "Portafolio" ni aparece en el menú lateral, y una llamada directa a `GET /api/v1/costeo/tarifas` con su token responde `403 FORBIDDEN`. **Fuera de alcance de esta pasada**: Riesgos (matriz probabilidad×impacto, ya tiene workflow sembrado en el motor) y la jerarquía Portafolio/Programa quedan para otra sesión (ver A5 en 3.2); "avance automático" de OKR ligado a KPIs depende del job nocturno de `tblKpiValor` (Hangfire/A4); sin pruebas automatizadas nuevas | Portafolio (`/portafolio`, pestañas Costeo/OKR) |
+| **Base de conocimiento (P23), incluida su publicacion anonima (2026-08-23)** | Tercer modulo de Fase 4. Articulos versionados y terminos de Glosario sobre `tblArticuloConocimiento`/`tblArticuloVersion` (tablas que ya existian desde el script 06 del despliegue inicial, sin codigo hasta ahora). Un termino de Glosario NO es una entidad aparte: es la misma fila con `EsGlosario = 1`, asi que hereda editor, imagenes, adjuntos y versionado sin ramas de codigo propias; lo unico distinto es la presentacion (el filtro "Glosario" pinta un indice alfabetico agrupado por letra en vez de tarjetas de resultado, porque son definiciones cortas y no articulos largos). **Versionado**: `tblArticuloVersion` guarda TODAS las versiones incluida la vigente y `VersionActual` apunta a ella; una edicion genera version nueva SOLO si el contenido cambio (renombrar o mover los switches no ensucia el historial). Se puede abrir una version anterior para verla sin restaurarla. **Contenido enriquecido y archivos**: reutiliza `EditorEnriquecido` (Tiptap) tal cual -- formato basico y pegado de imagenes del portapapeles -- y la tabla generica `tblArchivoVinculo` con el discriminador `Entidad = 'ArticuloConocimiento'`, asi que NO hizo falta esquema de adjuntos propio (solo un `SubirArchivoArticuloCommand`/`ObtenerArchivosArticuloQuery` calcados de los de WorkItem). Permiso nuevo `CON.Administrar` (script 42, sembrado solo al rol Administrador): escribir lo exige, LEER no -- P23 esta marcada como "Todos" en la seccion 5.1 del Documento Maestro. **Publicacion anonima (pedido de negocio de esta misma sesion)**: columna nueva `tblArticuloConocimiento.EsPublico` (BIT NOT NULL DEFAULT 0, script 42) y un controlador aparte `ConocimientoPublicoController` con `[AllowAnonymous]` -- segunda excepcion deliberada al FallbackPolicy despues de health/version/auth, con la razon escrita en el propio controlador como exige CLAUDE.md. Los limites de esa excepcion, todos implementados: (1) el default es privado y marcar publico es una accion explicita del autor; (2) un articulo interno responde 404 igual que uno inexistente, para que nadie enumere el contenido privado probando ids; (3) solo lectura; (4) DTOs propios (`ArticuloPublico*`) que NO exponen autores, numero de version ni historial; (5) **las imagenes del texto SI se ven pero los adjuntos NO se descargan** (decision explicita del negocio en esta sesion) -- el endpoint publico de imagenes sirve un GUID solo si esta vinculado a un articulo publico Y ademas aparece incrustado dentro de su HTML (`Contenido.Contains(guid)`, LIKE parametrizado, nunca SQL interpolado), asi un PDF o un archivo interno no se sirve sin sesion aunque alguien adivine su GUID; no existe endpoint publico de adjuntos; (6) limitador de tasa nuevo (`AddRateLimiter`, politica `publico`, 120 req/min por IP) porque son las unicas rutas expuestas a internet -- el resto de la API exige token y vive en la red interna. Dar de baja un articulo apaga `EsPublico` en el mismo movimiento, para que un cambio futuro en el filtro publico no pueda re-exponerlo. En el frontend las 2 rutas publicas viven FUERA de `GuardiaSesion` (las unicas del SPA que cargan sin sesion) y con `LayoutPublico` propio: reusar el shell interno le revelaria el menu de los 20 modulos de GTE a cualquier visitante. `ContenidoEnriquecido` se extendio con una prop opcional (`urlPublicaImagen`) en vez de duplicarse: en modo publico resuelve la imagen a una URL directa (se puede porque la ruta es anonima y no hay token que exponer, que es la razon de ser del blob autenticado en el modo interno). **Verificado extremo a extremo (no solo compilado)** contra el SQL Server real `ALIEN\SQLEXPRESS01` (la base NO esta en LocalDB -- ver nota de entorno abajo). Script 42 aplicado y corrido dos veces (la segunda solo SKIP y 0 filas afectadas, idempotencia confirmada); la columna real quedo `EsPublico bit NOT NULL`, igual que el scaffold editado a mano. Pruebas reales con datos creados por la propia API: (a) el listado publico anonimo devuelve SOLO el articulo marcado publico (1 de 2); (b) el detalle publico de un articulo interno responde **404**, indistinguible de uno inexistente; (c) los DTOs publicos llegan sin autor ni version; (d) **la regla de imagenes**: la imagen INCRUSTADA en un articulo publico se sirve `200 image/png`, mientras que un PDF adjunto al MISMO articulo publico pero NO incrustado responde **404**, y una imagen incrustada en un articulo PRIVADO tambien **404**; (e) la baja logica dejo `Activo=0` y `EsPublico=0` en la misma operacion y el articulo desaparecio del publico; (f) RBAC: una cuenta sin `CON.Administrar` LEE (200 en lista y detalle) pero no escribe (403 en POST y DELETE, con el mensaje del permiso); (g) versionado: editar el contenido subio a v2 y un PUT identico NO creo version nueva (siguio en 2 versiones); (h) titulo duplicado -> 409; (i) el limitador de tasa corto exacto en 120 (120x200 + 10x429 en 130 peticiones); (j) el sanitizado elimino `<script>`, `onerror`, `href="javascript:"` e `<iframe>` dejando solo `<p>ok</p><img><a>clic</a>`; (k) la bitacora registro CREAR/ACTUALIZAR/ELIMINAR/ADJUNTAR con el usuario del token. En el navegador: `/publico/conocimiento` lista el articulo publico sin sesion, el detalle renderiza la imagen resuelta por la URL publica (`cargada: true`) y NO tiene boton Editar, ni panel de Adjuntos, ni historial de versiones; `/conocimiento` sigue cayendo en la pantalla de login. Compilacion y pruebas: backend `0 Errores`, `tsc -b`/`oxlint` limpios, 23 Domain + 2 Application pasan. **Datos de prueba que quedaron en esa base de desarrollo** (borrarlos si molestan): articulos 1 "Procedimiento interno de respaldos" (privado) y 2 "SLA (Service Level Agreement)" (publico, glosario, con `captura.png` incrustada y `manual.pdf` adjunto), los articulos 3 y 4 ya dados de baja, y el usuario sin roles `pruebaconocimiento` que se creo solo al pedir un token de desarrollo. **Entorno real (confirmado con el usuario 2026-08-23, dejar de adivinar esto)**: el API que vale es el **servicio de Windows `GTE`** (`C:\Servicios\GTE\GTE.WebApi.exe`, como LocalSystem, ambiente Production) en el puerto **5090**; la base es la instancia **`SQLEXPRESS01`**, alcanzable como `Server=localhost` en el puerto 1433 (es la forma que usa `appsettings.json` y la que funciona para el servicio -- verificado: el servicio en 5090 devuelve los articulos sembrados en `ALIEN\SQLEXPRESS01`, o sea es la MISMA base). Hay una segunda instancia de SQL en la maquina (`SQLEXPRESS`) que NO se usa. La segunda instancia del API en el puerto 5088, que se levantaba a mano, **ya no se usa**: se quito la entrada `api` del `.claude/launch.json` (clavaba la cadena a `(localdb)\MSSQLLocalDB`, que no existe aqui) y el frontend apunta a 5090 por default (`.env.development` + el default de `http.ts`; `.env.production` va vacio porque en produccion Kestrel sirve el SPA desde wwwroot en el mismo origen). Aun asi existe `appsettings.Local.json` (gitignored) como mecanismo de override por maquina: CLAUDE.md ya lo documentaba pero nunca se cargaba, y ahora si se lee via `AddJsonFile` en `Program.cs` -- "Local" no es un ASPNETCORE_ENVIRONMENT, asi que la convencion `appsettings.{Environment}.json` no lo tomaba. **INCIDENTE de esta sesion, leer antes de tocar configuracion**: ese `appsettings.Local.json` de desarrollo se colo en el `dotnet publish` (el SDK web lo barre con el glob `appsettings*.json`), se copio a `C:\Servicios\GTE` y, al tener la precedencia mas alta, le gano a `appsettings.json` y repunto el SERVICIO al nombre `ALIEN\SQLEXPRESS01`, forma con la que el servicio NO logra conectar (con `localhost` si; la causa exacta de esa diferencia no se investigo a fondo -- SQL Browser esta arriba y la instancia escucha en 1433, asi que apunta a resolucion de nombre de instancia en el contexto de LocalSystem, no a permisos de BD, ya que es la misma base). Resultado: toda llamada a BD trono y el login empezo a responder `500 INTERNAL_ERROR` incluso con contraseña incorrecta -- **sintoma delator para la proxima vez: la instancia local con el MISMO codigo respondia `400` limpio, o sea el 500 era de conexion, no de credenciales**. Se arreglo borrando el archivo de `C:\Servicios\GTE` (respaldo en el scratchpad de esa sesion) y reiniciando el servicio. Quedaron DOS defensas: (1) `CopyToPublishDirectory="Never"` sobre `appsettings.Local.json` y `appsettings.*.Local.json` en `GTE.WebApi.csproj` -- verificado con un `dotnet publish` real, el paquete ya solo lleva `appsettings.json`/`.Development`/`.Production` y el bin de desarrollo si conserva el Local; y (2) el `AddJsonFile` de `Program.cs` corre SOLO si `IsDevelopment()`, para que aunque alguien lo copie a mano a un servidor no pise la config de produccion. **Leccion general**: un archivo de configuracion por maquina jamas debe poder ganarle a la config de produccion, y "gitignored" no implica "no se publica". **Fuera de alcance de esta pasada**: migracion del Glosario del GT (falta el equivalente de `tblGlosarioTag`, ver B3); sugerencia de articulos al capturar ticket (IA, Fase 5); busqueda por texto es `LIKE` sobre titulo y contenido (si crece el volumen toca evaluar Full-Text, con indice de apoyo ya creado para el filtro publico/glosario); sin pruebas automatizadas nuevas | Base de conocimiento (`/conocimiento`), Detalle de articulo (`/conocimiento/:id`), y las 2 publicas sin sesion: `/publico/conocimiento` y `/publico/conocimiento/:id` |
 | **Manual de usuario (Ayuda) (actualizado 2026-08-04)** | Pagina de ayuda dentro de la SPA: `ManualUsuarioPage.tsx` ahora es un `<iframe>` que incrusta `Doctos/ManualUsuarioGTE.html` (el manual real y completo, HTML autocontenido con su propio sidebar/buscador/estilos, 27 secciones incluyendo Proximamente y Glosario), servido como `/manual-usuario.html` desde `public/` de Vite. `frontend/gte-web/scripts/sync-manual.mjs` copia el HTML de `Doctos/` a `public/` en cada `predev`/`prebuild` -- se edita SOLO `Doctos/ManualUsuarioGTE.html` (a mano o con IA) y el build/publish siempre lo refleja, sin tocar codigo. Sin permiso (disponible para cualquier usuario autenticado). El acordeon viejo (contenido fijo en el componente) se reemplazo por completo; `DiagramaFlujoSolicitud.tsx` quedo sin referencias, no se borro (ver nota arriba) | Ayuda (visible para todos en el menu) |
 | **Menu lateral (2026-08-02)** | La navegacion se movio de una barra horizontal arriba a un panel lateral fijo del lado izquierdo (`Drawer` de MUI, `variant="permanent"`, `anchor="left"`), con la opcion activa resaltada segun la ruta actual. En pantallas chicas se colapsa a un boton de menu al inicio de la barra superior (junto al logo) que abre un cajon deslizable (`variant="temporary"`) que se cierra solo al navegar. La barra superior conservo el logo, la campana de notificaciones y el chip de usuario (con el nombre truncado en pantallas chicas para no empujar el boton de menu fuera de la vista). Se probo primero con `anchor="right"` (pedido inicial) y se corrigio a `anchor="left"` (decision final) -- ver leccion tecnica en la seccion 5 sobre por que el lado derecho encimaba el menu con el contenido | Panel lateral izquierdo (todas las pantallas) |
 | **Combos con buscador (2026-08-03)** | Todo `Select`+`MenuItem` de MUI que representa un catalogo dinamico del backend (proyecto, usuario, estatus, prioridad, severidad, release, ambiente, etc.) se reemplazo por dos componentes nuevos y reutilizables en `frontend/gte-web/src/shared/components/ComboBuscable.tsx`: `ComboBuscable` (single) y `ComboBuscableMultiple` (multiple), ambos wrapper de MUI Autocomplete con el catalogo normalizado a `{valor, etiqueta}` -- el filtro "contiene" insensible a mayusculas es el default nativo de Autocomplete, sin `filterOptions` custom. Cubre ~70 combos en 22 archivos de `src/features/`. Las opciones "Todos"/"Sin asignar"/"Sin especificar" viven como una entrada mas del arreglo con `valor: ""`, igual que el `MenuItem value=""` que reemplazan. El multiple con chips (Estatus en BarraFiltros/BandejaTickets, sentinel `-1`="Todos") y el multiple con resumen de texto (prop `resumenSimple`, "Elementos" en ReleasesPage) usan el mismo `ComboBuscableMultiple`. **Fuera de alcance por decision explicita**: unos 10 `Select` de listas cortas y fijas escritas en el JSX sin catalogo de backend (dia de semana y Alcance en Horarios, Aplica-a y Trimestre en OKRs, Destino de cierre de sprint en Backlog, Tipo de artefacto y Tipo despliegue/rollback en Releases, Resultado de ejecucion en QA) quedan como `Select` simple -- pocas opciones fijas, buscar no aporta. Verificado con `tsc --noEmit` (0 errores, `noUnusedLocals`/`noUnusedParameters` activos) y probado en vivo en el navegador (filtro Proyecto y Estatus multiple de la Bandeja de trabajo) | Todos los combos de catalogo en toda la SPA |
@@ -521,8 +522,11 @@ transiciones automáticas configurables.
   real de SLA en "Esperando Usuario" más allá del estatus (RN-SUP-01 el reloj se detiene
   conceptualmente pero no hay job que recalcule la fecha límite al reanudar), alertas
   80%/100% y cierre automático (RN-SUP-02/03, necesitan Hangfire/A4).
-- Base de conocimiento (`tblArticuloConocimiento`, `tblArticuloVersion`): incluye la
-  migración del Glosario del GT con sus imágenes y tags de redirección.
+- ~~Base de conocimiento (`tblArticuloConocimiento`, `tblArticuloVersion`)~~
+  **Construida 2026-08-23** (P23). Ver fila "Base de conocimiento (P23)" en la sección 2.
+  Pendiente dentro de este sub-alcance: la migración del Glosario del GT con sus imágenes
+  y tags de redirección (falta el equivalente de `tblGlosarioTag` para las relaciones
+  bidireccionales, ver B3); sugerencia de artículos al capturar ticket (IA-, Fase 5).
 
 **Fase 5 — Ejecutivo, automatizaciones e IA**
 - ~~Dashboard ejecutivo: KPIs, OKRs, DORA metrics, costo y rentabilidad por proyecto,
@@ -545,6 +549,39 @@ transiciones automáticas configurables.
 
 ### 3.4 Detalles menores conocidos
 
+- ~~**El servicio de Windows no comparte el almacen de archivos con las instancias de
+  desarrollo**~~ **Resuelto 2026-08-24 (era problema de despliegue, no de codigo; afectaba
+  a TODA la app).** `AlmacenArchivos:Ruta` estaba VACIO, y con ese valor
+  `AlmacenArchivosDisco` cae al fallback `AppContext.BaseDirectory + "ArchivosGte"`: cada
+  proceso guardaba los binarios junto a su propio ejecutable (el servicio en
+  `C:\Servicios\GTE\ArchivosGte`, una instancia de desarrollo en su
+  `bin\Debug\net8.0\ArchivosGte`). Como la BD es la MISMA, los METADATOS de
+  `tblArchivo`/`tblArchivoVinculo` se compartian pero los BINARIOS no: un adjunto subido
+  por una instancia respondia 500 al descargarse desde la otra (el registro existe, el
+  archivo no). Sintoma observado: la imagen incrustada en un articulo de la base de
+  conocimiento se veia bien en la instancia local y el navegador la bloqueaba con
+  `ERR_BLOCKED_BY_ORB` contra el servicio -- **ojo con ese error, enganna: la respuesta
+  real era un 500 en JSON y el navegador lo bloqueo por no ser una imagen**. Aplicaba
+  igual a adjuntos e imagenes pegadas de WorkItems, Solicitudes, Comentarios y Revisiones.
+  **Arreglo aplicado** (se mantuvo ADR-07, filesystem con GUID; NO se migro a VARBINARY):
+  `AlmacenArchivos:Ruta` = `D:\GTE\Archivos` tanto en el `appsettings.json` del REPO (para
+  que viaje en cada `dotnet publish`) como en el del servicio (para que tome efecto sin
+  esperar un redespliegue). Se eligio `D:` porque tiene ~560 GB libres contra ~30 GB de
+  `C:`, y sobre todo porque NO debe vivir dentro de `C:\Servicios\GTE` (ese directorio se
+  sobreescribe en cada publicacion y se llevaria los archivos) ni dentro del repo, que
+  esta en la carpeta sincronizada de Google Drive. Se consolidaron ahi los binarios de
+  los dos almacenes y se verifico que las 5 filas activas de `tblArchivo` tienen su
+  archivo presente. **Hallazgo colateral que justifica la mudanza**: un archivo guardado
+  en el almacen de desarrollo (dentro de Google Drive) aparecio en disco como
+  `...1546.pdf` mientras `tblArchivo.RutaRelativa` decia `...1546` sin extension -- el
+  codigo nombra los archivos SOLO por GUID (`guid.ToString("N")`, sin extension; la
+  extension es metadato en BD), asi que algo del sincronizador le agrego la extension y
+  eso rompe la descarga, porque `ObtenerAsync` abre la ruta sin extension. Se renombro.
+  **Leccion: el almacen de archivos nunca debe vivir en una carpeta sincronizada.**
+  Pendiente real: incluir `D:\GTE\Archivos` en la politica de respaldos (los respaldos de
+  BD y de archivos son SEPARADOS, asi que pueden quedar inconsistentes entre si -- es la
+  desventaja conocida de ADR-07 frente a guardar los binarios en la BD), y cuando haya
+  servidor dedicado mover la ruta al share de red que preve el Documento Maestro (§1.2).
 - **Proyectos migrados sin Responsable ni Equipo (dato faltante, no bug de codigo):**
   detectado al probar el filtro "solo mis proyectos" (2026-08-03) -- la mayoria de
   proyectos migrados del GT no tienen `IdResponsable` ni `IdEquipo` capturados en BD
@@ -577,15 +614,74 @@ transiciones automáticas configurables.
   2026-08-04**, ver fila "Catalogos Area y Puesto" en la seccion 2. El catalogo de
   Nivel/Horario sigue solo de lectura para los selects de Usuarios, falta un alta propia si se
   necesita crear valores nuevos desde la UI en vez de por SQL.
-- `QaPage`: el alta de caso solo captura **un paso**; falta editar casos para agregar más.
+- ~~`QaPage`: el alta de caso solo captura un paso; falta editar casos para agregar más~~
+  **Resuelto por el rediseño 2026-08-21 (commit `52e2bec`, "las pruebas y sus hallazgos
+  viven en el WorkItem").** `QaPage` ya no existe; alta y edición de casos soportan N
+  pasos de punta a punta: `PanelPruebas.tsx` (alta, pestaña Pruebas del WorkItem) y
+  `CasosPruebaTab.tsx` (edición del catálogo, Admin), ambos sobre `PasoCaso[]` real
+  (tabla hija `tblCasoPruebaPaso`, no texto libre) vía `ActualizarCasoPruebaCommand`.
 - `tblEtiqueta` sin uso (etiquetas libres para WorkItems).
-- Cadena de aprobación de releases fija (`QA`, `Líder`, `Negocio`); el diseño la quiere
-  configurable por proyecto.
+- ~~Cadena de aprobación de releases fija (`QA`, `Líder`, `Negocio`); el diseño la quiere
+  configurable por proyecto~~ **Resuelto 2026-08-24.** Tabla nueva
+  `tblCadenaAprobacionProyecto` (script
+  `41_2026-08-24_SCRIPT_bdsGTE_CadenaAprobacionProyecto.sql`, 1-a-N por proyecto,
+  reemplazo completo en cada guardado). `CambiarEstatusReleaseHandler` usa la cadena
+  configurada del proyecto si existe; si no, sigue con el default fijo
+  `RolesAprobacion.Cadena` (ningun proyecto existente cambia de comportamiento). Editor
+  en Admin > Workflows (gateado por `ADM.Workflows`, permiso ya sembrado sin consumidor
+  hasta ahora): elegir proyecto, lista ordenada de roles con mover arriba/abajo/quitar/
+  agregar, "Restaurar default" limpia la config (vuelve a `QA -> Lider -> Negocio`).
+  **Verificado**: `dotnet build`/`dotnet test` (58/58) y `tsc -b`/`oxlint` limpios. **No
+  verificado en vivo en navegador** (sin LocalDB disponible en esta sesion) -- pendiente
+  real: probar el flujo end-to-end (configurar cadena custom, solicitar aprobacion de un
+  release real, confirmar que crea las firmas en el orden configurado).
 - RN-PLA-01 (avisar si el sprint se compromete por encima de la velocidad histórica +20%)
   no implementado; la capacidad sí se compara contra horas.
 - `spImportarJira` planeado, no escrito.
-- Suplantación auditada (permiso `ADM.Suplantar` ya sembrado) sin implementar.
-- Tema oscuro y revisión de accesibilidad (WCAG AA) pendientes.
+- ~~Suplantación auditada (permiso `ADM.Suplantar` ya sembrado) sin implementar~~
+  **Resuelto 2026-08-24.** "Iniciar sesion como" en Admin > Usuarios (oculto si no tienes
+  `ADM.Suplantar` o si el objetivo eres tu mismo): pide re-autenticacion con la PROPIA
+  contraseña del suplantador (no la del suplantado) en `IniciarSuplantacionCommand`, emite
+  un JWT cuya identidad efectiva (`preferred_username`, la que evalua RBAC via
+  `AuditContext.Usuario`) es la del suplantado, con un claim extra `actor_real` que
+  `AuditMiddleware` vuelca a `AuditContext.UsuarioReal` -- doble identidad real en
+  `tblBitacora` (columna nueva `UsuarioReal`, script
+  `40_2026-08-24_SCRIPT_bdsGTE_BitacoraSuplantacion.sql`). Banner visible "Actuando como
+  X · admin: Y" con boton "Salir" en la barra superior mientras dura la suplantacion
+  (`estaSuplantando()` en `sesion.ts`, token real guardado aparte en sessionStorage).
+  "Salir"/`TerminarSuplantacionCommand` solo deja rastro en bitacora (el JWT no tiene
+  estado que revocar) y hace recarga completa de la SPA para descartar cache/estado
+  cargado con la identidad suplantada. Sin suplantacion anidada (bloqueada con
+  `BusinessException` si `AuditContext.EsSuplantacion` ya es true). **Verificado**:
+  `dotnet build`/`dotnet test` (58/58) y `tsc -b`/`oxlint` limpios. **No verificado en
+  vivo en navegador** (sin entorno de LocalDB disponible en esta sesion para probar el
+  flujo end-to-end con dos usuarios reales) -- pendiente real: probarlo manualmente antes
+  de considerarlo cerrado del todo en produccion.
+- ~~Tema oscuro y revisión de accesibilidad (WCAG AA) pendientes~~ **Alcance acotado
+  resuelto 2026-08-24** (decisión explícita con el usuario: dark mode funcional + pase de
+  accesibilidad acotado, NO una auditoría WCAG AA formal completa). Toggle de tema
+  claro/oscuro persistente (`localStorage`, sin tabla nueva -- no hay preferencias de
+  usuario en BD todavía) en la barra superior (`App.tsx`); `primary`/`secondary` quedan
+  fijos en ambos modos (MUI ya resuelve `contrastText` legible) y `palette.mode` deja que
+  MUI calcule background/paper/texto/`divider` del modo oscuro con sus defaults (ya
+  pensados para contraste WCAG AA), salvo `background.default` en claro que se conserva
+  igual que antes para no regresionar. Accesibilidad: se agregaron `aria-label` a los
+  `IconButton` de la barra superior que no lo tenían (menu, notificaciones, nuevo toggle
+  de tema) -- no se auditó el resto de la app boton por boton (fuera del alcance
+  acotado). Sin overrides de `outline` que rompan el foco de teclado (verificado con
+  grep, cero coincidencias). **Fuera de alcance, señalado explícitamente**: ~56
+  colores hexadecimales fijos en 9 archivos (concentrados en
+  `DashboardEjecutivoPage.tsx`, `CatalogoReportesPage.tsx` y `DiagramaFlujoSolicitud.tsx`
+  -- paletas de categorías/estatus para graficas y diagramas) no se tocaron: remapearlos
+  de forma segura exige verlos en vivo en ambos modos, y esta sesión no pudo levantar
+  LocalDB para probarlo (ver abajo). Revisarlos es el pendiente real si se quiere
+  profundizar la accesibilidad en modo oscuro. **Verificado**: `tsc -b`/`oxlint` limpios.
+  **No verificado en vivo**: la base `bdsGTE` no existe en la LocalDB de este entorno
+  (crearla exige correr ~40 scripts de `DataBase/Scripts` en orden, fuera de alcance
+  razonable solo para una verificación visual) -- se pudo confirmar que la app carga sin
+  romperse (pantalla de login) pero no se llegó a ver la barra superior autenticada con
+  el toggle real. Pendiente real: probarlo con LocalDB poblada (login real) y confirmar
+  visualmente contraste en ambos modos.
 - ~~El arrastre de tarjetas del kanban no se pudo verificar con ratón real~~ **Verificado
   2026-08-01.** Sí funciona: se simuló un arrastre real (`PointerEvent` sintético con
   `pointerdown`/`pointermove`/`pointerup`, `isPrimary: true`, `button: 0`) moviendo
@@ -604,23 +700,38 @@ transiciones automáticas configurables.
   Maestro §8.5). El almacén (`AlmacenArchivosDisco`) usa una carpeta local por defecto
   (`AlmacenArchivos:Ruta` vacío cae a una subcarpeta junto al ejecutable); para producción
   hay que apuntarlo al share de red real.
-- **Catálogo de Complejidades sin semilla de datos:** `tblComplejidad` existe y ya se
-  expone en `GET /catalogos/bandeja`, pero ningún script de despliegue le carga filas — en
-  un ambiente nuevo el select de Complejidad en el modal de edición de WorkItem apareceria
-  vacío (no bloquea nada, el campo es opcional). Si se necesita, es un script `INSERT` de
-  datos, no de esquema.
+- ~~**Catálogo de Complejidades sin semilla de datos**~~ **Resuelto 2026-08-24.** Script
+  `39_2026-08-24_INSERT_bdsGTE_ComplejidadSeed.sql`: siembra Baja/Media/Alta (Orden 1-3)
+  para ambientes nuevos sin migración del GT (la migración real ya siembra sus propios
+  nombres reales `Basica`/`Media`/etc. desde `bdsApollo`, y no corre en estos ambientes).
+  Es un default genérico editable por administración, no un catálogo fijo de negocio.
+  **Deliberadamente NO siembra `tblMatrizPresupuesto`** (Complejidad x Nivel -> Minutos/
+  Puntos, RN-REQ-08): son valores reales de negocio que este script no debe inventar: sin
+  esas filas, el presupuesto automático simplemente no se calcula para WorkItems con estas
+  complejidades hasta que administración capture la matriz real.
 - **Edición de WorkItem, fuera de alcance deliberado de esta entrega:** el modal de alta
   (`NuevoItemModal.tsx`) sigue sin captura de complejidad ni puntos de historia (no se pidió
   ampliarlo); no se introdujo deshabilitado de campos individuales por permiso (el backend
   revalida cada regla y su 403 se muestra tal cual, consistente con el resto de la app).
-- **Notificaciones y SignalR, fuera de alcance deliberado de esta entrega:** sin canales
-  Correo/Teams/WhatsApp (`ICanalNotificacion` sigue sin implementación, reservado para
-  cuando existan credenciales externas), sin `tblPlantillaNotificacion` (mensajes armados
-  inline en cada disparador), sin disparador de Solicitud convertida ni de Release
-  liberado (quedan para otra sesión), sin grupo por equipo en el broadcast de tablero
-  (`Clients.All`, la escala del ERP no lo justifica hoy), sin eliminar/editar
-  notificaciones (solo alta + marcar leída) y sin preferencias de canal/evento por usuario
-  (el Documento Maestro las menciona en el perfil pero no hay tabla para ellas).
+- ~~**Notificaciones, sin canales Correo/Teams/WhatsApp**~~ **Correo resuelto 2026-08-24**
+  (Teams/WhatsApp siguen sin implementación -- decisión explícita: sin credenciales de
+  ningún tipo disponibles en este entorno para esos dos). `CanalCorreoSmtp : ICanalNotificacion`
+  via `System.Net.Mail.SmtpClient` (sin agregar dependencia nueva al proyecto);
+  `ServicioNotificaciones` resuelve el correo de cada destinatario (`tblUsuario.Correo`) y
+  llama al canal ademas del InApp de siempre. **Sin credenciales SMTP en este entorno**:
+  `Smtp:Habilitado=false` por default en `appsettings.json` -- el canal existe pero no
+  envia nada hasta que alguien configure host/usuario/password reales; un fallo de envio
+  se atrapa y solo deja warning en log (no tumba el flujo de negocio que disparo la
+  notificacion). **Verificado**: `dotnet build`/`dotnet test` (58/58) limpios. **No
+  verificado en vivo** (sin servidor SMTP real disponible para probar un envio real) --
+  pendiente real: configurar credenciales SMTP reales y confirmar que llega un correo.
+  Sigue fuera de alcance (sin cambios): `tblPlantillaNotificacion` (mensajes siguen armados
+  inline en cada disparador), disparador de Solicitud convertida ni de Release liberado,
+  grupo por equipo en el broadcast de tablero (`Clients.All`), eliminar/editar
+  notificaciones (solo alta + marcar leída) y preferencias de canal/evento por usuario (el
+  Documento Maestro las menciona en el perfil pero no hay tabla para ellas -- decisión
+  explícita de no construirlas en esta pasada, se manda correo a todo destinatario con
+  correo capturado, sin opt-out).
 
 ---
 

@@ -26,6 +26,8 @@ public class AuditMiddleware(RequestDelegate next)
         auditoria.Correo =
             usuario.FindFirstValue(ClaimTypes.Email)
             ?? usuario.FindFirstValue("email");
+        // Solo presente en tokens emitidos por IniciarSuplantacion (ver EmisorTokenSesion).
+        auditoria.UsuarioReal = usuario.FindFirstValue("actor_real");
         auditoria.Ip = contexto.Connection.RemoteIpAddress?.ToString() ?? string.Empty;
         auditoria.Endpoint = $"{contexto.Request.Method} {contexto.Request.Path}";
 

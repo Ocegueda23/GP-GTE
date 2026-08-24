@@ -5,6 +5,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
 import { ComboBuscable } from "../../shared/components/ComboBuscable";
+import { EditorEnriquecido } from "../../shared/editor/EditorEnriquecido";
 import { useSesion } from "../../shared/api/sesion";
 import { crearWorkItem, type CatalogosBandeja } from "../../shared/api/workitems";
 
@@ -42,6 +43,7 @@ export function NuevoItemModal({ abierto, catalogos, alCerrar, alExito, alError,
   const [idComplejidad, setIdComplejidad] = useState<number | "">("");
   const [titulo, setTitulo] = useState(copiaDe ? `Copia de ${copiaDe.titulo}` : "");
   const [descripcion, setDescripcion] = useState(copiaDe?.descripcion ?? "");
+  const [descripcionVacia, setDescripcionVacia] = useState(true);
   const [compromiso, setCompromiso] = useState("");
   const [enviando, setEnviando] = useState(false);
   const clienteQuery = useQueryClient();
@@ -52,6 +54,7 @@ export function NuevoItemModal({ abierto, catalogos, alCerrar, alExito, alError,
   const limpiar = () => {
     setTitulo("");
     setDescripcion("");
+    setDescripcionVacia(true);
     setCompromiso("");
     setIdAsignado(sesion?.idUsuario ?? "");
     setIdComplejidad("");
@@ -76,7 +79,7 @@ export function NuevoItemModal({ abierto, catalogos, alCerrar, alExito, alError,
         idProyecto: idProyecto as number,
         idTipoWorkItem: idTipo as number,
         titulo: titulo.trim(),
-        descripcion: descripcion.trim() || null,
+        descripcion: descripcionVacia ? null : descripcion,
         idPrioridad: idPrioridad as number,
         idComplejidad: idComplejidad as number,
         idAsignado: idAsignado === "" ? null : (idAsignado as number),
@@ -126,13 +129,12 @@ export function NuevoItemModal({ abierto, catalogos, alCerrar, alExito, alError,
           onChange={(e) => setTitulo(e.target.value)}
           slotProps={{ htmlInput: { maxLength: 200 } }}
         />
-        <TextField
-          size="small"
+        <EditorEnriquecido
           label="Descripcion"
-          multiline
-          minRows={3}
           value={descripcion}
-          onChange={(e) => setDescripcion(e.target.value)}
+          onChange={setDescripcion}
+          onVacioChange={setDescripcionVacia}
+          onError={alError}
         />
         <ComboBuscable
           label="Prioridad"

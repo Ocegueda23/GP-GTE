@@ -8,7 +8,7 @@ import AddIcon from "@mui/icons-material/Add";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link as RouterLink } from "react-router-dom";
 import { ErrorApi } from "../../shared/api/http";
-import { ComboBuscable } from "../../shared/components/ComboBuscable";
+import { ComboBuscable, ComboBuscableMultiple } from "../../shared/components/ComboBuscable";
 import { obtenerCatalogosBandeja } from "../../shared/api/workitems";
 import { useSesion } from "../../shared/api/sesion";
 import {
@@ -17,6 +17,16 @@ import {
 
 const ESTATUS_RESUELTO = 5;
 const ESTATUS_CERRADO = 6;
+
+/** Contrato de IDs de dbo.tblEstatusTicket (GTE.Domain.Soporte.EstatusTicket). */
+const ESTATUS_TICKET = [
+  { id: 1, nombre: "Nuevo" },
+  { id: 2, nombre: "Asignado" },
+  { id: 3, nombre: "En Atencion" },
+  { id: 4, nombre: "Esperando Usuario" },
+  { id: 5, nombre: "Resuelto" },
+  { id: 6, nombre: "Cerrado" },
+];
 
 function formatearFecha(iso: string | null): string {
   if (!iso) return "-";
@@ -34,6 +44,9 @@ export function PortalTicketsPage() {
   const [idUsuarioSolicitante, setIdUsuarioSolicitante] = useState<number | "">("");
   const [idLocacion, setIdLocacion] = useState<number | "">("");
   const [enviando, setEnviando] = useState(false);
+  const [busqueda, setBusqueda] = useState("");
+  // Sin filtro = abiertos (todos menos Cerrado); "Todos" (-1) sigue disponible como opcion.
+  const [filtroEstatus, setFiltroEstatus] = useState<number[]>([]);
   const clienteQuery = useQueryClient();
   const puede = useSesion((estado) => estado.puede);
   const esIngeniero = puede("TKT.Atender");
@@ -43,7 +56,15 @@ export function PortalTicketsPage() {
     queryFn: obtenerCatalogosBandeja,
     staleTime: 5 * 60_000,
   });
-  const mios = useQuery({ queryKey: ["mis-tickets"], queryFn: obtenerMisTickets });
+  const mios = useQuery({
+    queryKey: ["mis-tickets", filtroEstatus],
+    queryFn: () => obtenerMisTickets(filtroEstatus),
+  });
+  const miosFiltrados = (mios.data ?? []).filter((t) => {
+    const texto = busqueda.trim().toLowerCase();
+    if (!texto) return true;
+    return t.folio?.toLowerCase().includes(texto) || t.titulo.toLowerCase().includes(texto);
+  });
 
   const valido = titulo.trim().length > 0 && idPrioridad !== "";
 
@@ -91,6 +112,25 @@ export function PortalTicketsPage() {
         <Alert severity="error" sx={{ mb: 2 }}>{(mios.error as Error).message}</Alert>
       )}
 
+      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5, mb: 1.5 }}>
+        <TextField size="small" placeholder="Buscar folio o titulo..." value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)} sx={{ minWidth: 260 }} />
+        <ComboBuscableMultiple
+          label="Estatus"
+          value={filtroEstatus}
+          onChange={(valores) => {
+            const valor = valores as number[];
+            const eligioTodos = valor.includes(-1) && !filtroEstatus.includes(-1);
+            setFiltroEstatus(eligioTodos ? [-1] : valor.filter((v) => v !== -1));
+          }}
+          opciones={[
+            { valor: -1, etiqueta: "Todos" },
+            ...ESTATUS_TICKET.map((e) => ({ valor: e.id, etiqueta: e.nombre })),
+          ]}
+          sx={{ minWidth: 220 }}
+        />
+      </Box>
+
       <Paper variant="outlined">
         <TableContainer sx={{ overflowX: "auto" }}>
           <Table size="small">
@@ -107,16 +147,18 @@ export function PortalTicketsPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {mios.data?.length === 0 && (
+              {miosFiltrados.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={8}>
                     <Typography color="text.secondary" sx={{ py: 4, textAlign: "center" }}>
-                      Aun no tienes tickets. Crea el primero con el boton Nuevo ticket.
+                      {(mios.data?.length ?? 0) === 0 && filtroEstatus.length === 0 && !busqueda.trim()
+                        ? "Aun no tienes tickets. Crea el primero con el boton Nuevo ticket."
+                        : "No hay tickets con estos filtros."}
                     </Typography>
                   </TableCell>
                 </TableRow>
               )}
-              {mios.data?.map((t) => (
+              {miosFiltrados.map((t) => (
                 <FilaTicket key={t.idTicket} ticket={t}
                   alExito={(mensaje) => {
                     setAviso({ tipo: "success", mensaje });
@@ -223,7 +265,7 @@ function FilaTicket({ ticket, alExito, alError }: {
     <TableRow hover>
       <TableCell sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>
         <Typography component={RouterLink} to={`/tickets/${ticket.folio}`} variant="body2"
-          sx={{ fontWeight: 600, color: "inherit" }}>
+          sx={{ fontWeight: 600, color: "info.main" }}>
           {ticket.folio}
         </Typography>
       </TableCell>

@@ -36,6 +36,18 @@ public interface IEntregaRepository
 
     /* Aprobaciones */
 
+    /// <summary>
+    /// Cadena de aprobacion configurada por proyecto (Admin > Workflows). Lista vacia si el
+    /// proyecto no tiene configuracion propia: en ese caso el llamador usa el default fijo
+    /// (GTE.Domain.Entregas.RolesAprobacion.Cadena).
+    /// </summary>
+    Task<IReadOnlyList<string>> ObtenerCadenaAprobacionConfiguradaAsync(
+        int idProyecto, CancellationToken cancellationToken = default);
+
+    /// <summary>Reemplaza completa la cadena configurada del proyecto (lista vacia = volver al default fijo).</summary>
+    Task GuardarCadenaAprobacionConfiguradaAsync(
+        int idProyecto, IReadOnlyList<string> roles, CancellationToken cancellationToken = default);
+
     Task CrearCadenaAprobacionAsync(int idRelease, IReadOnlyList<string> roles, CancellationToken cancellationToken = default);
 
     /// <summary>Da de baja la cadena de aprobacion vigente (REABRIR): la siguiente

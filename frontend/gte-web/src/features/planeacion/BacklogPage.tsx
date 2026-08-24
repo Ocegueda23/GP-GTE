@@ -16,8 +16,9 @@ import { ErrorApi } from "../../shared/api/http";
 import { ComboBuscable } from "../../shared/components/ComboBuscable";
 import { EncabezadoOrdenable } from "../../shared/components/EncabezadoOrdenable";
 import { useOrdenTabla } from "../../shared/hooks/useOrdenTabla";
+import { useSesion } from "../../shared/api/sesion";
 import {
-  asignarSprint, cambiarEstatusSprint, crearSprint, obtenerBacklog, obtenerBacklogGlobal,
+  asignarSprint, cambiarEstatusSprint, crearSprint, editarSprint, obtenerBacklog, obtenerBacklogGlobal,
   obtenerCapacidad, obtenerItemsSprint, obtenerSprints, reordenarBacklog,
 } from "../../shared/api/planeacion";
 import { colorEstatus, formatearMinutos, obtenerCatalogosBandeja, type BandejaItem } from "../../shared/api/workitems";
@@ -63,9 +64,15 @@ function FilaItem({ item, acciones }: { item: BandejaItem; acciones: React.React
 
 /** P06 - Backlog y planeacion de sprint: prioriza, compromete y compara contra capacidad. */
 export function BacklogPage() {
+  const puede = useSesion((estado) => estado.puede);
   const [idProyecto, setIdProyecto] = useState<number | "">("");
   const [idSprint, setIdSprint] = useState<number | "">("");
   const [modalSprint, setModalSprint] = useState(false);
+  const [modalEditar, setModalEditar] = useState(false);
+  const [nombreEditar, setNombreEditar] = useState("");
+  const [objetivoEditar, setObjetivoEditar] = useState("");
+  const [fechaInicioEditar, setFechaInicioEditar] = useState("");
+  const [fechaFinEditar, setFechaFinEditar] = useState("");
   const [modalCierre, setModalCierre] = useState(false);
   const [destinoCierre, setDestinoCierre] = useState("Backlog");
   const [modalRelease, setModalRelease] = useState(false);
@@ -179,6 +186,24 @@ export function BacklogPage() {
     }).then((r) => { setModalSprint(false); setNombre(""); setObjetivo(""); return r; }),
       "No se pudo crear el sprint.");
 
+  const abrirModalEditar = () => {
+    if (!sprintSeleccionado) return;
+    setNombreEditar(sprintSeleccionado.nombre);
+    setObjetivoEditar(sprintSeleccionado.objetivo ?? "");
+    setFechaInicioEditar(sprintSeleccionado.fechaInicio);
+    setFechaFinEditar(sprintSeleccionado.fechaFin);
+    setModalEditar(true);
+  };
+
+  const guardarEdicionSprint = () =>
+    manejar(() => editarSprint(sprintActual!, {
+      nombre: nombreEditar.trim(),
+      objetivo: objetivoEditar.trim() || null,
+      fechaInicio: fechaInicioEditar,
+      fechaFin: fechaFinEditar,
+    }).then((r) => { setModalEditar(false); return r; }),
+      "No se pudo modificar el sprint.");
+
   const excedeCapacidad = capacidad.data !== undefined
     && capacidad.data.horasComprometidas > capacidad.data.horasCapacidad
     && capacidad.data.horasCapacidad > 0;
@@ -246,8 +271,8 @@ export function BacklogPage() {
               label="Proyecto"
               value={proyectoActual ?? ""}
               onChange={(v) => setIdProyecto(v as number | "")}
-              opciones={(catalogos.data?.proyectos ?? []).map((p) => ({ valor: p.id, etiqueta: p.clave }))}
-              sx={{ minWidth: 180 }}
+              opciones={(catalogos.data?.proyectos ?? []).map((p) => ({ valor: p.id, etiqueta: `${p.clave} - ${p.nombre}` }))}
+              sx={{ minWidth: 420 }}
             />
           </Stack>
           {backlog.isLoading && <LinearProgress />}
@@ -307,7 +332,7 @@ export function BacklogPage() {
                 <Typography variant="caption" color="text.secondary">
                   {sprintSeleccionado.fechaInicio} al {sprintSeleccionado.fechaFin}
                 </Typography>
-                {sprintSeleccionado.idEstatus === 1 && (
+                {sprintSeleccionado.idEstatus === 1 && puede("PLA.CambiarEstatusSprint") && (
                   <Button size="small" variant="contained"
                     onClick={() => void manejar(
                       () => cambiarEstatusSprint(sprintSeleccionado.idSprint, { accion: "ACTIVAR" }),
@@ -315,7 +340,15 @@ export function BacklogPage() {
                     Activar
                   </Button>
                 )}
-                {sprintSeleccionado.idEstatus === 2 && (
+                {sprintSeleccionado.idEstatus === 2 && puede("PLA.CambiarEstatusSprint") && (
+                  <Button size="small" variant="outlined"
+                    onClick={() => void manejar(
+                      () => cambiarEstatusSprint(sprintSeleccionado.idSprint, { accion: "VOLVER_PLANEADO" }),
+                      "No se pudo volver el sprint a planeado.")}>
+                    Volver a planeado
+                  </Button>
+                )}
+                {sprintSeleccionado.idEstatus === 2 && puede("PLA.CerrarSprint") && (
                   <Button size="small" variant="outlined" onClick={() => setModalCierre(true)}>
                     Cerrar sprint
                   </Button>
@@ -323,6 +356,11 @@ export function BacklogPage() {
                 {sprintSeleccionado.idEstatus === 3 && (
                   <Button size="small" variant="contained" onClick={() => setModalRelease(true)}>
                     Enviar a release
+                  </Button>
+                )}
+                {sprintSeleccionado.idEstatus !== 3 && puede("PLA.ModificarSprint") && (
+                  <Button size="small" onClick={abrirModalEditar}>
+                    Modificar sprint
                   </Button>
                 )}
               </Stack>
@@ -410,6 +448,29 @@ export function BacklogPage() {
           <Button variant="contained" onClick={() => void guardarSprint()}
             disabled={idEquipoNuevo === "" || nombre.trim().length === 0 || !fechaInicio || !fechaFin}>
             Crear
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={modalEditar} onClose={() => setModalEditar(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Modificar sprint</DialogTitle>
+        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
+          <TextField size="small" required label="Nombre" value={nombreEditar}
+            onChange={(e) => setNombreEditar(e.target.value)} />
+          <TextField size="small" label="Objetivo del sprint" multiline minRows={2}
+            value={objetivoEditar} onChange={(e) => setObjetivoEditar(e.target.value)} />
+          <TextField size="small" type="date" required label="Inicio" value={fechaInicioEditar}
+            onChange={(e) => setFechaInicioEditar(e.target.value)}
+            slotProps={{ inputLabel: { shrink: true } }} />
+          <TextField size="small" type="date" required label="Fin" value={fechaFinEditar}
+            onChange={(e) => setFechaFinEditar(e.target.value)}
+            slotProps={{ inputLabel: { shrink: true } }} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setModalEditar(false)}>Cancelar</Button>
+          <Button variant="contained" onClick={() => void guardarEdicionSprint()}
+            disabled={nombreEditar.trim().length === 0 || !fechaInicioEditar || !fechaFinEditar}>
+            Guardar
           </Button>
         </DialogActions>
       </Dialog>

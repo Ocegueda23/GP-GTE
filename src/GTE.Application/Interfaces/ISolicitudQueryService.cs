@@ -13,7 +13,9 @@ public interface ISolicitudQueryService
     Task<PagedResult<SolicitudResponse>> ObtenerTriageAsync(FiltroTriage filtro, CancellationToken cancellationToken = default);
 
     /// <summary>Solicitudes del usuario actual (portal del solicitante).</summary>
-    Task<IReadOnlyList<SolicitudResponse>> ObtenerMiasAsync(int idSolicitante, CancellationToken cancellationToken = default);
+    /// <summary>Sin estatus = pendientes (Enviada, En Analisis, Aprobada); [-1] = todas.</summary>
+    Task<IReadOnlyList<SolicitudResponse>> ObtenerMiasAsync(
+        int idSolicitante, IReadOnlyList<int>? estatus, CancellationToken cancellationToken = default);
 
     Task<SolicitudResponse?> ObtenerPorIdAsync(int idSolicitud, CancellationToken cancellationToken = default);
 

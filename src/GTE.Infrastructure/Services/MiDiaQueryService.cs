@@ -98,7 +98,7 @@ public class MiDiaQueryService(
         var ticketsAsignados = await tickets.ObtenerBandejaAsync(
             new FiltroBandejaTicket(PageSize: 50, IdAsignado: idUsuario), cancellationToken);
         var incidentesRelevantes = await incidentes.ObtenerRelevantesAsync(idUsuario, cancellationToken);
-        var solicitudesPendientes = (await solicitudes.ObtenerMiasAsync(idUsuario, cancellationToken))
+        var solicitudesPendientes = (await solicitudes.ObtenerMiasAsync(idUsuario, null, cancellationToken))
             .Where(s => EstatusSolicitudPendiente.Contains(s.IdEstatus))
             .ToList();
         var triagePendientes = puedeTriage

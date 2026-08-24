@@ -9,6 +9,11 @@
 
   <ItemGroup>
     <PackageReference Include="HtmlSanitizer" Version="9.1.974" />
+    <!-- Cifrado de columnas del motor de catalogos genericos: IDataProtector/IXmlRepository.
+         Paquete propio de Microsoft (parte del framework compartido de ASP.NET Core), no
+         un tercero nuevo; se referencia explicito porque este proyecto es class library
+         (Microsoft.NET.Sdk), no Web SDK, y no lo trae implicito. -->
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="8.0.*" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.*">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>

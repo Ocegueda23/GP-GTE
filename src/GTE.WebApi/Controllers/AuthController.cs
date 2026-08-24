@@ -26,6 +26,14 @@ public class TokenResponse
     public SesionResponse Sesion { get; set; } = new();
 }
 
+public class IniciarSuplantacionRequest
+{
+    public int IdUsuarioSuplantado { get; set; }
+
+    /// <summary>Contraseña del SUPLANTADOR (re-autenticacion), no la del suplantado.</summary>
+    public string Password { get; set; } = string.Empty;
+}
+
 /// <summary>
 /// Identidad de la sesion, login propio (usuario+contraseña) y, solo en desarrollo,
 /// el atajo sin contraseña. GTE no depende de ningun proveedor de identidad externo.
@@ -125,6 +133,36 @@ public class AuthController(
         await mediator.Send(
             new CambiarPasswordCommand(request.PasswordActual, request.PasswordNueva), cancellationToken);
         return Ok(ApiResponse<object>.Exito(new { }, "Contraseña actualizada."));
+    }
+
+    /// <summary>
+    /// "Iniciar sesion como" (soporte), auditado: requiere el permiso ADM.Suplantar y la
+    /// PROPIA contraseña del suplantador. El token resultante evalua permisos como el
+    /// suplantado y deja doble identidad en bitacora (ver AuditContext.UsuarioReal).
+    /// </summary>
+    [HttpPost("suplantacion/iniciar")]
+    public async Task<ActionResult<ApiResponse<TokenResponse>>> IniciarSuplantacion(
+        [FromBody] IniciarSuplantacionRequest request, CancellationToken cancellationToken)
+    {
+        var resultado = await mediator.Send(
+            new IniciarSuplantacionCommand(request.IdUsuarioSuplantado, request.Password), cancellationToken);
+        return Ok(ApiResponse<TokenResponse>.Exito(new TokenResponse
+        {
+            Token = resultado.Token,
+            Expira = resultado.Expira,
+            Sesion = resultado.Sesion
+        }, $"Suplantando a {resultado.Sesion.Nombre}."));
+    }
+
+    /// <summary>
+    /// Cierra una suplantacion activa: solo deja rastro en bitacora (el JWT no tiene
+    /// estado que revocar). El cliente vuelve a usar el token real que tenia guardado.
+    /// </summary>
+    [HttpPost("suplantacion/terminar")]
+    public async Task<ActionResult<ApiResponse<object>>> TerminarSuplantacion(CancellationToken cancellationToken)
+    {
+        await mediator.Send(new TerminarSuplantacionCommand(), cancellationToken);
+        return Ok(ApiResponse<object>.Exito(new { }, "Suplantacion finalizada."));
     }
 
     /// <summary>

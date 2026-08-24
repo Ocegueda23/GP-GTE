@@ -11,7 +11,7 @@ import BuildIcon from "@mui/icons-material/Build";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link as RouterLink } from "react-router-dom";
 import { ErrorApi } from "../../shared/api/http";
-import { ComboBuscable } from "../../shared/components/ComboBuscable";
+import { ComboBuscable, ComboBuscableMultiple } from "../../shared/components/ComboBuscable";
 import { EncabezadoOrdenable } from "../../shared/components/EncabezadoOrdenable";
 import { obtenerCatalogosBandeja, type AccionDisponible, type CatalogosBandeja } from "../../shared/api/workitems";
 import {
@@ -31,6 +31,15 @@ function fechaLocalAhora(): string {
   return ahora.toISOString().slice(0, 16);
 }
 
+/** Contrato de IDs de dbo.tblEstatusIncidente (GTE.Domain.Operacion.EstatusIncidente). */
+const ESTATUS_INCIDENTE = [
+  { id: 1, nombre: "Detectado" },
+  { id: 2, nombre: "En Atencion" },
+  { id: 3, nombre: "Mitigado" },
+  { id: 4, nombre: "Resuelto" },
+  { id: 5, nombre: "Cerrado" },
+];
+
 /** P17 - Incidentes: bandeja de operacion (permiso INC.Gestionar). */
 export function BandejaIncidentesPage() {
   const [texto, setTexto] = useState("");
@@ -38,6 +47,11 @@ export function BandejaIncidentesPage() {
   const [aviso, setAviso] = useState<{ tipo: "success" | "error"; mensaje: string } | null>(null);
   const [idProyecto, setIdProyecto] = useState<number | "">("");
   const [idSeveridad, setIdSeveridad] = useState<number | "">("");
+  // Sin filtro = abiertos (todos menos Cerrado); "Todos" (-1) sigue disponible como opcion
+  // explicita en el combo de abajo.
+  const [filtroEstatus, setFiltroEstatus] = useState<number[]>([]);
+  const [filtroSeveridad, setFiltroSeveridad] = useState<number | "">("");
+  const [filtroProyecto, setFiltroProyecto] = useState<number | "">("");
   const [titulo, setTitulo] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [fechaOcurrencia, setFechaOcurrencia] = useState(fechaLocalAhora());
@@ -58,9 +72,15 @@ export function BandejaIncidentesPage() {
     staleTime: 5 * 60_000,
   });
   const bandeja = useQuery({
-    queryKey: ["bandeja-incidentes", texto, ordenarPor, ordenDescendente],
+    queryKey: ["bandeja-incidentes", texto, filtroEstatus, filtroSeveridad, filtroProyecto, ordenarPor, ordenDescendente],
     queryFn: () => obtenerBandejaIncidentes({
-      ...filtroBandejaIncidentesInicial, texto, ordenarPor, ordenDescendente,
+      ...filtroBandejaIncidentesInicial,
+      texto,
+      estatus: filtroEstatus,
+      idSeveridad: filtroSeveridad === "" ? null : filtroSeveridad,
+      idProyecto: filtroProyecto === "" ? null : filtroProyecto,
+      ordenarPor,
+      ordenDescendente,
     }),
     placeholderData: (anterior) => anterior,
   });
@@ -106,8 +126,44 @@ export function BandejaIncidentesPage() {
         </Button>
       </Box>
 
-      <TextField size="small" label="Buscar folio o titulo" value={texto}
-        onChange={(e) => setTexto(e.target.value)} sx={{ mb: 2, minWidth: 300 }} />
+      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5, mb: 2 }}>
+        <TextField size="small" label="Buscar folio o titulo" value={texto}
+          onChange={(e) => setTexto(e.target.value)} sx={{ minWidth: 260 }} />
+        <ComboBuscableMultiple
+          label="Estatus"
+          value={filtroEstatus}
+          onChange={(valores) => {
+            const valor = valores as number[];
+            const eligioTodos = valor.includes(-1) && !filtroEstatus.includes(-1);
+            setFiltroEstatus(eligioTodos ? [-1] : valor.filter((v) => v !== -1));
+          }}
+          opciones={[
+            { valor: -1, etiqueta: "Todos" },
+            ...ESTATUS_INCIDENTE.map((e) => ({ valor: e.id, etiqueta: e.nombre })),
+          ]}
+          sx={{ minWidth: 220 }}
+        />
+        <ComboBuscable
+          label="Severidad"
+          value={filtroSeveridad}
+          onChange={(v) => setFiltroSeveridad(v as number | "")}
+          opciones={[
+            { valor: "", etiqueta: "Todas" },
+            ...(catalogos.data?.severidades ?? []).map((s) => ({ valor: s.id, etiqueta: s.nombre })),
+          ]}
+          sx={{ minWidth: 160 }}
+        />
+        <ComboBuscable
+          label="Proyecto"
+          value={filtroProyecto}
+          onChange={(v) => setFiltroProyecto(v as number | "")}
+          opciones={[
+            { valor: "", etiqueta: "Todos" },
+            ...(catalogos.data?.proyectos ?? []).map((p) => ({ valor: p.id, etiqueta: `${p.clave} - ${p.nombre}` })),
+          ]}
+          sx={{ minWidth: 220 }}
+        />
+      </Box>
 
       {bandeja.isError && (
         <Alert severity="error" sx={{ mb: 2 }}>{(bandeja.error as Error).message}</Alert>
@@ -133,7 +189,7 @@ export function BandejaIncidentesPage() {
                 <TableRow>
                   <TableCell colSpan={8}>
                     <Typography color="text.secondary" sx={{ py: 4, textAlign: "center" }}>
-                      No hay incidentes abiertos.
+                      No hay incidentes con estos filtros.
                     </Typography>
                   </TableCell>
                 </TableRow>
@@ -142,7 +198,7 @@ export function BandejaIncidentesPage() {
                 <TableRow key={i.idIncidente} hover>
                   <TableCell sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>
                     <Typography component={RouterLink} to={`/operacion/incidentes/${i.folio}`} variant="body2"
-                      sx={{ fontWeight: 600, color: "inherit" }}>
+                      sx={{ fontWeight: 600, color: "info.main" }}>
                       {i.folio}
                     </Typography>
                   </TableCell>

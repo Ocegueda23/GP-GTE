@@ -65,8 +65,12 @@ public class CambiarEstatusReleaseHandler(
 
         if (command.Accion == AccionesRelease.SolicitarAprobacion)
         {
+            var cadenaConfigurada = await repositorio.ObtenerCadenaAprobacionConfiguradaAsync(
+                release.IdProyecto, cancellationToken);
             await repositorio.CrearCadenaAprobacionAsync(
-                command.IdRelease, RolesAprobacion.Cadena, cancellationToken);
+                command.IdRelease,
+                cadenaConfigurada.Count > 0 ? cadenaConfigurada : RolesAprobacion.Cadena,
+                cancellationToken);
         }
         else if (command.Accion == AccionesRelease.Reabrir)
         {

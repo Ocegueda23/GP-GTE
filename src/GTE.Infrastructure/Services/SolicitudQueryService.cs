@@ -90,12 +90,23 @@ public class SolicitudQueryService(FabricaContexto fabrica) : ISolicitudQuerySer
     }
 
     public async Task<IReadOnlyList<SolicitudResponse>> ObtenerMiasAsync(
-        int idSolicitante, CancellationToken cancellationToken = default)
+        int idSolicitante, IReadOnlyList<int>? estatus, CancellationToken cancellationToken = default)
     {
         await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
 
-        var solicitudes = await Proyectar(contexto)
-            .Where(s => s.IdSolicitanteInterno == idSolicitante)
+        var consulta = Proyectar(contexto).Where(s => s.IdSolicitanteInterno == idSolicitante);
+
+        if (estatus is null || estatus.Count == 0)
+        {
+            consulta = consulta.Where(s => EstatusPendientesTriage.Contains(s.IdEstatus));
+        }
+        else if (!estatus.Contains(-1))
+        {
+            var estatusArray = estatus.ToArray();
+            consulta = consulta.Where(s => estatusArray.Contains(s.IdEstatus));
+        }
+
+        var solicitudes = await consulta
             .OrderByDescending(s => s.IdSolicitud)
             .ToListAsync(cancellationToken);
 

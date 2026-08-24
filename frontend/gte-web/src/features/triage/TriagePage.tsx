@@ -9,6 +9,7 @@ import MoreVertIcon from "@mui/icons-material/MoreVert";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
+import { alpha } from "@mui/material/styles";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
 import { ComboBuscable } from "../../shared/components/ComboBuscable";
@@ -108,7 +109,11 @@ export function TriagePage() {
               )}
               {triage.data?.items.map((s) => (
                 <TableRow key={s.idSolicitud} hover
-                  sx={{ backgroundColor: s.diasEspera >= 3 && s.idEstatus === 2 ? "#fdecea" : undefined }}>
+                  sx={(theme) => ({
+                    backgroundColor: s.diasEspera >= 3 && s.idEstatus === 2
+                      ? alpha(theme.palette.error.main, theme.palette.mode === "dark" ? 0.18 : 0.08)
+                      : undefined,
+                  })}>
                   <TableCell sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>{s.folio}</TableCell>
                   <TableCell sx={{ maxWidth: 300 }}>
                     <Tooltip title={`${htmlATextoPlano(s.descripcion ?? "")}\n${s.justificacionNegocio ?? ""}`.trim()}>

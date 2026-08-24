@@ -23,4 +23,14 @@ public class AuditContext
     public string Ip { get; set; } = string.Empty;
     public string Endpoint { get; set; } = string.Empty;
     public string IdSistema { get; set; } = "GTE";
+
+    /// <summary>
+    /// Dominio del suplantador cuando la sesion actual viene de "iniciar sesion como"
+    /// (ver AuthController.IniciarSuplantacion / claim "actor_real" del token). Null en
+    /// sesiones normales. <see cref="Usuario"/> sigue siendo el suplantado (asi RBAC evalua
+    /// sus permisos), y este campo deja la doble identidad en tblBitacora.
+    /// </summary>
+    public string? UsuarioReal { get; set; }
+
+    public bool EsSuplantacion => !string.IsNullOrWhiteSpace(UsuarioReal);
 }

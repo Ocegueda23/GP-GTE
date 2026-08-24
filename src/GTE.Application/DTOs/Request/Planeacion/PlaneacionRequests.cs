@@ -9,6 +9,15 @@ public class SprintCrearRequest
     public DateOnly FechaFin { get; set; }
 }
 
+/// <summary>Editar nombre/objetivo/fechas de un sprint no cerrado.</summary>
+public class SprintEditarRequest
+{
+    public string Nombre { get; set; } = string.Empty;
+    public string? Objetivo { get; set; }
+    public DateOnly FechaInicio { get; set; }
+    public DateOnly FechaFin { get; set; }
+}
+
 public class CambiarEstatusSprintRequest
 {
     public string Accion { get; set; } = string.Empty;

@@ -87,11 +87,23 @@ public class TicketQueryService(FabricaContexto fabrica) : ITicketQueryService
     }
 
     public async Task<IReadOnlyList<TicketResponse>> ObtenerMiosAsync(
-        int idSolicitante, CancellationToken cancellationToken = default)
+        int idSolicitante, IReadOnlyList<int>? estatus, CancellationToken cancellationToken = default)
     {
         await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
-        return await Proyectar(contexto)
-            .Where(t => t.IdSolicitanteInterno == idSolicitante)
+
+        var consulta = Proyectar(contexto).Where(t => t.IdSolicitanteInterno == idSolicitante);
+
+        if (estatus is null || estatus.Count == 0)
+        {
+            consulta = consulta.Where(t => t.IdEstatus != EstatusTicket.Cerrado);
+        }
+        else if (!estatus.Contains(-1))
+        {
+            var estatusArray = estatus.ToArray();
+            consulta = consulta.Where(t => estatusArray.Contains(t.IdEstatus));
+        }
+
+        return await consulta
             .OrderByDescending(t => t.IdTicket)
             .ToListAsync(cancellationToken);
     }

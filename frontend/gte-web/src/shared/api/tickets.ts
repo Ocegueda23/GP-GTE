@@ -62,8 +62,11 @@ export async function crearTicket(datos: NuevoTicket) {
   return enviar<Ticket>("post", "/api/v1/tickets", datos);
 }
 
-export async function obtenerMisTickets() {
-  return obtener<Ticket[]>("/api/v1/tickets/mios");
+/** Sin estatus = abiertos (todos menos Cerrado); [-1] = todos. */
+export async function obtenerMisTickets(estatus: number[] = []) {
+  const params = new URLSearchParams();
+  estatus.forEach((e) => params.append("estatus", String(e)));
+  return obtener<Ticket[]>("/api/v1/tickets/mios", params);
 }
 
 export async function obtenerBandejaTickets(filtro: FiltroBandejaTickets) {

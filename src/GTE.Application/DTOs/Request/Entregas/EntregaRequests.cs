@@ -19,6 +19,12 @@ public class AgregarContenidoRequest
     public List<int> IdsWorkItem { get; set; } = [];
 }
 
+public class ConfigurarCadenaAprobacionRequest
+{
+    /// <summary>Vacia para volver al default fijo (QA, Lider, Negocio).</summary>
+    public List<string> Roles { get; set; } = [];
+}
+
 /// <summary>
 /// Envio de lo terminado de un sprint a un release: o entra a uno ya En Preparacion
 /// del proyecto (IdReleaseExistente), o se crea uno nuevo con VersionNueva. Exactamente

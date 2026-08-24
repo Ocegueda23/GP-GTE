@@ -34,6 +34,19 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- appsettings.Local.json son overrides POR MAQUINA (la cadena de conexion de cada
+         desarrollador), gitignored y cargados por Program.cs. NUNCA deben salir en el
+         paquete de publicacion: el SDK web los barre por el glob appsettings*.json y, al
+         copiarse a C:\Servicios\GTE, pisarian la configuracion de produccion. Es
+         exactamente lo que tumbo el login del servicio el 2026-08-23 (se publico un
+         appsettings.Local.json de desarrollo que repunto el servicio a una instancia de
+         SQL donde LocalSystem no tiene acceso). CopyToPublishDirectory=Never los deja
+         fuera del publish pero los sigue copiando al bin de desarrollo. -->
+    <Content Update="appsettings.Local.json" CopyToPublishDirectory="Never" />
+    <Content Update="appsettings.*.Local.json" CopyToPublishDirectory="Never" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\GTE.Application\GTE.Application.csproj" />
     <ProjectReference Include="..\GTE.Infrastructure\GTE.Infrastructure.csproj" />
   </ItemGroup>

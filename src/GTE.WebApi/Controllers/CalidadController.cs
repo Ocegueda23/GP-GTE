@@ -25,6 +25,16 @@ public class CalidadController(IMediator mediator) : ControllerBase
         return Ok(ApiResponse<IReadOnlyList<CasoPruebaResponse>>.Exito(resultado));
     }
 
+    /// <summary>Catalogo completo de casos del proyecto (incluye retirados y no reutilizables),
+    /// para la pantalla de administracion del catalogo.</summary>
+    [HttpGet("proyectos/{idProyecto:int}/casosprueba/catalogo")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<CasoAdminResponse>>>> ObtenerCatalogoCasos(
+        int idProyecto, CancellationToken cancellationToken)
+    {
+        var resultado = await mediator.Send(new ObtenerCatalogoCasosQuery(idProyecto), cancellationToken);
+        return Ok(ApiResponse<IReadOnlyList<CasoAdminResponse>>.Exito(resultado));
+    }
+
     [HttpGet("workitems/{idWorkItem:int}/casosprueba")]
     public async Task<ActionResult<ApiResponse<IReadOnlyList<CasoAsignadoResponse>>>> ObtenerCasosAsignados(
         int idWorkItem, CancellationToken cancellationToken)

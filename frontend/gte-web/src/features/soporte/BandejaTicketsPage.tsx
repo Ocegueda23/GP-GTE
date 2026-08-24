@@ -7,6 +7,7 @@ import {
 } from "@mui/material";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import UpgradeIcon from "@mui/icons-material/UpgradeOutlined";
+import { alpha } from "@mui/material/styles";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link as RouterLink } from "react-router-dom";
 import { ErrorApi } from "../../shared/api/http";
@@ -138,10 +139,15 @@ export function BandejaTicketsPage() {
                   && new Date(t.fechaLimiteResolucion) < new Date()
                   && t.fechaResolucion === null;
                 return (
-                  <TableRow key={t.idTicket} hover sx={{ backgroundColor: vencido ? "#fdecea" : undefined }}>
+                  <TableRow key={t.idTicket} hover
+                    sx={(theme) => ({
+                      backgroundColor: vencido
+                        ? alpha(theme.palette.error.main, theme.palette.mode === "dark" ? 0.18 : 0.08)
+                        : undefined,
+                    })}>
                     <TableCell sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>
                       <Typography component={RouterLink} to={`/tickets/${t.folio}`} variant="body2"
-                        sx={{ fontWeight: 600, color: "inherit" }}>
+                        sx={{ fontWeight: 600, color: "info.main" }}>
                         {t.folio}
                       </Typography>
                     </TableCell>

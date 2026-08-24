@@ -9,6 +9,7 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
+import { iniciarSuplantacion, useSesion } from "../../shared/api/sesion";
 import { AvatarUsuario } from "../../shared/components/AvatarUsuario";
 import { ComboBuscable } from "../../shared/components/ComboBuscable";
 import { EncabezadoOrdenable } from "../../shared/components/EncabezadoOrdenable";
@@ -21,10 +22,15 @@ import {
 
 /** P20 - Usuarios: alta manual, baja logica, nivel, horario, jefe y asignacion de roles. */
 export function UsuariosTab() {
+  const { sesion, puede } = useSesion();
   const [texto, setTexto] = useState("");
   const [modalNuevo, setModalNuevo] = useState(false);
   const [usuarioEditar, setUsuarioEditar] = useState<Usuario | null>(null);
   const [passwordAMostrar, setPasswordAMostrar] = useState<{ nombre: string; password: string } | null>(null);
+  const [suplantarUsuario, setSuplantarUsuario] = useState<Usuario | null>(null);
+  const [passwordPropia, setPasswordPropia] = useState("");
+  const [erroSuplantacion, setErrorSuplantacion] = useState<string | null>(null);
+  const [enviandoSuplantacion, setEnviandoSuplantacion] = useState(false);
   const [aviso, setAviso] = useState<{ tipo: "success" | "error"; mensaje: string } | null>(null);
   const clienteQuery = useQueryClient();
 
@@ -177,6 +183,22 @@ export function UsuariosTab() {
       await refrescar();
     } catch (error) {
       avisar(error instanceof ErrorApi ? error.message : "No se pudo retirar el rol.", true);
+    }
+  };
+
+  const confirmarSuplantacion = async () => {
+    if (!suplantarUsuario) return;
+    setEnviandoSuplantacion(true);
+    setErrorSuplantacion(null);
+    try {
+      await iniciarSuplantacion(suplantarUsuario.idUsuario, passwordPropia);
+      // Recarga completa: hay que descartar todo el cache/estado cargado con la
+      // identidad anterior (TanStack Query, Zustand) antes de operar como el suplantado.
+      window.location.href = "/";
+    } catch (error) {
+      setErrorSuplantacion(error instanceof ErrorApi ? error.message : "No se pudo iniciar la suplantacion.");
+    } finally {
+      setEnviandoSuplantacion(false);
     }
   };
 
@@ -400,6 +422,17 @@ export function UsuariosTab() {
           <Stack direction="row" spacing={1}>
             <Button color="error" onClick={() => void darBaja()}>Dar de baja</Button>
             <Button onClick={() => void restablecerPassword()}>Restablecer contraseña</Button>
+            {puede("ADM.Suplantar") && usuarioEditar?.idUsuario !== sesion?.idUsuario && (
+              <Button
+                onClick={() => {
+                  setPasswordPropia("");
+                  setErrorSuplantacion(null);
+                  setSuplantarUsuario(usuarioEditar);
+                }}
+              >
+                Iniciar sesion como
+              </Button>
+            )}
           </Stack>
           <Stack direction="row" spacing={1}>
             <Button onClick={() => setUsuarioEditar(null)}>Cancelar</Button>
@@ -420,6 +453,33 @@ export function UsuariosTab() {
         </DialogContent>
         <DialogActions>
           <Button variant="contained" onClick={() => setPasswordAMostrar(null)}>Listo</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={suplantarUsuario !== null} onClose={() => setSuplantarUsuario(null)} fullWidth maxWidth="xs">
+        <DialogTitle>Iniciar sesion como {suplantarUsuario?.nombre}</DialogTitle>
+        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
+          <Alert severity="warning">
+            Vas a operar GTE con la identidad de <strong>{suplantarUsuario?.nombre}</strong>. Queda
+            registrado en la bitacora con tu usuario como suplantador. Confirma tu propia
+            contraseña para continuar.
+          </Alert>
+          <TextField
+            size="small" required type="password" label="Tu contraseña" value={passwordPropia}
+            onChange={(e) => setPasswordPropia(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && passwordPropia.trim()) void confirmarSuplantacion(); }}
+            autoFocus
+          />
+          {erroSuplantacion && <Alert severity="error">{erroSuplantacion}</Alert>}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSuplantarUsuario(null)}>Cancelar</Button>
+          <Button
+            variant="contained" disabled={enviandoSuplantacion || passwordPropia.trim().length === 0}
+            onClick={() => void confirmarSuplantacion()}
+          >
+            Confirmar
+          </Button>
         </DialogActions>
       </Dialog>
 

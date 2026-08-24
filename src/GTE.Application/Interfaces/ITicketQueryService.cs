@@ -13,8 +13,10 @@ public interface ITicketQueryService
 {
     Task<PagedResult<TicketResponse>> ObtenerBandejaAsync(FiltroBandejaTicket filtro, CancellationToken cancellationToken = default);
 
-    /// <summary>Tickets del usuario actual (portal del solicitante).</summary>
-    Task<IReadOnlyList<TicketResponse>> ObtenerMiosAsync(int idSolicitante, CancellationToken cancellationToken = default);
+    /// <summary>Tickets del usuario actual (portal del solicitante). Sin estatus = abiertos
+    /// (todos menos Cerrado); [-1] = todos, mismo contrato que ObtenerBandejaAsync.</summary>
+    Task<IReadOnlyList<TicketResponse>> ObtenerMiosAsync(
+        int idSolicitante, IReadOnlyList<int>? estatus, CancellationToken cancellationToken = default);
 
     Task<TicketResponse?> ObtenerPorIdAsync(int idTicket, CancellationToken cancellationToken = default);
 

@@ -41,3 +41,20 @@ public class EjecucionRegistradaResponse
     public int IdEjecucionPrueba { get; set; }
     public int? IdRevision { get; set; }
 }
+
+/// <summary>Catalogo completo de casos de un proyecto (incluye retirados y no reutilizables),
+/// para la pantalla de administracion del catalogo.</summary>
+public class CasoAdminResponse
+{
+    public int IdCasoPrueba { get; set; }
+    public string? Folio { get; set; }
+    public string Titulo { get; set; } = string.Empty;
+    public string? Precondiciones { get; set; }
+    public string? ResultadoEsperado { get; set; }
+    public int IdTipoPrueba { get; set; }
+    public string TipoPrueba { get; set; } = string.Empty;
+    public bool Reutilizable { get; set; }
+    public bool Activo { get; set; }
+    public int TotalAsignaciones { get; set; }
+    public IReadOnlyList<PasoCasoResponse> Pasos { get; set; } = [];
+}

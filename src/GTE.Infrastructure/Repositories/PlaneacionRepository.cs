@@ -43,6 +43,25 @@ public class PlaneacionRepository(FabricaContexto fabrica, AuditContext auditori
         return entidad.IdSprint;
     }
 
+    public async Task EditarSprintAsync(
+        int idSprint, SprintEdicion datos, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
+        var entidad = await contexto.TblSprint
+            .FirstOrDefaultAsync(s => s.IdSprint == idSprint, cancellationToken)
+            ?? throw new InvalidOperationException($"Sprint {idSprint} no existe.");
+
+        entidad.Nombre = datos.Nombre;
+        entidad.Objetivo = datos.Objetivo;
+        entidad.FechaInicio = datos.FechaInicio;
+        entidad.FechaFin = datos.FechaFin;
+        entidad.UsuarioMovto = Auditoria.Usuario.Length > 50 ? Auditoria.Usuario[..50] : Auditoria.Usuario;
+        entidad.FechaMovto = DateTime.Now;
+        await contexto.SaveChangesAsync(cancellationToken);
+
+        await RegistrarBitacoraAsync("Sprint", idSprint, "MODIFICAR", datos.Nombre, cancellationToken);
+    }
+
     public async Task<EstadoSprint?> ObtenerEstadoSprintAsync(
         int idSprint, CancellationToken cancellationToken = default)
     {

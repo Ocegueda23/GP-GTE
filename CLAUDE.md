@@ -38,7 +38,10 @@ SOLO a este proyecto. No migrar sin decision del equipo.
   Sin identidad, AuditContext.Usuario queda VACIO (usar TieneIdentidad): no usar centinelas
   con texto porque pueden coincidir con una cuenta real y confundir la auditoria.
 - Toda la API exige autenticacion por FallbackPolicy. Un endpoint solo se abre con
-  [AllowAnonymous] y con una razon escrita (hoy: health, version y auth/configuracion).
+  [AllowAnonymous] y con una razon escrita (hoy: health, version, auth/configuracion y
+  la base de conocimiento publica -- `ConocimientoPublicoController`, solo lectura, solo
+  articulos con `EsPublico = 1`, con limitador de tasa por IP; la razon y los limites de
+  esa excepcion estan escritos en el propio controlador).
   Bitacora con contexto de vida corta (RegistrarBitacoraAsync de RepositoryBase).
 - Cambios de estatus SOLO via IMotorWorkflow (dbo.spCambiarEstatus, motor propio); el
   front manda la accion, nunca el estatus destino. El estatus inicial lo fija el backend.

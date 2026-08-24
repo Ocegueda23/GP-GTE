@@ -61,8 +61,11 @@ export async function actualizarSolicitud(idSolicitud: number, datos: NuevaSolic
 /** Estatus en los que una solicitud todavia admite edicion (Enviada, En analisis, Aprobada). */
 export const ESTATUS_SOLICITUD_EDITABLE = [2, 3, 4];
 
-export async function obtenerMisSolicitudes() {
-  return obtener<Solicitud[]>("/api/v1/solicitudes/mias");
+/** Sin estatus = pendientes (Enviada, En Analisis, Aprobada); [-1] = todas. */
+export async function obtenerMisSolicitudes(estatus: number[] = []) {
+  const params = new URLSearchParams();
+  estatus.forEach((e) => params.append("estatus", String(e)));
+  return obtener<Solicitud[]>("/api/v1/solicitudes/mias", params);
 }
 
 export async function obtenerTriage(

@@ -21,7 +21,8 @@ public class ObtenerTriageHandler(ISolicitudQueryService consultas, IVerificador
     }
 }
 
-public record ObtenerMisSolicitudesQuery : IRequest<IReadOnlyList<SolicitudResponse>>;
+/// <summary>Sin estatus = pendientes (Enviada, En Analisis, Aprobada); [-1] = todas.</summary>
+public record ObtenerMisSolicitudesQuery(IReadOnlyList<int>? Estatus = null) : IRequest<IReadOnlyList<SolicitudResponse>>;
 
 public class ObtenerMisSolicitudesHandler(
     ISolicitudQueryService consultas,
@@ -32,7 +33,7 @@ public class ObtenerMisSolicitudesHandler(
     {
         var usuario = await proveedorUsuario.ObtenerAsync(cancellationToken)
             ?? throw new ForbiddenException("La identidad actual no esta registrada como usuario de GTE.");
-        return await consultas.ObtenerMiasAsync(usuario.IdUsuario, cancellationToken);
+        return await consultas.ObtenerMiasAsync(usuario.IdUsuario, query.Estatus, cancellationToken);
     }
 }
 

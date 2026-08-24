@@ -27,3 +27,17 @@ public class ObtenerCasosAsignadosHandler(ICalidadQueryService consultas)
         return await consultas.ObtenerCasosAsignadosAsync(query.IdWorkItem, cancellationToken);
     }
 }
+
+/// <summary>Catalogo completo de casos de un proyecto (incluye retirados y no reutilizables),
+/// para la pantalla de administracion del catalogo.</summary>
+public record ObtenerCatalogoCasosQuery(int IdProyecto) : IRequest<IReadOnlyList<CasoAdminResponse>>;
+
+public class ObtenerCatalogoCasosHandler(ICalidadQueryService consultas)
+    : IRequestHandler<ObtenerCatalogoCasosQuery, IReadOnlyList<CasoAdminResponse>>
+{
+    public async Task<IReadOnlyList<CasoAdminResponse>> Handle(
+        ObtenerCatalogoCasosQuery query, CancellationToken cancellationToken)
+    {
+        return await consultas.ObtenerCatalogoCasosAsync(query.IdProyecto, cancellationToken);
+    }
+}

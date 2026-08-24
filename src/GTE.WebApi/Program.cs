@@ -8,9 +8,30 @@ using GTE.WebApi.Middleware;
 using GTE.WebApi.Seguridad;
 using Hangfire;
 using MediatR;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Overrides locales POR MAQUINA (la cadena de conexion del SQL Server de cada quien), en
+// un archivo gitignored. Ya estaba documentado en CLAUDE.md y listado en .gitignore, pero
+// nunca se cargaba: "Local" no es un ASPNETCORE_ENVIRONMENT, asi que el
+// appsettings.{Environment}.json por convencion no lo tomaba. Va al final para ganarle a
+// appsettings.json y appsettings.{Environment}.json, y sigue por debajo de las variables
+// de entorno y los argumentos de linea de comandos.
+//
+// SOLO en Development, a proposito. El 2026-08-23 un appsettings.Local.json de desarrollo
+// se colo en el paquete de publicacion y, al tener la precedencia mas alta, repunto el
+// servicio de Windows a una instancia de SQL donde LocalSystem no tiene acceso: todas las
+// llamadas a BD tronaron y el login empezo a responder 500. La primera defensa es
+// CopyToPublishDirectory="Never" en el .csproj (no viaja en el publish); esta es la
+// segunda, para que aunque alguien lo copie a mano a un servidor jamas pise la config de
+// produccion.
+if (builder.Environment.IsDevelopment())
+{
+    builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
+}
 
 // Integracion con el Service Control Manager de Windows: sin esto, el .exe publicado
 // corre como una consola normal y "sc start" truena con error 1053 (nunca le avisa a
@@ -42,6 +63,16 @@ builder.Services.AddAutoMapper(typeof(AutoMapperProfile).Assembly);
 // Transversales
 builder.Services.AddScoped<AuditContext>();
 builder.Services.AddSingleton<FabricaContexto>();
+
+// Data Protection: key ring persistido en bdsGTE (ADR-03) en vez del filesystem por
+// defecto, usado por el cifrado de columnas del motor de catalogos genericos.
+builder.Services.AddDataProtection().SetApplicationName("GTE");
+builder.Services.AddOptions<KeyManagementOptions>()
+    .Configure<FabricaContexto>((opciones, fabrica) =>
+    {
+        opciones.XmlRepository = new RepositorioClavesProteccionSql(fabrica);
+    });
+
 builder.Services.AddScoped<GTE.Application.Interfaces.IMotorWorkflow, GTE.Infrastructure.Services.MotorWorkflow>();
 builder.Services.AddScoped<GTE.Application.Interfaces.ICalendarioLaboral, GTE.Infrastructure.Services.CalendarioLaboral>();
 builder.Services.AddScoped<GTE.Application.Interfaces.IGeneradorFolios, GTE.Infrastructure.Services.GeneradorFolios>();
@@ -86,6 +117,10 @@ builder.Services.AddScoped<GTE.Application.Interfaces.ITicketQueryService, GTE.I
 builder.Services.AddScoped<GTE.Domain.Interfaces.IIncidenteRepository, GTE.Infrastructure.Repositories.IncidenteRepository>();
 builder.Services.AddScoped<GTE.Application.Interfaces.IIncidenteQueryService, GTE.Infrastructure.Services.IncidenteQueryService>();
 
+// Modulo Base de conocimiento (P23; incluye el consumo anonimo /api/v1/publico/conocimiento)
+builder.Services.AddScoped<GTE.Domain.Interfaces.IConocimientoRepository, GTE.Infrastructure.Repositories.ConocimientoRepository>();
+builder.Services.AddScoped<GTE.Application.Interfaces.IConocimientoQueryService, GTE.Infrastructure.Services.ConocimientoQueryService>();
+
 // Modulo Portafolio (Costeo + OKR)
 builder.Services.AddScoped<GTE.Domain.Interfaces.ICosteoRepository, GTE.Infrastructure.Repositories.CosteoRepository>();
 builder.Services.AddScoped<GTE.Application.Interfaces.ICosteoQueryService, GTE.Infrastructure.Services.CosteoQueryService>();
@@ -95,6 +130,13 @@ builder.Services.AddScoped<GTE.Application.Interfaces.IOkrQueryService, GTE.Infr
 // Modulo Administracion
 builder.Services.AddScoped<GTE.Domain.Interfaces.IAdministracionRepository, GTE.Infrastructure.Repositories.AdministracionRepository>();
 builder.Services.AddScoped<GTE.Application.Interfaces.IAdministracionQueryService, GTE.Infrastructure.Services.AdministracionQueryService>();
+
+// Motor de catalogos genericos (CRUD administrativo sobre tablas simples de bdsGTE)
+builder.Services.AddScoped<GTE.Domain.Interfaces.ICatalogoGenericoRepository, GTE.Infrastructure.Repositories.CatalogoGenericoRepository>();
+builder.Services.AddScoped<GTE.Application.Interfaces.ICatalogoGenericoQueryService, GTE.Infrastructure.Services.CatalogoGenericoQueryService>();
+builder.Services.AddScoped<GTE.Application.Interfaces.IMotorMetadatosEsquema, GTE.Infrastructure.Services.MotorMetadatosEsquema>();
+builder.Services.AddScoped<GTE.Application.Interfaces.IMotorCrudGenerico, GTE.Infrastructure.Services.MotorCrudGenerico>();
+builder.Services.AddSingleton<GTE.Application.Interfaces.IServicioCifradoColumna, GTE.Infrastructure.Services.ServicioCifradoColumna>();
 
 // Modulo Dashboard Ejecutivo de colaborador individual (solo lectura, sin repositorio de escritura)
 builder.Services.AddScoped<GTE.Application.Interfaces.IDashboardQueryService, GTE.Infrastructure.Services.DashboardQueryService>();
@@ -125,6 +167,10 @@ builder.Services.AddScoped<GTE.Application.Interfaces.IReportesQueryService, GTE
 builder.Services.AddSingleton<GTE.Application.Interfaces.IExportadorExcel, GTE.Infrastructure.Services.ExportadorExcelClosedXml>();
 builder.Services.AddScoped<GTE.Application.Interfaces.IServicioNotificaciones, GTE.Infrastructure.Services.ServicioNotificaciones>();
 builder.Services.AddScoped<GTE.Application.Interfaces.INotificadorTiempoReal, GTE.WebApi.Hubs.NotificadorSignalR>();
+// Canal Correo: sin credenciales SMTP en este entorno, Smtp:Habilitado queda en false por
+// default (appsettings) y el canal no envia nada -- ver CanalCorreoSmtp.
+builder.Services.Configure<GTE.Infrastructure.Services.OpcionesSmtp>(builder.Configuration.GetSection("Smtp"));
+builder.Services.AddScoped<GTE.Application.Interfaces.ICanalNotificacion, GTE.Infrastructure.Services.CanalCorreoSmtp>();
 
 // Modulo Autenticacion (propia de GTE, sin proveedor externo)
 builder.Services.AddScoped<GTE.Domain.Interfaces.IAutenticacionRepository, GTE.Infrastructure.Repositories.AutenticacionRepository>();
@@ -134,6 +180,25 @@ builder.Services.AddSingleton<GTE.Application.Interfaces.IEmisorTokenSesion, GTE
 // Autenticacion: JWT propio de GTE (sin proveedor externo).
 // Arranca con FallbackPolicy que exige identidad en toda la API.
 builder.Services.AgregarAutenticacionGte(builder.Configuration, builder.Environment);
+
+// Limitacion de tasa para las rutas ANONIMAS de la base de conocimiento
+// (/api/v1/publico/conocimiento). El resto de la API no la necesita: exige token y no esta
+// expuesta a internet. Particionado por IP de origen -- un visitante anonimo no tiene
+// identidad con la que particionar. Ventana fija por simplicidad; si el trafico real lo
+// pide se cambia a token bucket sin tocar los controladores (la politica es un nombre).
+builder.Services.AddRateLimiter(opciones =>
+{
+    opciones.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    opciones.AddPolicy(GTE.WebApi.Seguridad.LimitadoresTasa.Publico, contexto =>
+        System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: contexto.Connection.RemoteIpAddress?.ToString() ?? "desconocida",
+            factory: _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 120,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+});
 
 // CORS para el SPA (AllowCredentials: el refresh token viaja en una cookie HttpOnly)
 var origenesSpa = builder.Configuration.GetSection("Cors:Origenes").Get<string[]>()
@@ -213,6 +278,10 @@ app.UseCors("Spa");
 app.UseAuthentication();
 app.UseMiddleware<AuditMiddleware>();
 app.UseAuthorization();
+
+// Despues de UseAuthorization: solo las rutas que declaran [EnableRateLimiting] pasan por
+// un limitador (hoy, las anonimas de la base de conocimiento publica).
+app.UseRateLimiter();
 
 app.MapControllers();
 app.MapHub<GTE.WebApi.Hubs.NotificacionesHub>("/hubs/notificaciones");

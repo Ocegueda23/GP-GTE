@@ -78,6 +78,15 @@ export async function crearSprint(datos: {
   return enviar<Sprint>("post", "/api/v1/sprints", datos);
 }
 
+export async function editarSprint(idSprint: number, datos: {
+  nombre: string;
+  objetivo: string | null;
+  fechaInicio: string;
+  fechaFin: string;
+}) {
+  return enviar<Sprint>("put", `/api/v1/sprints/${idSprint}`, datos);
+}
+
 export async function cambiarEstatusSprint(
   idSprint: number,
   datos: { accion: string; destinoItemsAbiertos?: string },

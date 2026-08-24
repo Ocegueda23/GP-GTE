@@ -213,6 +213,43 @@ public class EntregaRepository(FabricaContexto fabrica, AuditContext auditoria)
 
     /* ---------- Aprobaciones ---------- */
 
+    public async Task<IReadOnlyList<string>> ObtenerCadenaAprobacionConfiguradaAsync(
+        int idProyecto, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
+        return await contexto.TblCadenaAprobacionProyecto.AsNoTracking()
+            .Where(c => c.IdProyecto == idProyecto)
+            .OrderBy(c => c.Orden)
+            .Select(c => c.Rol)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task GuardarCadenaAprobacionConfiguradaAsync(
+        int idProyecto, IReadOnlyList<string> roles, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
+
+        var existentes = await contexto.TblCadenaAprobacionProyecto
+            .Where(c => c.IdProyecto == idProyecto)
+            .ToListAsync(cancellationToken);
+        contexto.TblCadenaAprobacionProyecto.RemoveRange(existentes);
+
+        for (var i = 0; i < roles.Count; i++)
+        {
+            contexto.TblCadenaAprobacionProyecto.Add(new TblCadenaAprobacionProyecto
+            {
+                IdProyecto = idProyecto,
+                Orden = i + 1,
+                Rol = roles[i],
+                UsuarioRegistro = Auditoria.Usuario
+            });
+        }
+        await contexto.SaveChangesAsync(cancellationToken);
+
+        await RegistrarBitacoraAsync("Proyecto", idProyecto, "CONFIGURAR_CADENA_APROBACION",
+            roles.Count > 0 ? string.Join(", ", roles) : "(default)", cancellationToken);
+    }
+
     public async Task CrearCadenaAprobacionAsync(
         int idRelease, IReadOnlyList<string> roles, CancellationToken cancellationToken = default)
     {

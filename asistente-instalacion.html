@@ -204,10 +204,11 @@
     </section>
 
     <section class="tarjeta">
-      <h2><span class="paso">2</span> Base de datos bdsGTE</h2>
+      <h2><span class="paso">2</span> Conexion a la base de datos</h2>
       <p class="ayuda">
-        GTE usa una sola base. El SQL Server destino debe tener habilitado el modo mixto
-        (SQL Server and Windows Authentication mode).
+        La base <code>bdsGTE</code> ya debe existir (Paso 1 del manual de instalacion). El login
+        con el que la aplicacion se conecta a diario se puede crear aqui mismo, o usar uno que ya
+        tengas -- tu decides.
       </p>
 
       <div class="campos dos">
@@ -218,17 +219,21 @@
           <div class="msg-error" id="err-servidorSql"></div>
         </div>
         <div>
-          <label for="usuarioSql">Login de servicio de SQL <span class="req">*</span></label>
+          <label for="usuarioSql">Usuario de conexion a SQL <span class="req">*</span></label>
           <input type="text" id="usuarioSql" value="svc_gte" data-obligatorio>
-          <div class="pista">Login de minimo privilegio con el que la API se conecta.</div>
+          <div class="pista">
+            Con el que la aplicacion se conecta a diario (por defecto <code>svc_gte</code>, puede
+            ser cualquier otro, incluido <code>sa</code>).
+          </div>
           <div class="msg-error" id="err-usuarioSql"></div>
         </div>
         <div>
-          <label for="passwordSql">Contrasena del login de servicio <span class="req">*</span></label>
+          <label for="passwordSql">Contrasena de esa cuenta <span class="req">*</span></label>
           <input type="password" id="passwordSql" data-obligatorio>
           <div class="pista">
-            Se crea con CHECK_POLICY ON: cumple la politica de Windows (8+ caracteres, mayusculas,
-            minusculas y numeros). Guardala en el gestor de contrasenas del equipo.
+            Si el checkbox de abajo esta marcado, esta es la contrasena con la que el instalador
+            va a crear la cuenta -- no hace falta que exista todavia. Si esta desmarcado, tiene que
+            ser exactamente la contrasena que esa cuenta ya tiene.
           </div>
           <div class="msg-error" id="err-passwordSql"></div>
         </div>
@@ -241,50 +246,40 @@
 
       <div class="grupo-condicional">
         <div class="check">
-          <input type="checkbox" id="ejecutarScripts" checked>
+          <input type="checkbox" id="crearLogin" checked>
           <div>
-            <label for="ejecutarScripts">Ejecutar los scripts de esquema (base nueva)</label>
+            <label for="crearLogin">Crear este login ahora si no existe todavia</label>
             <div class="pista">
-              Desmarcalo solo si esta bdsGTE ya existe y esta al dia. Los scripts son idempotentes:
-              volver a correrlos solo imprime SKIP.
+              El instalador lo crea con la contrasena de arriba y le da permisos minimos en
+              bdsGTE (lectura/escritura + ejecutar los procedimientos del motor propio -- nunca
+              db_owner). Si ya existe, no lo toca. Desmarca esto si el login ya existe con sus
+              permisos y solo quieres que el instalador se conecte con el.
             </div>
           </div>
         </div>
 
-        <div id="grupoScripts" style="margin-top:12px">
-          <div class="campos">
-            <div>
-              <label for="rutaScripts">Carpeta DataBase\Scripts <span class="req">*</span></label>
-              <input type="text" id="rutaScripts" value="D:\GTE\DataBase\Scripts" data-obligatorio-si="ejecutarScripts">
-              <div class="pista">
-                Debe contener las subcarpetas <code>01_Libera</code> y <code>02_Libera</code>. Se ejecutan
-                en orden con sqlcmd.
-              </div>
-              <div class="msg-error" id="err-rutaScripts"></div>
-            </div>
-          </div>
-
-          <fieldset style="margin-top:12px">
-            <legend>Con que cuenta se ejecutan los scripts</legend>
+        <div id="grupoAdminSql" style="margin-top:12px">
+          <fieldset>
+            <legend>Con que cuenta se crea</legend>
             <p class="pista" style="margin:0 0 8px">
-              Crear la base y el login exige permisos altos: usa una cuenta administradora de SQL,
-              distinta del login de servicio de arriba.
+              Crear un login exige permisos de administrador de SQL Server -- una cuenta distinta
+              a la de conexion de arriba.
             </p>
             <div class="radios">
-              <label><input type="radio" name="authAdminSql" value="windows" checked> Autenticacion de Windows (la sesion actual)</label>
-              <label><input type="radio" name="authAdminSql" value="sql"> Usuario de SQL Server</label>
+              <label><input type="radio" name="authAdminAlta" value="windows" checked> Autenticacion de Windows (la sesion actual)</label>
+              <label><input type="radio" name="authAdminAlta" value="sql"> Usuario de SQL Server</label>
             </div>
-            <div id="grupoAdminSql" hidden style="margin-top:12px">
+            <div id="grupoCredencialesAdmin" hidden style="margin-top:12px">
               <div class="campos dos">
                 <div>
-                  <label for="usuarioAdminSql">Usuario administrador de SQL <span class="req">*</span></label>
-                  <input type="text" id="usuarioAdminSql" placeholder="sa">
-                  <div class="msg-error" id="err-usuarioAdminSql"></div>
+                  <label for="usuarioAdminAlta">Usuario administrador de SQL <span class="req">*</span></label>
+                  <input type="text" id="usuarioAdminAlta" placeholder="sa">
+                  <div class="msg-error" id="err-usuarioAdminAlta"></div>
                 </div>
                 <div>
-                  <label for="passwordAdminSql">Contrasena <span class="req">*</span></label>
-                  <input type="password" id="passwordAdminSql">
-                  <div class="msg-error" id="err-passwordAdminSql"></div>
+                  <label for="passwordAdminAlta">Contrasena <span class="req">*</span></label>
+                  <input type="password" id="passwordAdminAlta">
+                  <div class="msg-error" id="err-passwordAdminAlta"></div>
                 </div>
               </div>
             </div>
@@ -296,8 +291,8 @@
     <section class="tarjeta">
       <h2><span class="paso">3</span> Usuario administrador de GTE</h2>
       <p class="ayuda">
-        Con esta cuenta se entra la primera vez. En una base nueva tblUsuario nace vacia: sin este paso
-        nadie puede iniciar sesion.
+        Con esta cuenta se entra la primera vez. Si ya la diste de alta al correr los scripts a mano,
+        el instalador solo le pone la contrasena que captures aqui; si no existe todavia, la crea.
       </p>
 
       <div class="campos dos">
@@ -390,8 +385,8 @@
       <p class="ayuda" style="margin-bottom:8px"><strong>Que va a hacer en la maquina nueva:</strong></p>
       <ol class="pasos-script" id="listaPasos">
         <li id="p-req">Verificar permisos de administrador y el runtime de .NET 8</li>
-        <li id="p-sql">Ejecutar los scripts de bdsGTE (esquema, catalogos, motor de estatus) y crear el login de servicio</li>
-        <li id="p-admin-sql">Dar de alta el usuario administrador con rol Administrador</li>
+        <li id="p-login">Crear el login de conexion a bdsGTE (si no existia) con permisos minimos</li>
+        <li id="p-admin-sql">Dar de alta el usuario administrador (si no existia) con rol Administrador</li>
         <li id="p-copiar">Copiar la aplicacion publicada a la carpeta de instalacion</li>
         <li id="p-puerto">Fijar el puerto en appsettings.Production.json</li>
         <li id="p-servicio">Crear el servicio de Windows</li>
@@ -441,8 +436,8 @@ function sqlLiteral(valor) {
 }
 
 function leerDatos() {
-  var authAdmin = document.querySelector('input[name="authAdminSql"]:checked').value;
   var modoSecretos = document.querySelector('input[name="modoSecretos"]:checked').value;
+  var authAdminAlta = document.querySelector('input[name="authAdminAlta"]:checked').value;
   return {
     nombreServicio: $("nombreServicio").value.trim(),
     displayName: $("displayName").value.trim(),
@@ -457,11 +452,10 @@ function leerDatos() {
     usuarioSql: $("usuarioSql").value.trim(),
     passwordSql: $("passwordSql").value,
     passwordSql2: $("passwordSql2").value,
-    ejecutarScripts: $("ejecutarScripts").checked,
-    rutaScripts: $("rutaScripts").value.trim().replace(/[\\/]+$/, ""),
-    authAdminSql: authAdmin,
-    usuarioAdminSql: $("usuarioAdminSql").value.trim(),
-    passwordAdminSql: $("passwordAdminSql").value,
+    crearLogin: $("crearLogin").checked,
+    authAdminAlta: authAdminAlta,
+    usuarioAdminAlta: $("usuarioAdminAlta").value.trim(),
+    passwordAdminAlta: $("passwordAdminAlta").value,
     adminDominio: $("adminDominio").value.trim(),
     adminNombre: $("adminNombre").value.trim(),
     adminPassword: $("adminPassword").value,
@@ -501,16 +495,12 @@ function validar(d) {
   if (!d.usuarioSql) errores.usuarioSql = "Obligatorio.";
 
   if (!d.passwordSql) errores.passwordSql = "Obligatorio.";
-  else if (d.passwordSql.length < 8) errores.passwordSql = "Minimo 8 caracteres (CHECK_POLICY ON).";
-  else if (d.passwordSql === "CAMBIAR-ESTA-CONTRASENA") errores.passwordSql = "No uses el valor de ejemplo del script.";
+  else if (d.passwordSql.length < 8) errores.passwordSql = "Minimo 8 caracteres.";
   if (d.passwordSql && d.passwordSql2 !== d.passwordSql) errores.passwordSql2 = "Las contrasenas no coinciden.";
 
-  if (d.ejecutarScripts) {
-    if (!d.rutaScripts) errores.rutaScripts = "Obligatorio.";
-    if (d.authAdminSql === "sql") {
-      if (!d.usuarioAdminSql) errores.usuarioAdminSql = "Obligatorio.";
-      if (!d.passwordAdminSql) errores.passwordAdminSql = "Obligatorio.";
-    }
+  if (d.crearLogin && d.authAdminAlta === "sql") {
+    if (!d.usuarioAdminAlta) errores.usuarioAdminAlta = "Obligatorio.";
+    if (!d.passwordAdminAlta) errores.passwordAdminAlta = "Obligatorio.";
   }
 
   if (!d.adminDominio) errores.adminDominio = "Obligatorio.";
@@ -563,17 +553,16 @@ function generarScript(d) {
   add("$Puerto           = " + parseInt(d.puerto, 10));
   add("$ServidorSql      = " + psLiteral(d.servidorSql));
   add("$UsuarioSql       = " + psLiteral(d.usuarioSql));
+  add("$CrearLogin       = $" + (d.crearLogin ? "true" : "false"));
+  add("$AuthAdminAlta    = " + psLiteral(d.crearLogin ? d.authAdminAlta : "windows"));
+  add("$UsuarioAdminAlta = " + psLiteral(d.crearLogin && d.authAdminAlta === "sql" ? d.usuarioAdminAlta : ""));
   add("$AdminDominio     = " + psLiteral(d.adminDominio));
   add("$AdminNombre      = " + psLiteral(d.adminNombre));
   add("$ForzarCambio     = $" + (d.forzarCambio ? "true" : "false"));
   add("$CopiarPublish    = $" + (d.copiarPublish ? "true" : "false"));
   add("$RutaOrigen       = " + psLiteral(d.copiarPublish ? d.rutaOrigenPublish : ""));
-  add("$EjecutarScripts  = $" + (d.ejecutarScripts ? "true" : "false"));
-  add("$RutaScripts      = " + psLiteral(d.ejecutarScripts ? d.rutaScripts : ""));
   add("$AbrirFirewall    = $" + (d.abrirFirewall ? "true" : "false"));
   add("$RutaAlmacen      = " + psLiteral(d.usarAlmacen ? d.rutaAlmacen : ""));
-  add("$AuthAdminSql     = " + psLiteral(d.ejecutarScripts ? d.authAdminSql : "windows"));
-  add("$UsuarioAdminSql  = " + psLiteral(d.ejecutarScripts && d.authAdminSql === "sql" ? d.usuarioAdminSql : ""));
   add("$UrlBase          = " + psLiteral(urlBase));
   add("$PasswordTemporal = " + psLiteral(PASSWORD_TEMPORAL));
   add("$HashTemporal     = " + psLiteral(HASH_TEMPORAL));
@@ -594,18 +583,22 @@ function generarScript(d) {
     add("}");
     add();
     add("Write-Host 'Contrasenas de esta instalacion' -ForegroundColor Cyan");
-    add("$PasswordSql = LeerPassword -Titulo (\"Contrasena del login de SQL '$UsuarioSql'\")");
-    add("$AdminPassword = LeerPassword -Titulo (\"Contrasena del usuario administrador '$AdminDominio' de GTE\")");
-    if (d.ejecutarScripts && d.authAdminSql === "sql") {
-      add("$PasswordAdminSql = LeerPassword -Titulo (\"Contrasena del administrador de SQL '$UsuarioAdminSql'\")");
+    if (d.crearLogin) {
+      add("$PasswordSql = LeerPassword -Titulo (\"Contrasena CON LA QUE SE VA A CREAR '$UsuarioSql'\")");
     } else {
-      add("$PasswordAdminSql = ''");
+      add("$PasswordSql = LeerPassword -Titulo (\"Contrasena de conexion a SQL '$UsuarioSql'\")");
+    }
+    add("$AdminPassword = LeerPassword -Titulo (\"Contrasena del usuario administrador '$AdminDominio' de GTE\")");
+    if (d.crearLogin && d.authAdminAlta === "sql") {
+      add("$PasswordAdminAlta = LeerPassword -Titulo (\"Contrasena del administrador de SQL '$UsuarioAdminAlta' (para crear el login)\")");
+    } else {
+      add("$PasswordAdminAlta = ''");
     }
   } else {
     add("# ATENCION: contrasenas en texto plano. Borrar este archivo al terminar.");
     add("$PasswordSql      = " + psLiteral(d.passwordSql));
     add("$AdminPassword    = " + psLiteral(d.adminPassword));
-    add("$PasswordAdminSql = " + psLiteral(d.ejecutarScripts && d.authAdminSql === "sql" ? d.passwordAdminSql : ""));
+    add("$PasswordAdminAlta = " + psLiteral(d.crearLogin && d.authAdminAlta === "sql" ? d.passwordAdminAlta : ""));
   }
   add();
 
@@ -633,10 +626,13 @@ function generarScript(d) {
   add("}");
   add();
 
-  // Ejecucion de sqlcmd centralizada. Las consultas sueltas tambien pasan por archivo temporal:
-  // -Q con texto multilinea y comillas es fragil, -i no.
+  // Ejecucion de sqlcmd centralizada. Por defecto usa el login de conexion de la aplicacion
+  // (svc_gte o el que se haya capturado); -ComoAdmin usa en cambio la cuenta administradora de
+  // SQL (solo hace falta para crear el login, que un login de bajo privilegio no puede crearse
+  // a si mismo). Las consultas sueltas pasan por archivo temporal: -Q con texto multilinea y
+  // comillas es fragil, -i no.
   add("function EjecutarSql {");
-  add("    param([string]$Archivo, [string]$Consulta, [string]$BaseDatos = 'bdsGTE')");
+  add("    param([string]$Archivo, [string]$Consulta, [string]$BaseDatos = 'bdsGTE', [switch]$ComoAdmin)");
   add("    $temporalConsulta = $null");
   add("    if (-not $Archivo) {");
   add("        $temporalConsulta = Join-Path $env:TEMP ('gte-consulta-' + [guid]::NewGuid().ToString('N') + '.sql')");
@@ -644,8 +640,9 @@ function generarScript(d) {
   add("        $Archivo = $temporalConsulta");
   add("    }");
   add("    $argumentos = @('-S', $ServidorSql, '-d', $BaseDatos, '-I', '-b', '-i', $Archivo)");
-  add("    if ($AuthAdminSql -eq 'sql') { $argumentos += @('-U', $UsuarioAdminSql, '-P', $PasswordAdminSql) }");
-  add("    else { $argumentos += '-E' }");
+  add("    if ($ComoAdmin -and $AuthAdminAlta -eq 'sql') { $argumentos += @('-U', $UsuarioAdminAlta, '-P', $PasswordAdminAlta) }");
+  add("    elseif ($ComoAdmin) { $argumentos += '-E' }");
+  add("    else { $argumentos += @('-U', $UsuarioSql, '-P', $PasswordSql) }");
   add("    # sqlcmd escribe sus errores en stderr: con ErrorActionPreference en Stop, PowerShell 5.1");
   add("    # los convierte en excepcion y se pierde el detalle. Se baja solo mientras corre sqlcmd.");
   add("    $anterior = $ErrorActionPreference");
@@ -680,16 +677,11 @@ function generarScript(d) {
   add("}");
   add("Ok 'ASP.NET Core Runtime 8.0 presente'");
   add();
-  if (d.ejecutarScripts) {
-    add("if (-not (Get-Command sqlcmd -ErrorAction SilentlyContinue)) {");
-    add("    Detener 'No se encontro sqlcmd. Instala las herramientas de linea de comandos de SQL Server, o desmarca la ejecucion de scripts en el asistente y corre los scripts a mano con SSMS.'");
-    add("}");
-    add("Ok 'sqlcmd disponible'");
-    add();
-    add("if (-not (Test-Path $RutaScripts)) { Detener \"No existe la carpeta de scripts: $RutaScripts\" }");
-    add("Ok \"Carpeta de scripts: $RutaScripts\"");
-    add();
-  }
+  add("if (-not (Get-Command sqlcmd -ErrorAction SilentlyContinue)) {");
+  add("    Detener 'No se encontro sqlcmd en esta maquina. Instala las herramientas de linea de comandos de SQL Server (sqlcmd) y vuelve a correr este script.'");
+  add("}");
+  add("Ok 'sqlcmd disponible'");
+  add();
   if (d.copiarPublish) {
     add("if (-not (Test-Path $RutaOrigen)) { Detener \"No existe la carpeta de origen del publish: $RutaOrigen\" }");
     add("if (-not (Test-Path (Join-Path $RutaOrigen 'GTE.WebApi.exe'))) {");
@@ -706,105 +698,149 @@ function generarScript(d) {
   add("}");
   add();
 
-  // ---------------------------------------------------------------- paso 2: scripts SQL
+  // ---------------------------------------------------------------- crear login de conexion
   var paso = 2;
-  if (d.ejecutarScripts) {
-    add("Titulo 'Paso " + paso + " de " + totalPasos(d) + ": esquema de bdsGTE y login de servicio'");
+  if (d.crearLogin) {
+    add("Titulo 'Paso " + paso + " de " + totalPasos(d) + ": login de conexion a bdsGTE'");
     add();
-    add("# Orden de 01_Libera: NO es el alfabetico. La tanda inicial (01 a 10 del 2026-07-30) crea el");
-    add("# esquema completo, y las tandas posteriores de esa misma carpeta reinician la secuencia en 01,");
-    add("# asi que ordenar por nombre correria los INSERT antes de existir las tablas que necesitan.");
-    add("$ordenInicial = @(");
-    add("    '01_2026-07-30_SCRIPT_bdsGTE_Catalogos.sql',");
-    add("    '02_2026-07-30_SCRIPT_bdsGTE_Administracion.sql',");
-    add("    '03_2026-07-30_SCRIPT_bdsGTE_Portafolio.sql',");
-    add("    '04_2026-07-30_SCRIPT_bdsGTE_Nucleo.sql',");
-    add("    '05_2026-07-30_SCRIPT_bdsGTE_DesarrolloQaReleases.sql',");
-    add("    '06_2026-07-30_SCRIPT_bdsGTE_OperacionSoporte.sql',");
-    add("    '07_2026-07-30_SCRIPT_bdsGTE_Transversales.sql',");
-    add("    '08_2026-07-30_SCRIPT_bdsGTE_Programables.sql',");
-    add("    '09_2026-07-30_INSERT_bdsGTE_Procesos.sql',");
-    add("    '10_2026-07-30_SCRIPT_bdsGTE_Verificacion.sql',");
-    add("    '01_2026-07-30_INSERT_bdsGTE_TransicionesYEtiquetas.sql',");
-    add("    '01_2026-07-31_INSERT_bdsGTE_EtiquetasRelease.sql',");
-    add("    '01_2026-08-01_SCRIPT_bdsGTE_Autenticacion.sql'");
-    add(")");
+    add("# Mismo contenido que DataBase/Scripts/01_Libera/01_2026-08-01_SCRIPT_bdsGTE_UsuarioServicio.sql");
+    add("# del repositorio, con svc_gte/CAMBIAR-ESTA-CONTRASENA sustituidos por los valores reales");
+    add("# capturados en el asistente. Requiere permisos de administrador de SQL (crear un login es");
+    add("# a nivel de servidor, un login de bajo privilegio no puede crearse a si mismo).");
+    add("$plantillaLogin = @'");
+    add("USE [master]");
+    add("GO");
+    add("SET XACT_ABORT ON");
+    add("GO");
+    add("BEGIN TRANSACTION");
+    add("BEGIN TRY");
+    add("    DECLARE @NombreLogin SYSNAME = N'svc_gte';");
+    add("    DECLARE @Password NVARCHAR(128) = N'CAMBIAR-ESTA-CONTRASENA';");
+    add("    DECLARE @Sql NVARCHAR(MAX);");
+    add("    IF @Password = N'CAMBIAR-ESTA-CONTRASENA'");
+    add("    BEGIN");
+    add("        RAISERROR(N'Falta sustituir la contrasena de ejemplo.', 16, 1);");
+    add("    END");
+    add("    IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = @NombreLogin)");
+    add("    BEGIN");
+    add("        SET @Sql = N'CREATE LOGIN ' + QUOTENAME(@NombreLogin) + N'");
+    add("                     WITH PASSWORD = ' + QUOTENAME(@Password, N'''') + N',");
+    add("                     CHECK_POLICY = ON, CHECK_EXPIRATION = OFF,");
+    add("                     DEFAULT_DATABASE = [bdsGTE]';");
+    add("        EXEC sp_executesql @Sql;");
+    add("        PRINT 'OK: login ' + @NombreLogin + ' creado';");
+    add("    END");
+    add("    ELSE");
+    add("        PRINT 'SKIP: el login ' + @NombreLogin + ' ya existe';");
+    add("    COMMIT TRANSACTION");
+    add("    PRINT '===== Bloque 1 (login) ejecutado correctamente ====='");
+    add("END TRY");
+    add("BEGIN CATCH");
+    add("    IF @@TRANCOUNT > 0");
+    add("        ROLLBACK TRANSACTION;");
+    add("    PRINT '===== ERROR en Bloque 1 (login) -- Se hizo ROLLBACK =====';");
+    add("    PRINT 'Mensaje : ' + ERROR_MESSAGE();");
+    add("    PRINT 'Numero  : ' + CAST(ERROR_NUMBER() AS NVARCHAR(10));");
+    add("    THROW;");
+    add("END CATCH");
+    add("GO");
+    add("USE [bdsGTE]");
+    add("GO");
+    add("SET XACT_ABORT ON");
+    add("GO");
+    add("BEGIN TRANSACTION");
+    add("BEGIN TRY");
+    add("    DECLARE @NombreLogin SYSNAME = N'svc_gte';");
+    add("    DECLARE @Sql NVARCHAR(MAX);");
+    add("    IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = @NombreLogin)");
+    add("    BEGIN");
+    add("        SET @Sql = N'CREATE USER ' + QUOTENAME(@NombreLogin) + N' FOR LOGIN ' + QUOTENAME(@NombreLogin);");
+    add("        EXEC sp_executesql @Sql;");
+    add("        PRINT 'OK: usuario ' + @NombreLogin + ' creado en bdsGTE';");
+    add("    END");
+    add("    ELSE");
+    add("        PRINT 'SKIP: el usuario ' + @NombreLogin + ' ya existe en bdsGTE';");
+    add("    IF NOT EXISTS (SELECT 1 FROM sys.database_role_members rm");
+    add("                   JOIN sys.database_principals r ON r.principal_id = rm.role_principal_id");
+    add("                   JOIN sys.database_principals m ON m.principal_id = rm.member_principal_id");
+    add("                   WHERE r.name = 'db_datareader' AND m.name = @NombreLogin)");
+    add("    BEGIN");
+    add("        SET @Sql = N'ALTER ROLE db_datareader ADD MEMBER ' + QUOTENAME(@NombreLogin);");
+    add("        EXEC sp_executesql @Sql;");
+    add("        PRINT 'OK: ' + @NombreLogin + ' agregado a db_datareader';");
+    add("    END");
+    add("    ELSE");
+    add("        PRINT 'SKIP: ' + @NombreLogin + ' ya es miembro de db_datareader';");
+    add("    IF NOT EXISTS (SELECT 1 FROM sys.database_role_members rm");
+    add("                   JOIN sys.database_principals r ON r.principal_id = rm.role_principal_id");
+    add("                   JOIN sys.database_principals m ON m.principal_id = rm.member_principal_id");
+    add("                   WHERE r.name = 'db_datawriter' AND m.name = @NombreLogin)");
+    add("    BEGIN");
+    add("        SET @Sql = N'ALTER ROLE db_datawriter ADD MEMBER ' + QUOTENAME(@NombreLogin);");
+    add("        EXEC sp_executesql @Sql;");
+    add("        PRINT 'OK: ' + @NombreLogin + ' agregado a db_datawriter';");
+    add("    END");
+    add("    ELSE");
+    add("        PRINT 'SKIP: ' + @NombreLogin + ' ya es miembro de db_datawriter';");
+    add("    DECLARE @Procs TABLE (Nombre SYSNAME);");
+    add("    INSERT INTO @Procs (Nombre) VALUES");
+    add("        (N'spCambiarEstatus'), (N'spGenerarFolio'),");
+    add("        (N'spRegistrarBitacora'), (N'spSnapshotKpi');");
+    add("    DECLARE @Proc SYSNAME;");
+    add("    DECLARE cur CURSOR LOCAL FAST_FORWARD FOR SELECT Nombre FROM @Procs;");
+    add("    OPEN cur;");
+    add("    FETCH NEXT FROM cur INTO @Proc;");
+    add("    WHILE @@FETCH_STATUS = 0");
+    add("    BEGIN");
+    add("        IF NOT EXISTS (");
+    add("            SELECT 1 FROM sys.database_permissions dp");
+    add("            JOIN sys.database_principals p ON p.principal_id = dp.grantee_principal_id");
+    add("            WHERE dp.major_id = OBJECT_ID(N'dbo.' + @Proc)");
+    add("              AND dp.permission_name = 'EXECUTE' AND p.name = @NombreLogin)");
+    add("        BEGIN");
+    add("            SET @Sql = N'GRANT EXECUTE ON dbo.' + QUOTENAME(@Proc) + N' TO ' + QUOTENAME(@NombreLogin);");
+    add("            EXEC sp_executesql @Sql;");
+    add("            PRINT 'OK: EXECUTE sobre dbo.' + @Proc + ' concedido a ' + @NombreLogin;");
+    add("        END");
+    add("        ELSE");
+    add("            PRINT 'SKIP: ' + @NombreLogin + ' ya tiene EXECUTE sobre dbo.' + @Proc;");
+    add("        FETCH NEXT FROM cur INTO @Proc;");
+    add("    END");
+    add("    CLOSE cur;");
+    add("    DEALLOCATE cur;");
+    add("    COMMIT TRANSACTION");
+    add("    PRINT '===== Bloque 2 (usuario y permisos) ejecutado correctamente ====='");
+    add("END TRY");
+    add("BEGIN CATCH");
+    add("    IF @@TRANCOUNT > 0");
+    add("        ROLLBACK TRANSACTION;");
+    add("    IF CURSOR_STATUS('local', 'cur') >= -1");
+    add("    BEGIN");
+    add("        CLOSE cur;");
+    add("        DEALLOCATE cur;");
+    add("    END");
+    add("    PRINT '===== ERROR en Bloque 2 (usuario y permisos) -- Se hizo ROLLBACK =====';");
+    add("    PRINT 'Mensaje : ' + ERROR_MESSAGE();");
+    add("    PRINT 'Numero  : ' + CAST(ERROR_NUMBER() AS NVARCHAR(10));");
+    add("    THROW;");
+    add("END CATCH");
+    add("GO");
+    add("'@");
     add();
-    add("# Estos dos se tratan aparte: uno necesita la contrasena real del login de servicio, el otro");
-    add("# da de alta al administrador con los datos capturados en el asistente.");
-    add("$scriptUsuarioServicio = '01_2026-08-01_SCRIPT_bdsGTE_UsuarioServicio.sql'");
-    add("$scriptAdministrador   = '11_2026-07-30_Insert_usuarioAdministrador.sql'");
+    add("$contenidoLogin = $plantillaLogin.Replace(\"N'CAMBIAR-ESTA-CONTRASENA'\", (\"N'\" + $PasswordSql.Replace(\"'\", \"''\") + \"'\"))");
+    add("if ($UsuarioSql -ne 'svc_gte') { $contenidoLogin = $contenidoLogin.Replace(\"N'svc_gte'\", (\"N'\" + $UsuarioSql.Replace(\"'\", \"''\") + \"'\")) }");
     add();
-    add("function CorrerScript {");
-    add("    param([System.IO.FileInfo]$Archivo, [string]$Carpeta)");
-    add("    Write-Host \"  ... $Carpeta/$($Archivo.Name)\" -ForegroundColor DarkGray");
-    add("    $r = EjecutarSql -Archivo $Archivo.FullName -BaseDatos 'master'");
-    add("    if ($r.Codigo -ne 0) {");
-    add("        Write-Host $r.Salida -ForegroundColor DarkGray");
-    add("        Detener \"Fallo el script $($Archivo.Name). Revisa el detalle de arriba.\"");
-    add("    }");
-    add("    # El script de verificacion no falla con codigo de error: reporta objeto por objeto.");
-    add("    if ($r.Salida -match 'FALTA') {");
-    add("        Write-Host $r.Salida -ForegroundColor DarkGray");
-    add("        Aviso \"$($Archivo.Name) reporto objetos faltantes (ver detalle arriba)\"");
-    add("    }");
-    add("}");
-    add();
-    add("$rutaInicial = Join-Path $RutaScripts '01_Libera'");
-    add("if (-not (Test-Path $rutaInicial)) { Detener \"No existe la subcarpeta 01_Libera en $RutaScripts\" }");
-    add();
-    add("foreach ($nombre in $ordenInicial) {");
-    add("    $archivo = Get-Item -Path (Join-Path $rutaInicial $nombre) -ErrorAction SilentlyContinue");
-    add("    if (-not $archivo) { Detener \"Falta el script $nombre en 01_Libera. La carpeta no corresponde a esta version del repositorio.\" }");
-    add("    CorrerScript -Archivo $archivo -Carpeta '01_Libera'");
-    add("}");
-    add("Ok 'Esquema base de bdsGTE desplegado (01_Libera)'");
-    add();
-    add("# Cualquier .sql de 01_Libera que no este en la lista de arriba se reporta en vez de correrse a");
-    add("# ciegas: el orden importa demasiado para adivinarlo.");
-    add("$contemplados = $ordenInicial + @($scriptUsuarioServicio, $scriptAdministrador)");
-    add("$sinContemplar = Get-ChildItem -Path $rutaInicial -Filter '*.sql' | Where-Object { $contemplados -notcontains $_.Name }");
-    add("foreach ($extra in $sinContemplar) {");
-    add("    Aviso \"01_Libera/$($extra.Name) no esta contemplado en este instalador: revisalo y correlo a mano si aplica\"");
-    add("}");
-    add();
-    add("# 02_Libera y las tandas siguientes si van por fecha y luego por secuencia (la fecha del nombre");
-    add("# es la que fija el orden entre tandas; la secuencia, el orden dentro de una misma tanda).");
-    add("$rutaPosterior = Join-Path $RutaScripts '02_Libera'");
-    add("if (Test-Path $rutaPosterior) {");
-    add("    $posteriores = Get-ChildItem -Path $rutaPosterior -Filter '*.sql' | Sort-Object @{");
-    add("        Expression = { if ($_.Name -match '^(\\d+)_(\\d{4}-\\d{2}-\\d{2})_') { $matches[2] } else { '9999-99-99' } }");
-    add("    }, @{");
-    add("        Expression = { if ($_.Name -match '^(\\d+)_') { [int]$matches[1] } else { 999 } }");
-    add("    }, Name");
-    add();
-    add("    foreach ($archivo in $posteriores) { CorrerScript -Archivo $archivo -Carpeta '02_Libera' }");
-    add("    Ok 'Tandas posteriores desplegadas (02_Libera)'");
-    add("} else {");
-    add("    Aviso 'No existe la subcarpeta 02_Libera: se instala solo con el esquema base'");
-    add("}");
-    add();
-    add("# Login de servicio: el script trae la contrasena de ejemplo como variable, hay que");
-    add("# sustituirla por la real. Se hace sobre una copia temporal para no modificar el repositorio.");
-    add("$rutaUsuarioServicio = Join-Path (Join-Path $RutaScripts '01_Libera') $scriptUsuarioServicio");
-    add("if (-not (Test-Path $rutaUsuarioServicio)) { Detener \"No se encontro $scriptUsuarioServicio en la carpeta de scripts.\" }");
-    add();
-    add("$contenido = Get-Content -Path $rutaUsuarioServicio -Raw -Encoding UTF8");
-    add("$contenido = $contenido.Replace(\"N'CAMBIAR-ESTA-CONTRASENA'\", (\"N'\" + $PasswordSql.Replace(\"'\", \"''\") + \"'\"))");
-    add("if ($UsuarioSql -ne 'svc_gte') { $contenido = $contenido.Replace(\"N'svc_gte'\", (\"N'\" + $UsuarioSql.Replace(\"'\", \"''\") + \"'\")) }");
-    add();
-    add("$temporal = Join-Path $env:TEMP ('gte-usuarioservicio-' + [guid]::NewGuid().ToString('N') + '.sql')");
+    add("$temporalLogin = Join-Path $env:TEMP ('gte-login-' + [guid]::NewGuid().ToString('N') + '.sql')");
     add("try {");
-    add("    Set-Content -Path $temporal -Value $contenido -Encoding UTF8");
-    add("    $r = EjecutarSql -Archivo $temporal -BaseDatos 'master'");
+    add("    Set-Content -Path $temporalLogin -Value $contenidoLogin -Encoding UTF8");
+    add("    $r = EjecutarSql -Archivo $temporalLogin -BaseDatos 'master' -ComoAdmin");
     add("    if ($r.Codigo -ne 0) {");
     add("        Write-Host $r.Salida -ForegroundColor DarkGray");
-    add("        Detener \"Fallo la creacion del login $UsuarioSql. Revisa que el SQL Server tenga habilitado el modo mixto y que la contrasena cumpla la politica de Windows.\"");
+    add("        Detener \"No se pudo crear el login $UsuarioSql. Revisa las credenciales de administrador de SQL y que el servidor tenga habilitado el modo mixto.\"");
     add("    }");
-    add("    Ok \"Login de servicio $UsuarioSql creado y con permisos minimos en bdsGTE\"");
+    add("    Ok \"Login $UsuarioSql listo, con permisos minimos en bdsGTE\"");
     add("} finally {");
-    add("    # La copia temporal lleva la contrasena en claro: se borra siempre, aunque el paso falle.");
-    add("    if (Test-Path $temporal) { Remove-Item $temporal -Force }");
+    add("    if (Test-Path $temporalLogin) { Remove-Item $temporalLogin -Force }");
     add("}");
     add();
     paso++;
@@ -813,8 +849,9 @@ function generarScript(d) {
   // ---------------------------------------------------------------- alta del administrador
   add("Titulo 'Paso " + paso + " de " + totalPasos(d) + ": usuario administrador de GTE'");
   add();
-  add("# Alta idempotente con el mismo patron del script 11 del repositorio: la cuenta nace con la");
-  add("# contrasena temporal y mas adelante (ultimo paso) se cambia por la capturada en el asistente.");
+  add("# Alta idempotente: si ya diste de alta al Administrador corriendo los scripts a mano, esto");
+  add("# solo confirma que existe y sigue de largo (mas adelante se le ajusta la contrasena). Si no");
+  add("# existe todavia, lo crea con la misma contrasena temporal del script 11 del repositorio.");
   add("$sqlAdmin = @\"");
   add("IF NOT EXISTS (SELECT 1 FROM dbo.tblUsuario WHERE Dominio = " + sqlLiteral(d.adminDominio) + ")");
   add("BEGIN");
@@ -1068,7 +1105,7 @@ function generarScript(d) {
 function totalPasos(d) {
   // requisitos + admin + aplicacion + puerto + servicio + variables + arranque + contrasena
   var total = 8;
-  if (d.ejecutarScripts) total++;
+  if (d.crearLogin) total++;
   if (d.abrirFirewall) total++;
   return total;
 }
@@ -1079,7 +1116,7 @@ var scriptActual = "";
 
 function pintarPasos(d) {
   var mapa = {
-    "p-sql": d.ejecutarScripts,
+    "p-login": d.crearLogin,
     "p-copiar": d.copiarPublish,
     "p-fw": d.abrirFirewall
   };
@@ -1094,16 +1131,16 @@ function refrescar() {
   // Secciones que aparecen o desaparecen segun los checkboxes
   $("grupoOrigenPublish").hidden = !d.copiarPublish;
   $("grupoAlmacen").hidden = !d.usarAlmacen;
-  $("grupoScripts").hidden = !d.ejecutarScripts;
-  $("grupoAdminSql").hidden = !(d.ejecutarScripts && d.authAdminSql === "sql");
+  $("grupoAdminSql").hidden = !d.crearLogin;
+  $("grupoCredencialesAdmin").hidden = !(d.crearLogin && d.authAdminAlta === "sql");
   $("avisoSecretos").hidden = d.modoSecretos !== "incrustar";
 
   var errores = validar(d);
 
   // Mensajes de error campo por campo
   ["nombreServicio","displayName","rutaInstalacion","puerto","rutaOrigenPublish","rutaAlmacen",
-   "servidorSql","usuarioSql","passwordSql","passwordSql2","rutaScripts","usuarioAdminSql",
-   "passwordAdminSql","adminDominio","adminNombre","adminPassword","adminPassword2"].forEach(function (campo) {
+   "servidorSql","usuarioSql","passwordSql","passwordSql2","usuarioAdminAlta","passwordAdminAlta",
+   "adminDominio","adminNombre","adminPassword","adminPassword2"].forEach(function (campo) {
     var input = $(campo);
     var caja = $("err-" + campo);
     if (!input || !caja) return;

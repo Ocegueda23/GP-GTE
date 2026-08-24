@@ -1,5 +1,7 @@
 import { useEffect } from "react";
-import { Box, IconButton, Stack, Typography } from "@mui/material";
+import {
+  Box, FormControl, IconButton, MenuItem, Select, Stack, Typography, type SelectChangeEvent,
+} from "@mui/material";
 import FormatBoldIcon from "@mui/icons-material/FormatBold";
 import FormatItalicIcon from "@mui/icons-material/FormatItalic";
 import FormatListBulletedIcon from "@mui/icons-material/FormatListBulleted";
@@ -9,7 +11,10 @@ import Placeholder from "@tiptap/extension-placeholder";
 import { useQueryClient } from "@tanstack/react-query";
 import { subirArchivo, type Archivo } from "../api/archivos";
 import { ImagenProtegida } from "./ImagenProtegida";
+import { FontSize } from "./FontSize";
 import { normalizarHtmlLegado } from "./textoPlano";
+
+const TAMANOS_LETRA = ["12px", "14px", "16px", "18px", "24px"];
 
 interface Props {
   value: string;
@@ -48,6 +53,7 @@ export function EditorEnriquecido({
       StarterKit,
       Placeholder.configure({ placeholder: placeholder ?? "" }),
       ImagenProtegida,
+      FontSize,
     ],
     content: normalizarHtmlLegado(value),
     editorProps: {
@@ -100,8 +106,15 @@ export function EditorEnriquecido({
       negrita: instancia.isActive("bold"),
       cursiva: instancia.isActive("italic"),
       lista: instancia.isActive("bulletList"),
+      tamanoLetra: (instancia.getAttributes("textStyle").fontSize as string | undefined) ?? "",
     }),
   });
+
+  const cambiarTamano = (evento: SelectChangeEvent<string>) => {
+    const tamano = evento.target.value;
+    if (!tamano) editor?.chain().focus().unsetFontSize().run();
+    else editor?.chain().focus().setFontSize(tamano).run();
+  };
   const vacio = useEditorState({ editor, selector: ({ editor: instancia }) => instancia.isEmpty });
 
   useEffect(() => {
@@ -129,6 +142,15 @@ export function EditorEnriquecido({
           onClick={() => editor?.chain().focus().toggleBulletList().run()}>
           <FormatListBulletedIcon fontSize="small" />
         </IconButton>
+        <FormControl size="small" variant="standard" sx={{ minWidth: 72, ml: 0.5 }}>
+          <Select displayEmpty value={activo.tamanoLetra} onChange={cambiarTamano}
+            sx={{ fontSize: 13 }}>
+            <MenuItem value="">Normal</MenuItem>
+            {TAMANOS_LETRA.map((tamano) => (
+              <MenuItem key={tamano} value={tamano}>{tamano}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
       </Stack>
       <Box sx={{
         border: "1px solid", borderColor: "divider", borderRadius: 1, p: 1, minHeight,

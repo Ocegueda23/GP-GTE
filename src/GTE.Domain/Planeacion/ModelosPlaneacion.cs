@@ -7,6 +7,12 @@ public record SprintNuevo(
     DateOnly FechaInicio,
     DateOnly FechaFin);
 
+public record SprintEdicion(
+    string Nombre,
+    string? Objetivo,
+    DateOnly FechaInicio,
+    DateOnly FechaFin);
+
 public record EstadoSprint(
     int IdSprint,
     int IdEquipo,

@@ -8,6 +8,9 @@ public static class PermisosAdministracion
 
     /// <summary>Editar procesos y transiciones (P21). Sembrado en el script 02, sin uso hasta ahora.</summary>
     public const string Workflows = "ADM.Workflows";
+
+    /// <summary>"Iniciar sesion como" (soporte), auditado. Sembrado en el script 02.</summary>
+    public const string Suplantar = "ADM.Suplantar";
 }
 
 /// <summary>

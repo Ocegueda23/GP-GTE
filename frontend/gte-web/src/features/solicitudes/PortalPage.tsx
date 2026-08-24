@@ -8,7 +8,7 @@ import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
-import { ComboBuscable } from "../../shared/components/ComboBuscable";
+import { ComboBuscable, ComboBuscableMultiple } from "../../shared/components/ComboBuscable";
 import { EncabezadoOrdenable } from "../../shared/components/EncabezadoOrdenable";
 import { useOrdenTabla } from "../../shared/hooks/useOrdenTabla";
 import { EditorEnriquecido } from "../../shared/editor/EditorEnriquecido";
@@ -19,6 +19,17 @@ import {
   actualizarSolicitud, colorEstatusSolicitud, crearSolicitud, ESTATUS_SOLICITUD_EDITABLE,
   obtenerMisSolicitudes, type Solicitud,
 } from "../../shared/api/solicitudes";
+
+/** Contrato de IDs de dbo.tblEstatusSolicitud (GTE.Domain.Solicitudes.EstatusSolicitud). */
+const ESTATUS_SOLICITUD = [
+  { id: 1, nombre: "Borrador" },
+  { id: 2, nombre: "Enviada" },
+  { id: 3, nombre: "En Analisis" },
+  { id: 4, nombre: "Aprobada" },
+  { id: 5, nombre: "Rechazada" },
+  { id: 6, nombre: "Convertida" },
+  { id: 7, nombre: "Cancelada" },
+];
 
 function formatearFecha(iso: string | null): string {
   if (!iso) return "-";
@@ -40,6 +51,8 @@ export function PortalPage() {
   const [idUsuarioSolicitante, setIdUsuarioSolicitante] = useState<number | "">("");
   const [enviando, setEnviando] = useState(false);
   const [busqueda, setBusqueda] = useState("");
+  // Sin filtro = pendientes (Enviada, En Analisis, Aprobada); "Todas" (-1) sigue disponible.
+  const [filtroEstatus, setFiltroEstatus] = useState<number[]>([]);
   const clienteQuery = useQueryClient();
   const puede = useSesion((estado) => estado.puede);
   const puedeCapturarSolicitante = puede("SOL.Triage");
@@ -60,7 +73,10 @@ export function PortalPage() {
     queryFn: obtenerCatalogosBandeja,
     staleTime: 5 * 60_000,
   });
-  const mias = useQuery({ queryKey: ["mis-solicitudes"], queryFn: obtenerMisSolicitudes });
+  const mias = useQuery({
+    queryKey: ["mis-solicitudes", filtroEstatus],
+    queryFn: () => obtenerMisSolicitudes(filtroEstatus),
+  });
 
   const miasFiltradas = (mias.data ?? []).filter((s) => {
     const texto = busqueda.trim().toLowerCase();
@@ -156,8 +172,24 @@ export function PortalPage() {
         <Alert severity="error" sx={{ mb: 2 }}>{(mias.error as Error).message}</Alert>
       )}
 
-      <TextField size="small" placeholder="Buscar folio o titulo..." value={busqueda}
-        onChange={(e) => setBusqueda(e.target.value)} sx={{ mb: 1.5, minWidth: 280 }} />
+      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5, mb: 1.5 }}>
+        <TextField size="small" placeholder="Buscar folio o titulo..." value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)} sx={{ minWidth: 280 }} />
+        <ComboBuscableMultiple
+          label="Estatus"
+          value={filtroEstatus}
+          onChange={(valores) => {
+            const valor = valores as number[];
+            const eligioTodos = valor.includes(-1) && !filtroEstatus.includes(-1);
+            setFiltroEstatus(eligioTodos ? [-1] : valor.filter((v) => v !== -1));
+          }}
+          opciones={[
+            { valor: -1, etiqueta: "Todas" },
+            ...ESTATUS_SOLICITUD.map((e) => ({ valor: e.id, etiqueta: e.nombre })),
+          ]}
+          sx={{ minWidth: 220 }}
+        />
+      </Box>
 
       <Paper variant="outlined">
         <TableContainer sx={{ overflowX: "auto" }}>
@@ -180,7 +212,9 @@ export function PortalPage() {
                 <TableRow>
                   <TableCell colSpan={9}>
                     <Typography color="text.secondary" sx={{ py: 4, textAlign: "center" }}>
-                      Aun no tienes solicitudes. Crea la primera con el boton Nueva solicitud.
+                      {(mias.data?.length ?? 0) === 0 && filtroEstatus.length === 0 && !busqueda.trim()
+                        ? "Aun no tienes solicitudes. Crea la primera con el boton Nueva solicitud."
+                        : "No hay solicitudes con estos filtros."}
                     </Typography>
                   </TableCell>
                 </TableRow>
