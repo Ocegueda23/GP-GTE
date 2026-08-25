@@ -24,7 +24,7 @@ public class CrearUsuarioValidator : AbstractValidator<CrearUsuarioCommand>
 }
 
 /// <summary>
-/// Alta manual de usuario. No aplica RN-ADM-01 (ciclo de jerarquia): un usuario recien
+/// Alta manual de usuario. No aplica RN-GTE-001 (ciclo de jerarquia): un usuario recien
 /// creado no puede formar parte de un ciclo porque todavia nadie lo referencia como jefe.
 /// Genera una password temporal (el usuario debe cambiarla en su primer login) y la
 /// regresa una sola vez en la respuesta: no se puede volver a consultar despues.

@@ -11,7 +11,7 @@ public interface IAdministracionRepository
     Task AsignarFolioProyectoAsync(int idProyecto, string folio, CancellationToken cancellationToken = default);
     Task AplicarEfectosTransicionProyectoAsync(int idProyecto, string accion, CancellationToken cancellationToken = default);
 
-    /// <summary>RN-PRY-01: folios de WorkItems activos y sin terminar del proyecto (para el 409 de CERRAR).</summary>
+    /// <summary>RN-GTE-005: folios de WorkItems activos y sin terminar del proyecto (para el 409 de CERRAR).</summary>
     Task<IReadOnlyList<string>> ObtenerFoliosWorkItemsAbiertosAsync(int idProyecto, CancellationToken cancellationToken = default);
 
     /* ---------- Equipos ---------- */
@@ -27,7 +27,7 @@ public interface IAdministracionRepository
     Task DarBajaUsuarioAsync(int idUsuario, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// RN-ADM-01: valida con CTE recursivo si asignar idJefePropuesto como jefe de
+    /// RN-GTE-001: valida con CTE recursivo si asignar idJefePropuesto como jefe de
     /// idUsuario formaria un ciclo en la jerarquia. No valida el caso "es su propio jefe"
     /// (eso se revisa antes, comparando los dos ids directamente).
     /// </summary>

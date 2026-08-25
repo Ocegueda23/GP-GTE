@@ -79,7 +79,7 @@ public class EnviarSprintAReleaseValidator : AbstractValidator<EnviarSprintARele
 }
 
 /// <summary>
-/// RN-PLA-02 complementaria: en vez de que a alguien se le olvide meter a un release lo
+/// RN-GTE-018 complementaria: en vez de que a alguien se le olvide meter a un release lo
 /// que un sprint termino, este comando manda todo lo disponible de un proyecto de un
 /// jalon -- a un release ya En Preparacion de ese proyecto, o a uno nuevo si no hay.
 /// Recalcula los disponibles contra la BD (no confia en lo que mande el front).
@@ -161,7 +161,7 @@ public class AgregarContenidoValidator : AbstractValidator<AgregarContenidoComma
 }
 
 /// <summary>
-/// RN-REL-01: al release solo entran elementos Terminados y sin hallazgos de revision
+/// RN-GTE-031: al release solo entran elementos Terminados y sin hallazgos de revision
 /// pendientes. El contenido se congela cuando el release pasa a aprobacion.
 /// </summary>
 public class AgregarContenidoHandler(
@@ -257,7 +257,7 @@ public class AgregarArtefactoValidator : AbstractValidator<AgregarArtefactoComma
 }
 
 /// <summary>
-/// RN-REL-02: todo script SQL del release necesita su script de rollback pareado
+/// RN-GTE-032: todo script SQL del release necesita su script de rollback pareado
 /// o una justificacion explicita de por que el cambio es irreversible.
 /// </summary>
 public class AgregarArtefactoHandler(
@@ -360,7 +360,7 @@ public class ResolverAprobacionHandler(
         }
         else
         {
-            // RN-REL-03: el release avanza cuando toda la cadena firmo
+            // RN-GTE-033: el release avanza cuando toda la cadena firmo
             var aprobaciones = await repositorio.ObtenerAprobacionesAsync(idRelease, cancellationToken);
             if (aprobaciones.All(a => a.IdEstatus == EstatusAprobacion.Aprobada))
             {

@@ -74,8 +74,8 @@ public class WorkItemRepository(FabricaContexto fabrica, AuditContext auditoria)
         entidad.FechaCompromiso = datos.FechaCompromiso;
         if (datos.ActualizarPresupuesto)
         {
-            entidad.MinutosPresupuesto = datos.MinutosPresupuesto;   // RN-REQ-08
-            entidad.PuntosHistoria = datos.PuntosHistoria;           // RN-REQ-08: puntos se congelan junto con minutos
+            entidad.MinutosPresupuesto = datos.MinutosPresupuesto;   // RN-GTE-015
+            entidad.PuntosHistoria = datos.PuntosHistoria;           // RN-GTE-015: puntos se congelan junto con minutos
         }
         MarcarMovimiento(entidad);
 

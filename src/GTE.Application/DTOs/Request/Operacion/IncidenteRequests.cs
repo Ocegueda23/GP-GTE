@@ -27,7 +27,7 @@ public class CambiarEstatusIncidenteRequest
     public string? Motivo { get; set; }
 }
 
-/// <summary>RN-OPS-03: cambio de severidad exige motivo.</summary>
+/// <summary>RN-GTE-037: cambio de severidad exige motivo.</summary>
 public class CambiarSeveridadIncidenteRequest
 {
     public int IdSeveridad { get; set; }

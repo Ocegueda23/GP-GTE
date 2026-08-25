@@ -28,8 +28,8 @@ public class CambiarEstatusReleaseValidator : AbstractValidator<CambiarEstatusRe
 
 /// <summary>
 /// SOLICITAR_APROBACION congela el contenido y crea la cadena de firmas, validando antes
-/// la calidad del release (RN-QA-01: sin fallas de prueba sin bug ni bugs S1/S2 abiertos)
-/// y el rollback de los scripts (RN-REL-02). CANCELAR y ROLLBACK usan la misma puerta.
+/// la calidad del release (RN-GTE-025: sin fallas de prueba sin bug ni bugs S1/S2 abiertos)
+/// y el rollback de los scripts (RN-GTE-032). CANCELAR y ROLLBACK usan la misma puerta.
 /// REABRIR regresa un release ya Aprobado a preparacion (para agregar contenido o
 /// artefactos que hicieron falta) e invalida la cadena de firmas vigente: como deshace
 /// aprobaciones ya puestas, exige el mismo permiso que firmar, no el de solo preparar.
@@ -89,7 +89,7 @@ public class CambiarEstatusReleaseHandler(
             throw new BusinessException("Un release sin contenido no se puede mandar a aprobacion.");
         }
 
-        // RN-REL-02: scripts SQL sin rollback ni justificacion
+        // RN-GTE-032: scripts SQL sin rollback ni justificacion
         var artefactos = await repositorio.ObtenerArtefactosAsync(idRelease, cancellationToken);
         var sinRollback = artefactos
             .Where(a => a.IdTipoArtefacto == TipoArtefacto.ScriptSql
@@ -104,7 +104,7 @@ public class CambiarEstatusReleaseHandler(
                 new { scripts = sinRollback });
         }
 
-        // RN-QA-01: calidad del release -- ningun item del contenido puede tener un
+        // RN-GTE-025: calidad del release -- ningun item del contenido puede tener un
         // hallazgo (QA o code review) de severidad S1/S2 sin corregir. La cobertura de
         // pruebas es responsabilidad de QA al aprobar la fase En Pruebas de cada item,
         // no de este gate.
@@ -133,7 +133,7 @@ public class RegistrarDespliegueValidator : AbstractValidator<RegistrarDespliegu
 }
 
 /// <summary>
-/// Registra un despliegue. RN-REL-03: el paso a produccion exige que el release este
+/// Registra un despliegue. RN-GTE-033: el paso a produccion exige que el release este
 /// Aprobado (toda la cadena firmada) y mueve el release a Liberado; un rollback lo
 /// deja en Revertido. Ambos casos van por el motor de estatus.
 /// </summary>

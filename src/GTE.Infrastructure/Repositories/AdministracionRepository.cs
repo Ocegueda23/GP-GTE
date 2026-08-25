@@ -287,7 +287,7 @@ public class AdministracionRepository(FabricaContexto fabrica, AuditContext audi
     }
 
     /// <summary>
-    /// RN-ADM-01: sube la cadena de jefes desde idJefePropuesto (CTE recursivo parametrizado,
+    /// RN-GTE-001: sube la cadena de jefes desde idJefePropuesto (CTE recursivo parametrizado,
     /// sin SQL interpolado) y verifica si idUsuario aparece en ella; de ser asi, asignarlo
     /// formaria un ciclo. DbCommand crudo porque EF no expresa CTEs recursivos.
     /// </summary>

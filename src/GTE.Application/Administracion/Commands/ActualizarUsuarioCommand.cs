@@ -23,8 +23,8 @@ public class ActualizarUsuarioValidator : AbstractValidator<ActualizarUsuarioCom
 }
 
 /// <summary>
-/// RN-ADM-01: un usuario no puede ser su propio jefe ni formar ciclos en la jerarquia.
-/// El rol Administrador no cortocircuita esta validacion (RN-ADM-02).
+/// RN-GTE-001: un usuario no puede ser su propio jefe ni formar ciclos en la jerarquia.
+/// El rol Administrador no cortocircuita esta validacion (RN-GTE-002).
 /// </summary>
 public class ActualizarUsuarioHandler(
     IAdministracionRepository repositorio,

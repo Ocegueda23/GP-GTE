@@ -23,7 +23,7 @@ public class CambiarSeveridadIncidenteValidator : AbstractValidator<CambiarSever
 }
 
 /// <summary>
-/// RN-OPS-03: degradar/escalar severidad solo con motivo registrado. No es una
+/// RN-GTE-037: degradar/escalar severidad solo con motivo registrado. No es una
 /// transicion de tblTransicion (el proceso Incidente no tiene estatus de severidad) --
 /// es una accion de negocio aparte, con bitacora.
 /// </summary>

@@ -35,7 +35,7 @@ public static class PermisosPlaneacion
     public const string SaltarWip = "PLA.SaltarWip";
 }
 
-/// <summary>Que hacer con los elementos abiertos al cerrar un sprint (RN-PLA-02).</summary>
+/// <summary>Que hacer con los elementos abiertos al cerrar un sprint (RN-GTE-018).</summary>
 public enum DestinoItemsAbiertos
 {
     Backlog = 0,

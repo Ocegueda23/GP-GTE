@@ -124,7 +124,7 @@ export function BacklogPage() {
     placeholderData: (anterior) => anterior,
   });
 
-  // Paso aparte tras cerrar el sprint (RN-PLA-02 complementaria): que le falta a cada
+  // Paso aparte tras cerrar el sprint (RN-GTE-018 complementaria): que le falta a cada
   // proyecto para no dejar nada terminado fuera de un release.
   const cobertura = useQuery({
     queryKey: ["cobertura-release", sprintActual],

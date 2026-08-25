@@ -122,10 +122,10 @@ export function TableroPage() {
     queryFn: () => obtenerTablero(equipoActual),
   });
 
-  // RN-PLA-05: un usuario no puede arrastrar (y por lo tanto mover de columna) una
+  // RN-GTE-021: un usuario no puede arrastrar (y por lo tanto mover de columna) una
   // tarjeta que no le pertenece, salvo que tenga el permiso de modificar ajenos --
   // mismo criterio que MenuAcciones.tsx/DetallePage.tsx. El backend ya lo rechaza
-  // (RN-REQ-05), esto evita el intento fallido y avisa por que en la propia tarjeta.
+  // (RN-GTE-012), esto evita el intento fallido y avisa por que en la propia tarjeta.
   const esPropia = (item: BandejaItem) =>
     item.idAsignado === sesion?.idUsuario || puede("WI.ModificarAjeno");
 

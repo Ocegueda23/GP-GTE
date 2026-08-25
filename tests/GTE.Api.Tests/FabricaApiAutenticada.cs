@@ -77,7 +77,7 @@ public static class FabricaApiAutenticada
     }
 
     /// <summary>
-    /// Complejidad es obligatoria al crear un WorkItem (RN-REQ-08 extendida, 2026-08-07); las
+    /// Complejidad es obligatoria al crear un WorkItem (RN-GTE-015 extendida, 2026-08-07); las
     /// pruebas de integracion de varios modulos solo necesitan un Id valido para pasar la
     /// alta, no verifican el calculo de minutos/puntos -- se reutiliza cualquier fila activa
     /// ya sembrada y, si el ambiente no tiene ninguna, se crea una propia.

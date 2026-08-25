@@ -63,7 +63,7 @@ public class CrearWorkItemHandler(
             await permisos.ExigirPermisoAsync(PermisosWorkItem.CrearEnAdministrado, datos.IdProyecto, cancellationToken);
         }
 
-        // RN-REQ-05: agregar una subtarea a un elemento ajeno (asignado a otra persona
+        // RN-GTE-012: agregar una subtarea a un elemento ajeno (asignado a otra persona
         // o sin asignar) cuenta como "modificar" el padre -- mismo gate que
         // RegistrarTiempoCommand/CambiarEstatusWorkItemCommand. Sin asignar cuenta como
         // ajeno (decision del equipo 2026-08-02).
@@ -81,7 +81,7 @@ public class CrearWorkItemHandler(
             }
         }
 
-        // RN-REQ-04: compromiso en el pasado solo con permiso
+        // RN-GTE-011: compromiso en el pasado solo con permiso
         if (datos.FechaCompromiso.HasValue && datos.FechaCompromiso.Value.Date < DateTime.Today
             && !await permisos.TienePermisoAsync(PermisosWorkItem.ModificarCompromiso, datos.IdProyecto, cancellationToken))
         {
@@ -90,12 +90,12 @@ public class CrearWorkItemHandler(
 
         // La complejidad nunca queda vacia: si quien crea el item no la trae (flujos
         // internos que no tienen un momento de captura humana), se usa la de menor Orden
-        // activa como default -- asi RN-REQ-08 siempre tiene con que calcular presupuesto,
+        // activa como default -- asi RN-GTE-015 siempre tiene con que calcular presupuesto,
         // sin bloquear esos flujos ni obligarlos a construir su propio selector.
         var idComplejidadEfectiva = datos.IdComplejidad
             ?? await repositorio.ObtenerComplejidadPorDefectoAsync(cancellationToken);
 
-        // RN-REQ-08: presupuesto (minutos + puntos de historia) congelado al asignar
+        // RN-GTE-015: presupuesto (minutos + puntos de historia) congelado al asignar
         // (matriz complejidad x nivel del asignado)
         var (minutosPresupuesto, puntosHistoria) = await CalcularPresupuestoAsync(
             repositorio, idComplejidadEfectiva, datos.IdAsignado, cancellationToken);
@@ -119,7 +119,7 @@ public class CrearWorkItemHandler(
     }
 
     /// <summary>
-    /// RN-REQ-08: minutos de presupuesto y puntos de historia se derivan siempre de
+    /// RN-GTE-015: minutos de presupuesto y puntos de historia se derivan siempre de
     /// tblMatrizPresupuesto (complejidad x nivel del asignado) -- nunca se capturan a mano.
     /// Sin asignado (o sin nivel capturado en el asignado) no hay como resolver la matriz,
     /// ambos quedan en null hasta que se asigne.

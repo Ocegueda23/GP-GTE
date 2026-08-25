@@ -19,7 +19,7 @@ public record ArtefactoNuevo(
     int? IdArtefactoRollback,
     string? JustificacionIrreversible);
 
-/// <summary>Artefacto del release con su pareja de rollback, para validar RN-REL-02.</summary>
+/// <summary>Artefacto del release con su pareja de rollback, para validar RN-GTE-032.</summary>
 public record ArtefactoRelease(
     int IdReleaseArtefacto,
     int IdArtefacto,
@@ -38,5 +38,5 @@ public record AprobacionRelease(
 
 public record DespliegueNuevo(int IdRelease, int IdAmbiente, int IdEjecutor, bool EsRollback, string? Bitacora);
 
-/// <summary>Elemento candidato a entrar al release (RN-REL-01 exige Terminado y revisado).</summary>
+/// <summary>Elemento candidato a entrar al release (RN-GTE-031 exige Terminado y revisado).</summary>
 public record CandidatoRelease(int IdWorkItem, string Folio, string Titulo, int IdEstatus, bool Revisado, int RevisionesPendientes);

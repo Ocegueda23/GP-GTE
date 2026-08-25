@@ -49,7 +49,7 @@ export function MenuAcciones({ item, catalogos, alExito, alError }: Props) {
   const sesion = useSesion((estado) => estado.sesion);
   const puede = useSesion((estado) => estado.puede);
 
-  // RN-REQ-05: solo el propio asignado modifica un elemento; sin asignar tambien
+  // RN-GTE-012: solo el propio asignado modifica un elemento; sin asignar tambien
   // cuenta como ajeno (decision del equipo 2026-08-02). El backend revalida igual.
   const esAjeno = item.idAsignado !== sesion?.idUsuario && !puede("WI.ModificarAjeno");
 

@@ -41,6 +41,8 @@ import { CatalogosPage } from "./features/catalogos/CatalogosPage";
 import { CatalogosAdminPage } from "./features/catalogos/admin/CatalogosAdminPage";
 import { ManualUsuarioPage } from "./features/ayuda/ManualUsuarioPage";
 import { ConocimientoPage } from "./features/conocimiento/ConocimientoPage";
+import { ReglasNegocioPage } from "./features/reglasNegocio/ReglasNegocioPage";
+import { DetalleReglaPage } from "./features/reglasNegocio/DetalleReglaPage";
 import { DetalleArticuloPage } from "./features/conocimiento/DetalleArticuloPage";
 import { ConocimientoPublicoPage } from "./features/conocimiento/publico/ConocimientoPublicoPage";
 import { DetalleArticuloPublicoPage } from "./features/conocimiento/publico/DetalleArticuloPublicoPage";
@@ -268,6 +270,7 @@ const NAVEGACION: { ruta: string; etiqueta: string; permiso: string | string[] |
   { ruta: "/admin/workflows", etiqueta: "Workflows", permiso: "ADM.Workflows" },
   // P23 es "Todos" en el Documento Maestro: leer no exige permiso (escribir si, CON.Administrar).
   { ruta: "/conocimiento", etiqueta: "Base de conocimiento", permiso: null },
+  { ruta: "/reglas-negocio", etiqueta: "Reglas de negocio", permiso: "RGN.Ver" },
   { ruta: "/ayuda", etiqueta: "Ayuda", permiso: null },
 ];
 
@@ -515,6 +518,8 @@ function AplicacionAutenticada({ modo, alternarModo }: { modo: PaletteMode; alte
                 <Route path="/admin/workflows" element={<WorkflowsPage />} />
                 <Route path="/conocimiento" element={<ConocimientoPage />} />
                 <Route path="/conocimiento/:id" element={<DetalleArticuloPage />} />
+                <Route path="/reglas-negocio" element={<ReglasNegocioPage />} />
+                <Route path="/reglas-negocio/:id" element={<DetalleReglaPage />} />
                 <Route path="/ayuda" element={<ManualUsuarioPage />} />
               </Routes>
             </Box>

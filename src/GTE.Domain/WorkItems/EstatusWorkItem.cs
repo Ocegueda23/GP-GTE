@@ -41,7 +41,7 @@ public static class PermisosWorkItem
     public const string ModificarComplejidad = "WI.ModificarComplejidad";
     public const string ModificarTiempo = "WI.ModificarTiempo";
 
-    /// <summary>Bypass acotado (solo Administrador): omite ownership y el gate de cierre (RN-REQ-03).</summary>
+    /// <summary>Bypass acotado (solo Administrador): omite ownership y el gate de cierre (RN-GTE-010).</summary>
     public const string OmitirValidacionCierre = "WI.OmitirValidacionCierre";
 
     /// <summary>Aprobar (TERMINAR) o rechazar (RECHAZAR_QA) la fase de pruebas, desde En Pruebas.</summary>

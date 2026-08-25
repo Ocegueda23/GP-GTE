@@ -175,7 +175,7 @@ public class PlaneacionQueryService(FabricaContexto fabrica) : IPlaneacionQueryS
 
         // Las tarjetas del tablero son los elementos de los proyectos del equipo (o de
         // todos, en la vista consolidada); si hay sprint activo se acota a ese sprint (el
-        // tablero es del sprint en curso). RN-PLA-05 (nueva): en la columna Terminado solo
+        // tablero es del sprint en curso). RN-GTE-021 (nueva): en la columna Terminado solo
         // entran los items cerrados en el mes en curso -- evita que el tablero acumule
         // meses de historial en esa columna.
         var idSprintActivo = sprintActivo?.IdSprint;

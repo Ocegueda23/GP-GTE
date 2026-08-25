@@ -42,7 +42,7 @@ public interface IPlaneacionRepository
     Task<int> ContarItemsEnEstatusAsync(int idEquipo, int idEstatus, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Deja rastro de que alguien excedio el limite WIP con permiso (RN-PLA-04):
+    /// Deja rastro de que alguien excedio el limite WIP con permiso (RN-GTE-020):
     /// el limite se puede saltar, pero no en silencio.
     /// </summary>
     Task RegistrarSaltoWipAsync(

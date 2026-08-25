@@ -102,7 +102,7 @@ public class ProyectoCoberturaResponse
     /// <summary>Terminados, sin hallazgos pendientes y sin release todavia: lo que se puede enviar ya.</summary>
     public IReadOnlyList<ItemCoberturaResponse> Disponibles { get; set; } = [];
 
-    /// <summary>Terminados sin release pero con hallazgos de revision pendientes: no pueden entrar (RN-REL-01).</summary>
+    /// <summary>Terminados sin release pero con hallazgos de revision pendientes: no pueden entrar (RN-GTE-031).</summary>
     public IReadOnlyList<ItemCoberturaResponse> Bloqueados { get; set; } = [];
 
     /// <summary>Release En Preparacion de este proyecto, si ya existe uno (normalmente solo hay uno a la vez).</summary>
@@ -112,7 +112,7 @@ public class ProyectoCoberturaResponse
 }
 
 /// <summary>
-/// Cobertura de release de un sprint (paso aparte tras cerrarlo, RN-PLA-02 complementaria):
+/// Cobertura de release de un sprint (paso aparte tras cerrarlo, RN-GTE-018 complementaria):
 /// por cada proyecto que el sprint toco, que le falta mandar a un release. Vacio = nada
 /// pendiente, ya sea porque no hubo terminados o porque ya todos tienen release.
 /// </summary>

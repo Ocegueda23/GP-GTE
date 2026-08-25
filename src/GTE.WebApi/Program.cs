@@ -9,6 +9,7 @@ using GTE.WebApi.Seguridad;
 using Hangfire;
 using MediatR;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Serilog;
 
@@ -120,6 +121,8 @@ builder.Services.AddScoped<GTE.Application.Interfaces.IIncidenteQueryService, GT
 // Modulo Base de conocimiento (P23; incluye el consumo anonimo /api/v1/publico/conocimiento)
 builder.Services.AddScoped<GTE.Domain.Interfaces.IConocimientoRepository, GTE.Infrastructure.Repositories.ConocimientoRepository>();
 builder.Services.AddScoped<GTE.Application.Interfaces.IConocimientoQueryService, GTE.Infrastructure.Services.ConocimientoQueryService>();
+builder.Services.AddScoped<GTE.Domain.Interfaces.IReglasNegocioRepository, GTE.Infrastructure.Repositories.ReglasNegocioRepository>();
+builder.Services.AddScoped<GTE.Application.Interfaces.IReglasNegocioQueryService, GTE.Infrastructure.Services.ReglasNegocioQueryService>();
 
 // Modulo Portafolio (Costeo + OKR)
 builder.Services.AddScoped<GTE.Domain.Interfaces.ICosteoRepository, GTE.Infrastructure.Repositories.CosteoRepository>();
@@ -277,8 +280,27 @@ if (app.Environment.IsDevelopment())
 // asi que una ruta como "/assets/app.js" NUNCA la matchea (queda sin endpoint) y el
 // FallbackPolicy (RequireAuthenticatedUser) la bloquearia con 401 si UseStaticFiles no la
 // hubiera servido ya aqui arriba -- confirmado en pruebas manuales.
+// index.html NUNCA se cachea; los assets con hash en el nombre se cachean para siempre.
+//
+// Por que existe esto (incidente del 2026-08-24, no quitarlo): index.html se servia sin
+// Cache-Control, solo con ETag/Last-Modified. Tras un despliegue, un navegador que tenia
+// cacheado el index.html viejo seguia pidiendo el bundle viejo -- que sigue existiendo en
+// wwwroot si el despliegue no lo borro -- y cargaba la version ANTERIOR de la SPA sin
+// fallar en nada: modulo nuevo invisible, cero errores en consola, imposible de
+// diagnosticar desde la UI. Los nombres de los assets llevan hash de contenido, asi que
+// el unico archivo que debe revalidarse en cada carga es index.html.
+static void ConfigurarCacheSpa(StaticFileResponseContext contexto)
+{
+    var esHtml = contexto.File.Name.EndsWith(".html", StringComparison.OrdinalIgnoreCase);
+    contexto.Context.Response.Headers.CacheControl = esHtml
+        ? "no-cache, no-store, must-revalidate"
+        : "public, max-age=31536000, immutable";
+}
+
+var opcionesArchivosSpa = new StaticFileOptions { OnPrepareResponse = ConfigurarCacheSpa };
+
 app.UseDefaultFiles();
-app.UseStaticFiles();
+app.UseStaticFiles(opcionesArchivosSpa);
 
 app.UseCors("Spa");
 app.UseAuthentication();
@@ -298,7 +320,10 @@ app.MapGet("/health", () => Results.Ok(new { estado = "ok", fecha = DateTime.Utc
 // ningun controlador ni con un archivo real, asi que si matchean el fallback (":nonfile").
 // AllowAnonymous porque el shell tiene que poder cargar sin sesion -- es lo que muestra la
 // pantalla de login. Los datos reales siguen exigiendo token en /api/v1/...
-app.MapFallbackToFile("index.html").AllowAnonymous();
+// Con las mismas opciones de cache: este es el camino que sirve index.html en los deep
+// links (/reglas-negocio, /wi/123...), y si no se le pasan, esas rutas volverian a
+// entregar el index.html cacheable y reaparece el problema por la puerta de atras.
+app.MapFallbackToFile("index.html", opcionesArchivosSpa).AllowAnonymous();
 
 app.Run();
 

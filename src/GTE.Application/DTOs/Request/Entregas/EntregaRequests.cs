@@ -44,7 +44,7 @@ public class ArtefactoAgregarRequest
     public string? HashSha256 { get; set; }
     public int? OrdenEjecucion { get; set; }
 
-    /// <summary>Artefacto que revierte a este (obligatorio en scripts SQL, RN-REL-02).</summary>
+    /// <summary>Artefacto que revierte a este (obligatorio en scripts SQL, RN-GTE-032).</summary>
     public int? IdArtefactoRollback { get; set; }
 
     /// <summary>Alternativa al rollback: explicar por que el cambio es irreversible.</summary>

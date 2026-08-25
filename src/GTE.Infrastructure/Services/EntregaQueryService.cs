@@ -114,7 +114,7 @@ public class EntregaQueryService(FabricaContexto fabrica) : IEntregaQueryService
                 JustificacionIrreversible = ra.JustificacionIrreversible
             }).ToListAsync(cancellationToken);
 
-        // RN-REL-02 evaluada para la interfaz: los scripts SQL necesitan rollback o justificacion
+        // RN-GTE-032 evaluada para la interfaz: los scripts SQL necesitan rollback o justificacion
         foreach (var artefacto in artefactos)
         {
             artefacto.RequiereRollback = artefacto.IdTipoArtefacto == TipoArtefacto.ScriptSql;
@@ -260,7 +260,7 @@ public class EntregaQueryService(FabricaContexto fabrica) : IEntregaQueryService
             .FirstOrDefaultAsync(cancellationToken)
             ?? throw new NotFoundException("Sprint", idSprint);
 
-        // Terminados de este sprint que aun no tienen release: candidatos (RN-REL-01 los
+        // Terminados de este sprint que aun no tienen release: candidatos (RN-GTE-031 los
         // separa entre disponibles y bloqueados por hallazgos, igual que AgregarContenido).
         var items = await (
             from w in contexto.TblWorkItem.AsNoTracking()

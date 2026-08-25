@@ -70,7 +70,7 @@ public interface IEntregaRepository
 
     Task<int?> ObtenerAmbienteProduccionAsync(int idProyecto, CancellationToken cancellationToken = default);
 
-    /* Calidad del release (RN-QA-01) */
+    /* Calidad del release (RN-GTE-025) */
 
     /// <summary>
     /// WorkItems del contenido del release con un hallazgo (QA o code review) de severidad

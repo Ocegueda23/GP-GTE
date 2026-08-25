@@ -22,7 +22,7 @@ public class CambiarEstatusSprintRequest
 {
     public string Accion { get; set; } = string.Empty;
 
-    /// <summary>Al CERRAR: "Backlog" (default) o "SiguienteSprint" (RN-PLA-02).</summary>
+    /// <summary>Al CERRAR: "Backlog" (default) o "SiguienteSprint" (RN-GTE-018).</summary>
     public string? DestinoItemsAbiertos { get; set; }
 }
 

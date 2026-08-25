@@ -26,7 +26,7 @@ public class MiDiaResponse
     public string Usuario { get; set; } = string.Empty;
     public DateTime Fecha { get; set; }
 
-    /// <summary>El unico item En Proceso del usuario (RN-REQ-01); null si no esta trabajando en nada.</summary>
+    /// <summary>El unico item En Proceso del usuario (RN-GTE-008); null si no esta trabajando en nada.</summary>
     public MiDiaItemResponse? EnProceso { get; set; }
 
     public IReadOnlyList<MiDiaItemResponse> Vencidas { get; set; } = [];

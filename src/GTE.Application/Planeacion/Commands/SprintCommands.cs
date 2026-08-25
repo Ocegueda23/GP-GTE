@@ -97,7 +97,7 @@ public class CambiarEstatusSprintValidator : AbstractValidator<CambiarEstatusSpr
 /// <summary>
 /// ACTIVAR y CERRAR del sprint.
 /// Regla: solo un sprint Activo por equipo (409 accionable si ya hay otro).
-/// RN-PLA-02: al cerrar, los elementos abiertos se reubican en el backlog o en
+/// RN-GTE-018: al cerrar, los elementos abiertos se reubican en el backlog o en
 /// el siguiente sprint planeado, segun lo que pida quien cierra.
 /// </summary>
 public class CambiarEstatusSprintHandler(

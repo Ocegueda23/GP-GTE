@@ -38,7 +38,7 @@ public static class EstatusDespliegue
     public const int Fallido = 3;
 }
 
-/// <summary>IDs de dbo.tblTipoArtefacto. Los scripts SQL exigen rollback pareado (RN-REL-02).</summary>
+/// <summary>IDs de dbo.tblTipoArtefacto. Los scripts SQL exigen rollback pareado (RN-GTE-032).</summary>
 public static class TipoArtefacto
 {
     public const int Paquete = 1;

@@ -37,13 +37,13 @@ public class ActualizarWorkItemHandler(
         var estado = await repositorio.ObtenerEstadoAsync(command.IdWorkItem, cancellationToken)
             ?? throw new NotFoundException("WorkItem", command.IdWorkItem);
 
-        // RN-REQ-05: item terminado solo con permiso
+        // RN-GTE-012: item terminado solo con permiso
         if (estado.IdEstatus == EstatusWorkItem.Terminado)
         {
             await permisos.ExigirPermisoAsync(PermisosWorkItem.ModificarTerminado, estado.IdProyecto, cancellationToken);
         }
 
-        // RN-REQ-05: item ajeno (asignado a otra persona O SIN asignar) solo con permiso --
+        // RN-GTE-012: item ajeno (asignado a otra persona O SIN asignar) solo con permiso --
         // decision del equipo 2026-08-02: una tarea sin asignar no es "de nadie que la pueda
         // tocar libremente", se trata igual que ajena (evita que cualquiera tome trabajo del
         // backlog sin que un Lider/Admin con WI.ModificarAjeno la asigne primero).
@@ -54,7 +54,7 @@ public class ActualizarWorkItemHandler(
             await permisos.ExigirPermisoAsync(PermisosWorkItem.ModificarAjeno, estado.IdProyecto, cancellationToken);
         }
 
-        // RN-REQ-04: el usuario fija la fecha compromiso libremente la primera vez (de vacia
+        // RN-GTE-011: el usuario fija la fecha compromiso libremente la primera vez (de vacia
         // a una fecha), pero moverla una vez capturada -- a cualquier fecha, no solo al
         // pasado -- exige permiso; decision del equipo 2026-08-04, antes solo se bloqueaba
         // moverla al pasado y el resto de cambios pasaban libres.
@@ -66,7 +66,7 @@ public class ActualizarWorkItemHandler(
 
         // Cambiar complejidad exige permiso (regla heredada del GT); fijarla por primera vez
         // (de vacia a un valor, tipico de items legacy que quedaron sin capturar) queda libre --
-        // mismo criterio que RN-REQ-04 para fecha compromiso. La complejidad es obligatoria
+        // mismo criterio que RN-GTE-011 para fecha compromiso. La complejidad es obligatoria
         // (ver validator), asi que completar un dato que antes faltaba no deberia exigir un
         // permiso especial; el permiso protege RE-CLASIFICAR una complejidad ya elegida.
         var complejidadCambio = datos.IdComplejidad != estado.IdComplejidad;
@@ -75,7 +75,7 @@ public class ActualizarWorkItemHandler(
             await permisos.ExigirPermisoAsync(PermisosWorkItem.ModificarComplejidad, estado.IdProyecto, cancellationToken);
         }
 
-        // RN-REQ-08: el presupuesto (minutos + puntos) solo se recalcula al reasignar o
+        // RN-GTE-015: el presupuesto (minutos + puntos) solo se recalcula al reasignar o
         // cambiar complejidad; fuera de eso se conserva el valor ya congelado.
         var asignadoCambio = datos.IdAsignado != estado.IdAsignado;
         int? minutosPresupuesto = null;
