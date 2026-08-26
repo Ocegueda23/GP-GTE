@@ -14,6 +14,18 @@ public class SolicitudCrearRequest
     public int? IdUsuarioSolicitante { get; set; }
 }
 
+/// <summary>Edicion mientras la solicitud sigue activa en revision (Enviada/EnAnalisis/Aprobada).</summary>
+public class SolicitudEditarRequest
+{
+    public string Titulo { get; set; } = string.Empty;
+    public string? Descripcion { get; set; }
+    public int IdTipoSolicitud { get; set; }
+    public int IdPrioridad { get; set; }
+    public DateTime? FechaDeseada { get; set; }
+    public string? JustificacionNegocio { get; set; }
+    public int? IdUsuarioSolicitante { get; set; }
+}
+
 /// <summary>El frontend manda la ACCION; APROBAR ademas exige el proyecto destino.</summary>
 public class CambiarEstatusSolicitudRequest
 {

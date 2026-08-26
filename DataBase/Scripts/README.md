@@ -40,6 +40,20 @@ orden dentro de la tanda). Todo script es **idempotente**: se puede correr N vec
 |---|---|
 | 01_2026-08-01_SCRIPT_bdsGTE_UsuarioServicio.sql | Login de Windows (cuenta de servicio) + usuario en bdsGTE con permisos minimos (db_datareader/db_datawriter + EXECUTE sobre spCambiarEstatus/spGenerarFolio/spRegistrarBitacora/spSnapshotKpi). **Excepcion deliberada**: el Bloque 1 corre contra `[master]` (el login es un principal de servidor), no contra bdsGTE -- unico script de esta carpeta que lo hace. Ajustar la variable `@NombreLogin` en los dos bloques antes de correrlo. Ver `Doctos/MANUAL_INSTALACION_GTE.md` |
 
+## Catalogo de reglas de negocio (2026-08-24)
+
+| Script | Contenido |
+|---|---|
+| 43_2026-08-24_SCRIPT_bdsGTE_CatalogoReglasNegocio.sql | Esquema del modulo: 3 enumerados de ID fijo (`tblTipoAmbitoRegla`, `tblEstadoReglaNegocio`, `tblTipoRelacionRegla` -- IDs son CONTRATO, los referencia `GTE.Domain/ReglasNegocio`), `tblAmbitoRegla` (flujos y caracteristicas, catalogo propio de cada proyecto), `tblReglaNegocio` (una regla, un proyecto DUENO), `tblReglaNegocioVersion` (historial del enunciado), `tblReglaNegocioImpacto` (proyectos secundarios afectados, lista explicita) y `tblReglaNegocioRelacion`. Permisos `RGN.Ver`/`RGN.Administrar` sembrados solo al rol Administrador |
+| 44_2026-08-24_INSERT_bdsGTE_ReglasNegocioGTE.sql | Alta del proyecto `GTE` en `tblProyecto` (idempotente por Clave) + sus 9 flujos de operacion + las 40 reglas del Documento Maestro con su estado real + version 1 de cada una + 5 relaciones entre reglas. Siembra con las claves HISTORICAS (`RN-REQ-01`, `RN-QA-06`...); el script 45 las renumera despues. Lee la cabecera del script: documenta dos discrepancias reales entre el Documento Maestro y el codigo (una regla que existe en codigo sin documentar y otra clave con dos significados distintos) |
+| 45_2026-08-24_UPDATE_bdsGTE_RenumeraReglasGTE.sql | Renumera esas 40 reglas al formato uniforme `RN-GTE-001..040` (orden de las secciones 3.x del Documento Maestro), reescribe las referencias cruzadas dentro de los enunciados y deja la serie de folio `RN-GTE` en 40. Idempotente: solo renombra si la clave vieja todavia existe |
+
+**Contrato particular de este modulo**: una regla no puede impactar a su propio proyecto
+dueno, y eso se garantiza de forma declarativa (sin trigger) con `IdProyectoDueno`
+desnormalizado en la fila de impacto + FK compuesta contra `UQ_tblReglaNegocio_IdProyecto`
++ `CHECK IdProyectoAfectado <> IdProyectoDueno`. No quitar ninguna de las tres piezas por
+separado: solo funcionan juntas.
+
 ## Contratos importantes
 
 - **GTE es totalmente independiente**: una sola base (`bdsGTE`), sin referencias a ninguna

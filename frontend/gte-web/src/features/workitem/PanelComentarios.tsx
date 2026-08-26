@@ -4,7 +4,8 @@ import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined
 import ReplyIcon from "@mui/icons-material/Reply";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  crearComentario, eliminarComentario, obtenerComentarios, type Comentario,
+  crearComentario, crearComentarioTicket, eliminarComentario,
+  obtenerComentarios, obtenerComentariosTicket, type Comentario,
 } from "../../shared/api/comentarios";
 import { obtenerCatalogosBandeja } from "../../shared/api/workitems";
 import { ErrorApi } from "../../shared/api/http";
@@ -12,10 +13,10 @@ import { useSesion } from "../../shared/api/sesion";
 import { ContenidoEnriquecido } from "../../shared/editor/ContenidoEnriquecido";
 import { EditorComentario } from "./EditorComentario";
 
-interface Props {
-  idWorkItem: number;
+/** Exactamente uno de los dos: WorkItem o Ticket son las unicas entidades con comentarios hoy. */
+type Props = {
   alError: (mensaje: string) => void;
-}
+} & ({ idWorkItem: number; idTicket?: undefined } | { idWorkItem?: undefined; idTicket: number });
 
 function formatearFecha(iso: string): string {
   return new Date(iso).toLocaleString("es-MX", {
@@ -24,14 +25,16 @@ function formatearFecha(iso: string): string {
 }
 
 /** Franja fija bajo el detalle (no una pestana mas), como lo dibuja el mockup del Documento Maestro. */
-export function PanelComentarios({ idWorkItem, alError }: Props) {
+export function PanelComentarios({ idWorkItem, idTicket, alError }: Props) {
   const [respondiendoA, setRespondiendoA] = useState<number | null>(null);
   const dominioActual = useSesion((estado) => estado.sesion?.dominio);
   const clienteQuery = useQueryClient();
 
+  const claveQuery = idWorkItem !== undefined ? ["comentarios", idWorkItem] : ["comentarios-ticket", idTicket];
+
   const comentarios = useQuery({
-    queryKey: ["comentarios", idWorkItem],
-    queryFn: () => obtenerComentarios(idWorkItem),
+    queryKey: claveQuery,
+    queryFn: () => (idWorkItem !== undefined ? obtenerComentarios(idWorkItem) : obtenerComentariosTicket(idTicket)),
   });
 
   const catalogos = useQuery({
@@ -57,9 +60,13 @@ export function PanelComentarios({ idWorkItem, alError }: Props) {
 
   const publicar = async (contenido: string, idComentarioPadre?: number) => {
     try {
-      await crearComentario(idWorkItem, contenido, idComentarioPadre);
+      if (idWorkItem !== undefined) {
+        await crearComentario(idWorkItem, contenido, idComentarioPadre);
+      } else {
+        await crearComentarioTicket(idTicket, contenido, idComentarioPadre);
+      }
       setRespondiendoA(null);
-      await clienteQuery.invalidateQueries({ queryKey: ["comentarios", idWorkItem] });
+      await clienteQuery.invalidateQueries({ queryKey: claveQuery });
     } catch (error) {
       manejarError(error, "No se pudo publicar el comentario.");
     }
@@ -68,7 +75,7 @@ export function PanelComentarios({ idWorkItem, alError }: Props) {
   const borrar = async (idComentario: number) => {
     try {
       await eliminarComentario(idComentario);
-      await clienteQuery.invalidateQueries({ queryKey: ["comentarios", idWorkItem] });
+      await clienteQuery.invalidateQueries({ queryKey: claveQuery });
     } catch (error) {
       manejarError(error, "No se pudo eliminar el comentario.");
     }
@@ -110,14 +117,14 @@ export function PanelComentarios({ idWorkItem, alError }: Props) {
         {respondiendoA === comentario.idComentario && (
           <Box sx={{ mt: 1 }}>
             <EditorComentario
-              idWorkItem={idWorkItem}
+              idWorkItemParaAdjuntos={idWorkItem}
               usuarios={usuarios}
               enviando={false}
               placeholder="Responder..."
               onEnviar={(html) => void publicar(html, comentario.idComentario)}
               onError={(mensaje) => alError(mensaje)}
             />
-            <Button size="small" sx={{ mt: 0.5 }} onClick={() => setRespondiendoA(null)}>Cancelar</Button>
+            <Button color="error" size="small" sx={{ mt: 0.5 }} onClick={() => setRespondiendoA(null)}>Cancelar</Button>
           </Box>
         )}
       </Box>
@@ -145,7 +152,7 @@ export function PanelComentarios({ idWorkItem, alError }: Props) {
 
       <Box sx={{ mt: 2 }}>
         <EditorComentario
-          idWorkItem={idWorkItem}
+          idWorkItemParaAdjuntos={idWorkItem}
           usuarios={usuarios}
           enviando={false}
           onEnviar={(html) => void publicar(html)}

@@ -19,6 +19,24 @@ public class AgregarContenidoRequest
     public List<int> IdsWorkItem { get; set; } = [];
 }
 
+public class ConfigurarCadenaAprobacionRequest
+{
+    /// <summary>Vacia para volver al default fijo (QA, Lider, Negocio).</summary>
+    public List<string> Roles { get; set; } = [];
+}
+
+/// <summary>
+/// Envio de lo terminado de un sprint a un release: o entra a uno ya En Preparacion
+/// del proyecto (IdReleaseExistente), o se crea uno nuevo con VersionNueva. Exactamente
+/// uno de los dos aplica.
+/// </summary>
+public class EnviarSprintAReleaseRequest
+{
+    public int IdProyecto { get; set; }
+    public int? IdReleaseExistente { get; set; }
+    public string? VersionNueva { get; set; }
+}
+
 public class ArtefactoAgregarRequest
 {
     public string Nombre { get; set; } = string.Empty;
@@ -26,7 +44,7 @@ public class ArtefactoAgregarRequest
     public string? HashSha256 { get; set; }
     public int? OrdenEjecucion { get; set; }
 
-    /// <summary>Artefacto que revierte a este (obligatorio en scripts SQL, RN-REL-02).</summary>
+    /// <summary>Artefacto que revierte a este (obligatorio en scripts SQL, RN-GTE-032).</summary>
     public int? IdArtefactoRollback { get; set; }
 
     /// <summary>Alternativa al rollback: explicar por que el cambio es irreversible.</summary>

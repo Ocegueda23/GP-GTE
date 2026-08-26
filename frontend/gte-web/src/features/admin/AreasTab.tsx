@@ -118,7 +118,7 @@ export function AreasTab() {
             onChange={(e) => setNombre(e.target.value)} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setModal(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setModal(false)}>Cancelar</Button>
           <Button variant="contained" disabled={nombre.trim().length === 0} onClick={() => void guardar()}>
             Crear
           </Button>
@@ -132,7 +132,7 @@ export function AreasTab() {
             onChange={(e) => setNombreEditar(e.target.value)} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAreaEditar(null)}>Cancelar</Button>
+          <Button color="error" onClick={() => setAreaEditar(null)}>Cancelar</Button>
           <Button variant="contained" disabled={nombreEditar.trim().length === 0} onClick={() => void guardarEdicion()}>
             Guardar
           </Button>

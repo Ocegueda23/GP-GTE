@@ -9,6 +9,8 @@ public partial class TblBitacora
 
     public string Usuario { get; set; } = null!;
 
+    public string? UsuarioReal { get; set; }
+
     public string? Ip { get; set; }
 
     public string? Endpoint { get; set; }

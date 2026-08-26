@@ -29,6 +29,17 @@ public class ObtenerBacklogHandler(IPlaneacionQueryService consultas)
     }
 }
 
+public record ObtenerBacklogGlobalQuery(string? Texto) : IRequest<BacklogResponse>;
+
+public class ObtenerBacklogGlobalHandler(IPlaneacionQueryService consultas)
+    : IRequestHandler<ObtenerBacklogGlobalQuery, BacklogResponse>
+{
+    public async Task<BacklogResponse> Handle(ObtenerBacklogGlobalQuery query, CancellationToken cancellationToken)
+    {
+        return await consultas.ObtenerBacklogGlobalAsync(query.Texto, cancellationToken);
+    }
+}
+
 public record ObtenerItemsSprintQuery(int IdSprint) : IRequest<BacklogResponse>;
 
 public class ObtenerItemsSprintHandler(IPlaneacionQueryService consultas)
@@ -40,7 +51,8 @@ public class ObtenerItemsSprintHandler(IPlaneacionQueryService consultas)
     }
 }
 
-public record ObtenerTableroQuery(int IdEquipo) : IRequest<TableroResponse>;
+/// <summary>IdEquipo null = vista consolidada de todos los equipos.</summary>
+public record ObtenerTableroQuery(int? IdEquipo) : IRequest<TableroResponse>;
 
 public class ObtenerTableroHandler(
     IPlaneacionQueryService consultas,
@@ -48,8 +60,13 @@ public class ObtenerTableroHandler(
 {
     public async Task<TableroResponse> Handle(ObtenerTableroQuery query, CancellationToken cancellationToken)
     {
-        // Garantiza que el equipo tenga tablero y columnas antes de leerlo
-        await repositorio.ObtenerOCrearColumnasAsync(query.IdEquipo, cancellationToken);
+        if (query.IdEquipo.HasValue)
+        {
+            // Garantiza que el equipo tenga tablero y columnas antes de leerlo. La vista
+            // consolidada (IdEquipo null) no tiene un TblTablero propio: usa el mapeo
+            // estandar directo, sin nada que aprovisionar.
+            await repositorio.ObtenerOCrearColumnasAsync(query.IdEquipo.Value, cancellationToken);
+        }
         return await consultas.ObtenerTableroAsync(query.IdEquipo, cancellationToken);
     }
 }

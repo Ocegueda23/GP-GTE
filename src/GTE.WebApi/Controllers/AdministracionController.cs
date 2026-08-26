@@ -315,4 +315,70 @@ public class AdministracionController(IMediator mediator) : ControllerBase
         await mediator.Send(new RetirarAmbienteCommand(id), cancellationToken);
         return Ok(ApiResponse<object>.Exito(new { }, "Ambiente retirado."));
     }
+
+    /* ---------- Areas ---------- */
+
+    [HttpGet("areas")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<AreaResponse>>>> ObtenerAreas(
+        CancellationToken cancellationToken)
+    {
+        var resultado = await mediator.Send(new ObtenerAreasQuery(), cancellationToken);
+        return Ok(ApiResponse<IReadOnlyList<AreaResponse>>.Exito(resultado));
+    }
+
+    [HttpPost("areas")]
+    public async Task<ActionResult<ApiResponse<AreaResponse>>> CrearArea(
+        [FromBody] AreaCrearRequest request, CancellationToken cancellationToken)
+    {
+        var resultado = await mediator.Send(new CrearAreaCommand(request), cancellationToken);
+        return Ok(ApiResponse<AreaResponse>.Exito(resultado, $"Area {resultado.Nombre} creada."));
+    }
+
+    [HttpPut("areas/{id:int}")]
+    public async Task<ActionResult<ApiResponse<AreaResponse>>> ActualizarArea(
+        int id, [FromBody] AreaEditarRequest request, CancellationToken cancellationToken)
+    {
+        var resultado = await mediator.Send(new ActualizarAreaCommand(id, request), cancellationToken);
+        return Ok(ApiResponse<AreaResponse>.Exito(resultado, "Area actualizada."));
+    }
+
+    [HttpPut("areas/{id:int}/retirar")]
+    public async Task<ActionResult<ApiResponse<object>>> RetirarArea(int id, CancellationToken cancellationToken)
+    {
+        await mediator.Send(new RetirarAreaCommand(id), cancellationToken);
+        return Ok(ApiResponse<object>.Exito(new { }, "Area retirada."));
+    }
+
+    /* ---------- Puestos ---------- */
+
+    [HttpGet("puestos")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<PuestoResponse>>>> ObtenerPuestos(
+        CancellationToken cancellationToken)
+    {
+        var resultado = await mediator.Send(new ObtenerPuestosQuery(), cancellationToken);
+        return Ok(ApiResponse<IReadOnlyList<PuestoResponse>>.Exito(resultado));
+    }
+
+    [HttpPost("puestos")]
+    public async Task<ActionResult<ApiResponse<PuestoResponse>>> CrearPuesto(
+        [FromBody] PuestoCrearRequest request, CancellationToken cancellationToken)
+    {
+        var resultado = await mediator.Send(new CrearPuestoCommand(request), cancellationToken);
+        return Ok(ApiResponse<PuestoResponse>.Exito(resultado, $"Puesto {resultado.Nombre} creado."));
+    }
+
+    [HttpPut("puestos/{id:int}")]
+    public async Task<ActionResult<ApiResponse<PuestoResponse>>> ActualizarPuesto(
+        int id, [FromBody] PuestoEditarRequest request, CancellationToken cancellationToken)
+    {
+        var resultado = await mediator.Send(new ActualizarPuestoCommand(id, request), cancellationToken);
+        return Ok(ApiResponse<PuestoResponse>.Exito(resultado, "Puesto actualizado."));
+    }
+
+    [HttpPut("puestos/{id:int}/retirar")]
+    public async Task<ActionResult<ApiResponse<object>>> RetirarPuesto(int id, CancellationToken cancellationToken)
+    {
+        await mediator.Send(new RetirarPuestoCommand(id), cancellationToken);
+        return Ok(ApiResponse<object>.Exito(new { }, "Puesto retirado."));
+    }
 }

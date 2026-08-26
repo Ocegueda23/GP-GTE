@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import {
-  Alert, Box, Chip, FormControl, InputLabel, LinearProgress, Link, MenuItem,
-  Paper, Select, Snackbar, Stack, Typography,
+  Alert, Box, Chip, LinearProgress, Link,
+  Paper, Snackbar, Stack, Typography,
 } from "@mui/material";
 import {
   DndContext, DragOverlay, PointerSensor, useDraggable, useDroppable,
@@ -10,10 +10,16 @@ import {
 } from "@dnd-kit/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
+import { ComboBuscable } from "../../shared/components/ComboBuscable";
 import { moverTarjeta, obtenerTablero, type ColumnaTablero } from "../../shared/api/planeacion";
 import { obtenerCatalogosBandeja, type BandejaItem } from "../../shared/api/workitems";
+import { useSesion } from "../../shared/api/sesion";
 
-function Tarjeta({ item, arrastrable = true }: { item: BandejaItem; arrastrable?: boolean }) {
+const TODOS_LOS_EQUIPOS = "todos";
+
+function Tarjeta({ item, arrastrable = true, ajena = false }: {
+  item: BandejaItem; arrastrable?: boolean; ajena?: boolean;
+}) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: item.idWorkItem,
     disabled: !arrastrable,
@@ -49,12 +55,13 @@ function Tarjeta({ item, arrastrable = true }: { item: BandejaItem; arrastrable?
       <Typography variant="caption" color="text.secondary">
         {item.asignado ?? "Sin asignar"}
         {item.revisionesPendientes > 0 && ` - ${item.revisionesPendientes} hallazgo(s)`}
+        {ajena && " - no es tuya"}
       </Typography>
     </Paper>
   );
 }
 
-function Columna({ columna }: { columna: ColumnaTablero }) {
+function Columna({ columna, esPropia }: { columna: ColumnaTablero; esPropia: (item: BandejaItem) => boolean }) {
   const { setNodeRef, isOver } = useDroppable({ id: `col-${columna.idEstatusWorkItem}` });
   const excedeWip = columna.limiteWip !== null && columna.items.length >= columna.limiteWip;
 
@@ -83,18 +90,23 @@ function Columna({ columna }: { columna: ColumnaTablero }) {
       {columna.items.length === 0 && (
         <Typography variant="caption" color="text.secondary">Sin elementos.</Typography>
       )}
-      {columna.items.map((item) => <Tarjeta key={item.idWorkItem} item={item} />)}
+      {columna.items.map((item) => {
+        const propia = esPropia(item);
+        return <Tarjeta key={item.idWorkItem} item={item} arrastrable={propia} ajena={!propia} />;
+      })}
     </Paper>
   );
 }
 
 /** P05 - Tablero Kanban: soltar una tarjeta ejecuta la accion de workflow correspondiente. */
 export function TableroPage() {
-  const [idEquipo, setIdEquipo] = useState<number | "">("");
+  const [idEquipo, setIdEquipo] = useState<number | typeof TODOS_LOS_EQUIPOS>(TODOS_LOS_EQUIPOS);
   const [aviso, setAviso] = useState<{ tipo: "success" | "error"; mensaje: string } | null>(null);
   const [arrastrando, setArrastrando] = useState<BandejaItem | null>(null);
   const clienteQuery = useQueryClient();
   const sensores = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const sesion = useSesion((estado) => estado.sesion);
+  const puede = useSesion((estado) => estado.puede);
 
   const catalogos = useQuery({
     queryKey: ["catalogos-bandeja"],
@@ -103,13 +115,19 @@ export function TableroPage() {
   });
 
   const equipos = catalogos.data?.equipos ?? [];
-  const equipoActual = idEquipo === "" ? equipos[0]?.id : (idEquipo as number);
+  const equipoActual = idEquipo === TODOS_LOS_EQUIPOS ? undefined : idEquipo;
 
   const tablero = useQuery({
-    queryKey: ["tablero", equipoActual],
-    queryFn: () => obtenerTablero(equipoActual!),
-    enabled: equipoActual !== undefined,
+    queryKey: ["tablero", equipoActual ?? TODOS_LOS_EQUIPOS],
+    queryFn: () => obtenerTablero(equipoActual),
   });
+
+  // RN-GTE-021: un usuario no puede arrastrar (y por lo tanto mover de columna) una
+  // tarjeta que no le pertenece, salvo que tenga el permiso de modificar ajenos --
+  // mismo criterio que MenuAcciones.tsx/DetallePage.tsx. El backend ya lo rechaza
+  // (RN-GTE-012), esto evita el intento fallido y avisa por que en la propia tarjeta.
+  const esPropia = (item: BandejaItem) =>
+    item.idAsignado === sesion?.idUsuario || puede("WI.ModificarAjeno");
 
   const alIniciarArrastre = (evento: DragStartEvent) => {
     const id = Number(evento.active.id);
@@ -125,7 +143,7 @@ export function TableroPage() {
 
     const idEstatusDestino = Number(destino.replace("col-", ""));
     const item = tablero.data?.columnas.flatMap((c) => c.items).find((i) => i.idWorkItem === idWorkItem);
-    if (!item || item.idEstatus === idEstatusDestino) return;
+    if (!item || item.idEstatus === idEstatusDestino || !esPropia(item)) return;
 
     try {
       const { mensaje } = await moverTarjeta(idWorkItem, idEstatusDestino);
@@ -150,21 +168,22 @@ export function TableroPage() {
           {tablero.data?.sprintActivo && (
             <Chip color="success" label={`Sprint activo: ${tablero.data.sprintActivo}`} />
           )}
-          <FormControl size="small" sx={{ minWidth: 200 }}>
-            <InputLabel>Equipo</InputLabel>
-            <Select label="Equipo" value={equipoActual ?? ""}
-              onChange={(e) => setIdEquipo(e.target.value as number)}>
-              {equipos.map((eq) => (
-                <MenuItem key={eq.id} value={eq.id}>{eq.nombre}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <ComboBuscable
+            label="Equipo"
+            value={idEquipo}
+            onChange={(v) => setIdEquipo(v === TODOS_LOS_EQUIPOS ? TODOS_LOS_EQUIPOS : (v as number))}
+            opciones={[
+              { valor: TODOS_LOS_EQUIPOS, etiqueta: "Todos los equipos" },
+              ...equipos.map((eq) => ({ valor: eq.id, etiqueta: eq.nombre })),
+            ]}
+            sx={{ minWidth: 200 }}
+          />
         </Stack>
       </Stack>
 
       {equipos.length === 0 && !catalogos.isLoading && (
-        <Alert severity="info">
-          No hay equipos registrados. Crea un equipo y asignale proyectos para usar el tablero.
+        <Alert severity="info" sx={{ mb: 2 }}>
+          No hay equipos registrados. Crea un equipo y asignale proyectos para poder filtrar el tablero por equipo.
         </Alert>
       )}
 
@@ -177,11 +196,11 @@ export function TableroPage() {
         <DndContext sensors={sensores} onDragStart={alIniciarArrastre} onDragEnd={alTerminarArrastre}>
           <Box sx={{ display: "flex", gap: 1.5, overflowX: "auto", alignItems: "flex-start", pb: 1 }}>
             {tablero.data.columnas.map((columna) => (
-              <Columna key={columna.idTableroColumna} columna={columna} />
+              <Columna key={columna.idTableroColumna} columna={columna} esPropia={esPropia} />
             ))}
           </Box>
           <DragOverlay>
-            {arrastrando && <Tarjeta item={arrastrando} arrastrable={false} />}
+            {arrastrando && <Tarjeta item={arrastrando} arrastrable={false} ajena={!esPropia(arrastrando)} />}
           </DragOverlay>
         </DndContext>
       )}

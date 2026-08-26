@@ -8,6 +8,9 @@ import AddIcon from "@mui/icons-material/Add";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
+import { ComboBuscable } from "../../shared/components/ComboBuscable";
+import { EncabezadoOrdenable } from "../../shared/components/EncabezadoOrdenable";
+import { useOrdenTabla } from "../../shared/hooks/useOrdenTabla";
 import {
   crearFestivo, crearHorario, guardarTramosHorario, obtenerFestivos, obtenerHorario, obtenerHorarios,
   retirarFestivo,
@@ -28,6 +31,7 @@ export function HorariosTab() {
   const [descripcionFestivo, setDescripcionFestivo] = useState("");
   const [festivoGlobal, setFestivoGlobal] = useState(true);
   const [aviso, setAviso] = useState<{ tipo: "success" | "error"; mensaje: string } | null>(null);
+  const [busquedaFestivo, setBusquedaFestivo] = useState("");
   const clienteQuery = useQueryClient();
 
   const horarios = useQuery({ queryKey: ["horarios-admin"], queryFn: obtenerHorarios });
@@ -38,6 +42,13 @@ export function HorariosTab() {
     enabled: horarioActual !== undefined,
   });
   const festivosGlobales = useQuery({ queryKey: ["festivos-globales"], queryFn: () => obtenerFestivos() });
+  const festivosFiltrados = (festivosGlobales.data ?? []).filter((f) => {
+    const texto = busquedaFestivo.trim().toLowerCase();
+    if (!texto) return true;
+    return f.descripcion.toLowerCase().includes(texto) || (f.horario ?? "").toLowerCase().includes(texto);
+  });
+  const { datosOrdenados: festivosOrdenados, ordenarPor: ordenFestivo, descendente: descFestivo, ordenar: ordenarFestivo }
+    = useOrdenTabla(festivosFiltrados);
 
   useEffect(() => {
     if (detalle.data) {
@@ -116,12 +127,13 @@ export function HorariosTab() {
       <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", mb: 2, flexWrap: "wrap", gap: 1 }}>
         <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Horarios</Typography>
         <Stack direction="row" spacing={1}>
-          <FormControl size="small" sx={{ minWidth: 200 }}>
-            <InputLabel>Horario</InputLabel>
-            <Select label="Horario" value={horarioActual ?? ""} onChange={(e) => setIdHorario(e.target.value as number)}>
-              {horarios.data?.map((h) => <MenuItem key={h.idHorario} value={h.idHorario}>{h.nombre}</MenuItem>)}
-            </Select>
-          </FormControl>
+          <ComboBuscable
+            label="Horario"
+            value={horarioActual ?? ""}
+            onChange={(v) => setIdHorario(v as number | "")}
+            opciones={(horarios.data ?? []).map((h) => ({ valor: h.idHorario, etiqueta: h.nombre }))}
+            sx={{ minWidth: 200 }}
+          />
           <Button variant="outlined" startIcon={<AddIcon />} onClick={() => setModalHorario(true)}>
             Nuevo horario
           </Button>
@@ -165,17 +177,19 @@ export function HorariosTab() {
           <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Dias festivos</Typography>
           <Button size="small" startIcon={<AddIcon />} onClick={() => setModalFestivo(true)}>Agregar festivo</Button>
         </Stack>
+        <TextField size="small" placeholder="Buscar descripcion o alcance..." value={busquedaFestivo}
+          onChange={(e) => setBusquedaFestivo(e.target.value)} sx={{ mb: 1.5, minWidth: 280 }} />
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>Fecha</TableCell>
-              <TableCell>Descripcion</TableCell>
-              <TableCell>Alcance</TableCell>
+              <EncabezadoOrdenable clave="fecha" ordenActual={ordenFestivo} descendente={descFestivo} onOrdenar={ordenarFestivo}>Fecha</EncabezadoOrdenable>
+              <EncabezadoOrdenable clave="descripcion" ordenActual={ordenFestivo} descendente={descFestivo} onOrdenar={ordenarFestivo}>Descripcion</EncabezadoOrdenable>
+              <EncabezadoOrdenable clave="horario" ordenActual={ordenFestivo} descendente={descFestivo} onOrdenar={ordenarFestivo}>Alcance</EncabezadoOrdenable>
               <TableCell />
             </TableRow>
           </TableHead>
           <TableBody>
-            {festivosGlobales.data?.length === 0 && (
+            {festivosOrdenados.length === 0 && (
               <TableRow>
                 <TableCell colSpan={4}>
                   <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: "center" }}>
@@ -184,7 +198,7 @@ export function HorariosTab() {
                 </TableCell>
               </TableRow>
             )}
-            {festivosGlobales.data?.map((f) => (
+            {festivosOrdenados.map((f) => (
               <TableRow key={f.idDiaFestivo}>
                 <TableCell>{f.fecha}</TableCell>
                 <TableCell>{f.descripcion}</TableCell>
@@ -207,7 +221,7 @@ export function HorariosTab() {
             onChange={(e) => setNombreHorario(e.target.value)} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setModalHorario(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setModalHorario(false)}>Cancelar</Button>
           <Button variant="contained" disabled={nombreHorario.trim().length === 0}
             onClick={() => void crearNuevoHorario()}>
             Crear
@@ -232,7 +246,7 @@ export function HorariosTab() {
           </FormControl>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setModalFestivo(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setModalFestivo(false)}>Cancelar</Button>
           <Button variant="contained" disabled={!fechaFestivo || descripcionFestivo.trim().length === 0}
             onClick={() => void agregarFestivo()}>
             Agregar

@@ -30,6 +30,11 @@ public class SanitizadorHtmlGanss : ISanitizadorHtml
         _sanitizador.AllowedAttributes.Clear();
         _sanitizador.AllowedAttributes.Add("href");
         _sanitizador.AllowedAttributes.Add("class");
+        _sanitizador.AllowedAttributes.Add("style");
+
+        // Solo tamano de letra (editor enriquecido): no abrir la puerta a otros estilos.
+        _sanitizador.AllowedCssProperties.Clear();
+        _sanitizador.AllowedCssProperties.Add("font-size");
 
         _sanitizador.AllowedSchemes.Clear();
         _sanitizador.AllowedSchemes.Add("http");

@@ -1,6 +1,7 @@
 using GTE.Application.DTOs.Responses.Entregas;
 using GTE.Application.Interfaces;
 using GTE.Domain.Exceptions;
+using GTE.Domain.Planeacion;
 using MediatR;
 
 namespace GTE.Application.Entregas.Queries;
@@ -29,6 +30,20 @@ public class ObtenerReleaseHandler(IEntregaQueryService consultas)
     }
 }
 
+/// <summary>Elementos que pueden entrar al release, para el selector de "Agregar contenido".</summary>
+public record ObtenerCandidatosContenidoQuery(int IdRelease)
+    : IRequest<IReadOnlyList<CandidatoContenidoResponse>>;
+
+public class ObtenerCandidatosContenidoHandler(IEntregaQueryService consultas)
+    : IRequestHandler<ObtenerCandidatosContenidoQuery, IReadOnlyList<CandidatoContenidoResponse>>
+{
+    public async Task<IReadOnlyList<CandidatoContenidoResponse>> Handle(
+        ObtenerCandidatosContenidoQuery query, CancellationToken cancellationToken)
+    {
+        return await consultas.ObtenerCandidatosContenidoAsync(query.IdRelease, cancellationToken);
+    }
+}
+
 public record ObtenerMatrizAmbientesQuery : IRequest<IReadOnlyList<MatrizAmbienteResponse>>;
 
 public class ObtenerMatrizAmbientesHandler(IEntregaQueryService consultas)
@@ -38,5 +53,20 @@ public class ObtenerMatrizAmbientesHandler(IEntregaQueryService consultas)
         ObtenerMatrizAmbientesQuery query, CancellationToken cancellationToken)
     {
         return await consultas.ObtenerMatrizAmbientesAsync(cancellationToken);
+    }
+}
+
+/// <summary>Paso aparte tras cerrar un sprint: mismo permiso que gestiona el sprint (P.LA).</summary>
+public record ObtenerCoberturaReleaseSprintQuery(int IdSprint) : IRequest<CoberturaReleaseSprintResponse>;
+
+public class ObtenerCoberturaReleaseSprintHandler(
+    IEntregaQueryService consultas, IVerificadorPermisos permisos)
+    : IRequestHandler<ObtenerCoberturaReleaseSprintQuery, CoberturaReleaseSprintResponse>
+{
+    public async Task<CoberturaReleaseSprintResponse> Handle(
+        ObtenerCoberturaReleaseSprintQuery query, CancellationToken cancellationToken)
+    {
+        await permisos.ExigirPermisoAsync(PermisosPlaneacion.GestionarSprints, null, cancellationToken);
+        return await consultas.ObtenerCoberturaReleaseSprintAsync(query.IdSprint, cancellationToken);
     }
 }

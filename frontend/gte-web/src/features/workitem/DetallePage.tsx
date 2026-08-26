@@ -18,6 +18,7 @@ import { ModalEditarWorkItem } from "./ModalEditarWorkItem";
 import { PanelRevisiones } from "./PanelRevisiones";
 import { PanelAdjuntos } from "./PanelAdjuntos";
 import { PanelComentarios } from "./PanelComentarios";
+import { PanelPruebas } from "./PanelPruebas";
 import { PanelSubtareas } from "./PanelSubtareas";
 
 const ESTATUS_TERMINADO = 6;
@@ -136,6 +137,7 @@ export function DetallePage() {
             <Tab label={item.revisionesPendientes > 0
               ? `Revisiones (${item.revisionesPendientes})`
               : "Revisiones"} />
+            <Tab label="Pruebas" />
             <Tab label="Adjuntos" />
             <Tab label="Subtareas" />
           </Tabs>
@@ -172,12 +174,13 @@ export function DetallePage() {
                     <TableCell align="right">Minutos</TableCell>
                     <TableCell>Descripcion</TableCell>
                     <TableCell>Usuario</TableCell>
+                    <TableCell>Origen</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {tiempos.data?.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={4}>
+                      <TableCell colSpan={5}>
                         <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: "center" }}>
                           Sin registros de tiempo. El cierre exige avance registrado.
                         </Typography>
@@ -190,8 +193,22 @@ export function DetallePage() {
                       <TableCell align="right">{formatearMinutos(registro.minutos)}</TableCell>
                       <TableCell>{registro.descripcion ?? "-"}</TableCell>
                       <TableCell>{registro.usuario}</TableCell>
+                      <TableCell>
+                        {registro.folioOrigen
+                          ? <Chip size="small" variant="outlined" label={registro.folioOrigen} />
+                          : "-"}
+                      </TableCell>
                     </TableRow>
                   ))}
+                  {tiempos.data && tiempos.data.length > 0 && (
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 700 }}>Total</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 700 }}>
+                        {formatearMinutos(tiempos.data.reduce((total, r) => total + r.minutos, 0))}
+                      </TableCell>
+                      <TableCell colSpan={3} />
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </Box>
@@ -207,6 +224,15 @@ export function DetallePage() {
           )}
 
           {pestana === 3 && (
+            <PanelPruebas
+              idWorkItem={item.idWorkItem}
+              idProyecto={item.idProyecto}
+              alExito={(mensaje) => setAviso({ tipo: "success", mensaje })}
+              alError={(mensaje) => setAviso({ tipo: "error", mensaje })}
+            />
+          )}
+
+          {pestana === 4 && (
             <PanelAdjuntos
               idWorkItem={item.idWorkItem}
               alExito={(mensaje) => setAviso({ tipo: "success", mensaje })}
@@ -214,7 +240,7 @@ export function DetallePage() {
             />
           )}
 
-          {pestana === 4 && (
+          {pestana === 5 && (
             <PanelSubtareas
               idWorkItem={item.idWorkItem}
               folio={item.folio}
@@ -239,6 +265,7 @@ export function DetallePage() {
             <Campo etiqueta="Usuario solicitante" valor={item.usuarioSolicitante} />
           )}
           <Campo etiqueta="Prioridad" valor={item.prioridad} />
+          <Campo etiqueta="Complejidad" valor={item.complejidad ?? "-"} />
           <Campo etiqueta="Sprint" valor={item.sprint ?? "-"} />
           <Campo etiqueta="Compromiso" valor={formatearFecha(item.fechaCompromiso)} resaltar={item.esVencida} />
           <Campo etiqueta="Inicio" valor={formatearFecha(item.fechaInicio)} />

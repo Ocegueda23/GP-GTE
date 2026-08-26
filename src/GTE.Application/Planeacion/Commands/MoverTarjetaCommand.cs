@@ -24,8 +24,8 @@ public class MoverTarjetaValidator : AbstractValidator<MoverTarjetaCommand>
 /// Movimiento de tarjeta en el tablero. El tablero es una vista por estatus, asi que
 /// soltar una tarjeta en otra columna se TRADUCE a la accion del grafo que lleva a ese
 /// estatus: el front sigue sin decidir transiciones y todas las reglas de negocio del
-/// cambio de estatus (RN-REQ-01, 02, 03) se aplican igual que en el detalle.
-/// RN-PLA-04: si la columna destino tiene limite WIP alcanzado, se bloquea salvo permiso.
+/// cambio de estatus (RN-GTE-008, 02, 03) se aplican igual que en el detalle.
+/// RN-GTE-020: si la columna destino tiene limite WIP alcanzado, se bloquea salvo permiso.
 /// </summary>
 public class MoverTarjetaHandler(
     IMotorWorkflow motor,
@@ -70,7 +70,7 @@ public class MoverTarjetaHandler(
             new CambiarEstatusWorkItemCommand(command.IdWorkItem, accion.Accion, null), cancellationToken);
     }
 
-    /// <summary>RN-PLA-04: el limite de trabajo en curso se respeta salvo permiso explicito.</summary>
+    /// <summary>RN-GTE-020: el limite de trabajo en curso se respeta salvo permiso explicito.</summary>
     private async Task ValidarLimiteWipAsync(
         int idWorkItem, int idProyecto, int idEstatusDestino, CancellationToken cancellationToken)
     {

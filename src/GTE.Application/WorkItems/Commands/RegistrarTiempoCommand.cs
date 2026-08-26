@@ -41,7 +41,7 @@ public class RegistrarTiempoHandler(
             throw new BusinessException("No se puede registrar tiempo en un elemento cancelado o eliminado.");
         }
 
-        // RN-REQ-05: registrar tiempo en un item ajeno (asignado a otra persona O SIN
+        // RN-GTE-012: registrar tiempo en un item ajeno (asignado a otra persona O SIN
         // asignar) tambien cuenta como "modificar" el elemento -- mismo gate que
         // ActualizarWorkItemCommand y CambiarEstatusWorkItemCommand. Sin asignar cuenta
         // como ajeno (decision del equipo 2026-08-02).

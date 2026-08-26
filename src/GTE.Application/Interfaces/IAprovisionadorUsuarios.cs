@@ -4,7 +4,7 @@ namespace GTE.Application.Interfaces;
 public record IdentidadToken(string Dominio, string? Nombre, string? Correo);
 
 /// <summary>
-/// Aprovisionamiento JIT (RN-ADM-01): al primer inicio de sesion de una identidad
+/// Aprovisionamiento JIT (RN-GTE-001): al primer inicio de sesion de una identidad
 /// valida de Entra ID se crea su usuario en GTE. Nace SIN roles, asi que no puede
 /// hacer nada hasta que un administrador se los asigne.
 /// </summary>

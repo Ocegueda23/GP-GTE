@@ -9,7 +9,8 @@ public record ProyectoNuevo(
     int? IdEquipo,
     DateTime? FechaInicioPlan,
     DateTime? FechaFinPlan,
-    bool EsMantenimiento);
+    bool EsMantenimiento,
+    bool Administrado);
 
 public record ProyectoEdicion(
     int IdProyecto,
@@ -19,7 +20,8 @@ public record ProyectoEdicion(
     int? IdEquipo,
     DateTime? FechaInicioPlan,
     DateTime? FechaFinPlan,
-    bool EsMantenimiento);
+    bool EsMantenimiento,
+    bool Administrado);
 
 /// <summary>Estado minimo necesario para validar y aplicar una transicion de estatus.</summary>
 public record EstadoProyecto(int IdProyecto, string? Folio, string Clave, int IdEstatus, bool Activo);
@@ -73,3 +75,11 @@ public record AmbienteEdicion(
     int? IdResponsable);
 
 public record RolAsignadoNuevo(int IdUsuario, int IdRol, int? IdProyecto);
+
+public record AreaNueva(string Nombre);
+
+public record AreaEdicion(int IdArea, string Nombre);
+
+public record PuestoNuevo(string Nombre, int? IdArea);
+
+public record PuestoEdicion(int IdPuesto, string Nombre, int? IdArea);

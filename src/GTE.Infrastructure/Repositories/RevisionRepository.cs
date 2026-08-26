@@ -20,6 +20,8 @@ public class RevisionRepository(FabricaContexto fabrica, AuditContext auditoria)
             IdRevisor = datos.IdRevisor,
             Comentarios = datos.Comentarios,
             IdEstatusRevision = EstatusRevision.Pendiente,   // el estatus inicial lo fija el backend
+            IdSeveridad = datos.IdSeveridad,
+            IdEjecucionPrueba = datos.IdEjecucionPrueba,
             Corregido = false,
             UsuarioRegistro = Auditoria.Usuario,
             Activo = true
@@ -70,13 +72,6 @@ public class RevisionRepository(FabricaContexto fabrica, AuditContext auditoria)
         await contexto.SaveChangesAsync(cancellationToken);
         await RegistrarBitacoraAsync("Revision", idRevision,
             corregido ? "CORREGIR" : "REABRIR", null, cancellationToken);
-    }
-
-    public async Task<int> ContarPendientesAsync(int idWorkItem, CancellationToken cancellationToken = default)
-    {
-        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
-        return await contexto.TblRevision.AsNoTracking()
-            .CountAsync(r => r.IdWorkItem == idWorkItem && !r.Corregido && r.Activo, cancellationToken);
     }
 
     public async Task AplicarEfectosTransicionAsync(

@@ -145,7 +145,7 @@ export function PuestosTab() {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setModal(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setModal(false)}>Cancelar</Button>
           <Button variant="contained" disabled={nombre.trim().length === 0} onClick={() => void guardar()}>
             Crear
           </Button>
@@ -168,7 +168,7 @@ export function PuestosTab() {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setPuestoEditar(null)}>Cancelar</Button>
+          <Button color="error" onClick={() => setPuestoEditar(null)}>Cancelar</Button>
           <Button variant="contained" disabled={nombreEditar.trim().length === 0} onClick={() => void guardarEdicion()}>
             Guardar
           </Button>

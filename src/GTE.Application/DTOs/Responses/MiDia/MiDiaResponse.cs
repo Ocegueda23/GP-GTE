@@ -1,3 +1,7 @@
+using GTE.Application.DTOs.Responses.Entregas;
+using GTE.Application.DTOs.Responses.Operacion;
+using GTE.Application.DTOs.Responses.Solicitudes;
+using GTE.Application.DTOs.Responses.Soporte;
 using GTE.Application.DTOs.Responses.WorkItems;
 
 namespace GTE.Application.DTOs.Responses.MiDia;
@@ -22,7 +26,7 @@ public class MiDiaResponse
     public string Usuario { get; set; } = string.Empty;
     public DateTime Fecha { get; set; }
 
-    /// <summary>El unico item En Proceso del usuario (RN-REQ-01); null si no esta trabajando en nada.</summary>
+    /// <summary>El unico item En Proceso del usuario (RN-GTE-008); null si no esta trabajando en nada.</summary>
     public MiDiaItemResponse? EnProceso { get; set; }
 
     public IReadOnlyList<MiDiaItemResponse> Vencidas { get; set; } = [];
@@ -34,4 +38,19 @@ public class MiDiaResponse
 
     /// <summary>Total de elementos abiertos asignados al usuario.</summary>
     public int TotalAbiertos { get; set; }
+
+    /// <summary>Tickets asignados al usuario como agente (no Cerrado).</summary>
+    public IReadOnlyList<TicketResponse> TicketsAsignados { get; set; } = [];
+
+    /// <summary>Incidentes no cerrados en proyectos donde el usuario es responsable.</summary>
+    public IReadOnlyList<IncidenteResponse> IncidentesRelevantes { get; set; } = [];
+
+    /// <summary>Solicitudes levantadas por el usuario que siguen pendientes de resolucion.</summary>
+    public IReadOnlyList<SolicitudResponse> SolicitudesPendientes { get; set; } = [];
+
+    /// <summary>Cuantas solicitudes esperan revision en todo el sistema; 0 si el usuario no tiene SOL.Triage.</summary>
+    public int TriagePendientes { get; set; }
+
+    /// <summary>Releases no liberados/cancelados en proyectos donde el usuario es responsable.</summary>
+    public IReadOnlyList<ReleaseResponse> ReleasesRelevantes { get; set; } = [];
 }

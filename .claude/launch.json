@@ -1,15 +1,7 @@
 {
   "version": "0.0.1",
+  "//api": "El API NO se levanta desde aqui: la sirve el servicio de Windows 'GTE' (C:\\Servicios\\GTE, ambiente Production) en http://localhost:5090, que es a donde apunta el frontend por default. La entrada 'api' que antes levantaba una segunda instancia en 5088 se quito: ya no se necesita, y clavaba la cadena de conexion a (localdb)\\MSSQLLocalDB, que no existe en esta maquina. La base real es la instancia SQLEXPRESS01 (alcanzable como 'localhost' en el puerto 1433, que es la forma que usa appsettings.json). Si algun dia hace falta depurar con una instancia aparte, levantarla en un puerto libre y apuntar el frontend con VITE_API_URL.",
   "configurations": [
-    {
-      "name": "api",
-      "runtimeExecutable": "cmd",
-      "runtimeArgs": [
-        "/c",
-        "set ConnectionStrings__bdsGTE=Server=(localdb)\\MSSQLLocalDB;Database=bdsGTE;Trusted_Connection=True;TrustServerCertificate=True&& set ASPNETCORE_ENVIRONMENT=Development&& dotnet run --project src/GTE.WebApi --urls http://localhost:5088"
-      ],
-      "port": 5088
-    },
     {
       "name": "frontend",
       "runtimeExecutable": "npm",

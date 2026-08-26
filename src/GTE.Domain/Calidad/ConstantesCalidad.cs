@@ -17,7 +17,11 @@ public static class TipoPrueba
     public const int Regresion = 3;
 }
 
-/// <summary>IDs de dbo.tblSeveridad (S1 y S2 bloquean la aprobacion de un release).</summary>
+/// <summary>
+/// IDs de dbo.tblSeveridad. Decide si un hallazgo (QA o code review, tblRevision) bloquea:
+/// S1/S2 impiden Terminar el WorkItem y bloquean la aprobacion de un release que lo incluya;
+/// S3/S4 quedan registrados pero no bloquean.
+/// </summary>
 public static class Severidad
 {
     public const int S1Critica = 1;
@@ -28,6 +32,9 @@ public static class Severidad
 
 public static class PermisosCalidad
 {
+    /// <summary>Crear/editar/retirar casos de prueba del catalogo de un proyecto.</summary>
     public const string GestionarPlanes = "QA.GestionarPlanes";
+
+    /// <summary>Asignar un caso a un WorkItem y registrar el resultado de su ejecucion.</summary>
     public const string Ejecutar = "QA.Ejecutar";
 }

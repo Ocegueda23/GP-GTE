@@ -11,6 +11,7 @@ public class ProyectoItemResponse
     public int Id { get; set; }
     public string Clave { get; set; } = string.Empty;
     public string Nombre { get; set; } = string.Empty;
+    public string CategoriaProyecto { get; set; } = string.Empty;
 }
 
 /// <summary>Catalogos que alimentan la barra de filtros de la bandeja.</summary>

@@ -37,7 +37,8 @@ public class CrearProyectoHandler(
         var idProyecto = await repositorio.CrearProyectoAsync(new ProyectoNuevo(
             command.Datos.Clave.Trim(), command.Datos.Nombre.Trim(), command.Datos.IdPrograma,
             command.Datos.IdCategoriaProyecto, command.Datos.IdResponsable, command.Datos.IdEquipo,
-            command.Datos.FechaInicioPlan, command.Datos.FechaFinPlan, command.Datos.EsMantenimiento),
+            command.Datos.FechaInicioPlan, command.Datos.FechaFinPlan, command.Datos.EsMantenimiento,
+            command.Datos.Administrado),
             cancellationToken);
 
         return await consultas.ObtenerProyectoAsync(idProyecto, cancellationToken)

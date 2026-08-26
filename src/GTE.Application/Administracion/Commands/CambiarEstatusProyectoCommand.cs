@@ -22,7 +22,7 @@ public class CambiarEstatusProyectoValidator : AbstractValidator<CambiarEstatusP
 /// <summary>
 /// AUTORIZAR/INICIAR/PAUSAR/REANUDAR/CERRAR/CANCELAR del proyecto, via el motor de
 /// workflow (dbo.spCambiarEstatus, proceso "Proyecto" ya sembrado en el script 09).
-/// RN-PRY-01: no se puede CERRAR con WorkItems abiertos (409 con el detalle de folios).
+/// RN-GTE-005: no se puede CERRAR con WorkItems abiertos (409 con el detalle de folios).
 /// El folio del proyecto (serie PRY-anio) se genera al confirmar AUTORIZAR, nunca antes
 /// de que el motor valide la transicion (para no quemar un folio en un intento invalido).
 /// </summary>

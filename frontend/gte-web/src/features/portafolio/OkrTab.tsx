@@ -9,6 +9,7 @@ import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined
 import EditIcon from "@mui/icons-material/Edit";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
+import { ComboBuscable } from "../../shared/components/ComboBuscable";
 import { obtenerEquipos, obtenerProyectos } from "../../shared/api/administracion";
 import {
   actualizarResultadoClave, crearObjetivo, crearResultadoClave, obtenerObjetivos,
@@ -204,7 +205,7 @@ function FilaResultadoClave({ idObjetivoOkr, resultado, alExito, alError }: {
             onChange={(e) => setClaveKpi(e.target.value)} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setModal(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setModal(false)}>Cancelar</Button>
           <Button variant="contained" disabled={!nombre.trim() || !valorMeta} onClick={() => void guardar()}>
             Guardar
           </Button>
@@ -242,7 +243,7 @@ function ModalNuevoResultado({ abierto, idObjetivoOkr, onCerrar, alExito, alErro
         <TextField size="small" label="Clave KPI (opcional)" value={claveKpi} onChange={(e) => setClaveKpi(e.target.value)} />
       </DialogContent>
       <DialogActions>
-        <Button onClick={onCerrar}>Cancelar</Button>
+        <Button color="error" onClick={onCerrar}>Cancelar</Button>
         <Button variant="contained" disabled={!nombre.trim() || !valorMeta} onClick={() => void guardar()}>
           Agregar
         </Button>
@@ -295,19 +296,21 @@ function ModalNuevoObjetivo({ abierto, proyectos, equipos, anioSugerido, onCerra
           </Select>
         </FormControl>
         {tipo === "proyecto" ? (
-          <FormControl size="small" required>
-            <InputLabel>Proyecto</InputLabel>
-            <Select label="Proyecto" value={idProyecto} onChange={(e) => setIdProyecto(e.target.value as number)}>
-              {proyectos.map((p) => <MenuItem key={p.idProyecto} value={p.idProyecto}>{p.clave} - {p.nombre}</MenuItem>)}
-            </Select>
-          </FormControl>
+          <ComboBuscable
+            label="Proyecto"
+            required
+            value={idProyecto}
+            onChange={(v) => setIdProyecto(v as number | "")}
+            opciones={proyectos.map((p) => ({ valor: p.idProyecto, etiqueta: `${p.clave} - ${p.nombre}` }))}
+          />
         ) : (
-          <FormControl size="small" required>
-            <InputLabel>Equipo</InputLabel>
-            <Select label="Equipo" value={idEquipo} onChange={(e) => setIdEquipo(e.target.value as number)}>
-              {equipos.map((eq) => <MenuItem key={eq.idEquipo} value={eq.idEquipo}>{eq.nombre}</MenuItem>)}
-            </Select>
-          </FormControl>
+          <ComboBuscable
+            label="Equipo"
+            required
+            value={idEquipo}
+            onChange={(v) => setIdEquipo(v as number | "")}
+            opciones={equipos.map((eq) => ({ valor: eq.idEquipo, etiqueta: eq.nombre }))}
+          />
         )}
         <TextField size="small" required label="Nombre del objetivo" value={nombre}
           onChange={(e) => setNombre(e.target.value)} slotProps={{ htmlInput: { maxLength: 200 } }} />
@@ -328,7 +331,7 @@ function ModalNuevoObjetivo({ abierto, proyectos, equipos, anioSugerido, onCerra
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onCerrar}>Cancelar</Button>
+        <Button color="error" onClick={onCerrar}>Cancelar</Button>
         <Button variant="contained" disabled={!valido} onClick={() => void guardar()}>Crear</Button>
       </DialogActions>
     </Dialog>

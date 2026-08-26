@@ -41,8 +41,6 @@ public partial class TblRelease
 
     public virtual ICollection<TblIncidente> TblIncidente { get; set; } = new List<TblIncidente>();
 
-    public virtual ICollection<TblPlanPrueba> TblPlanPrueba { get; set; } = new List<TblPlanPrueba>();
-
     public virtual ICollection<TblReleaseArtefacto> TblReleaseArtefacto { get; set; } = new List<TblReleaseArtefacto>();
 
     public virtual ICollection<TblWorkItem> TblWorkItem { get; set; } = new List<TblWorkItem>();

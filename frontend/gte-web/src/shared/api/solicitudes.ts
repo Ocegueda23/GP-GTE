@@ -12,11 +12,14 @@ export interface Solicitud {
   folio: string | null;
   titulo: string;
   descripcion: string | null;
+  idTipoSolicitud: number;
   tipo: string;
+  idPrioridad: number;
   prioridad: string;
   idEstatus: number;
   estatus: string;
   solicitante: string;
+  idUsuarioSolicitante: number | null;
   usuarioSolicitante: string | null;
   proyecto: string | null;
   idProyecto: number | null;
@@ -51,15 +54,32 @@ export async function crearSolicitud(datos: NuevaSolicitud) {
   return enviar<Solicitud>("post", "/api/v1/solicitudes", datos);
 }
 
-export async function obtenerMisSolicitudes() {
-  return obtener<Solicitud[]>("/api/v1/solicitudes/mias");
+export async function actualizarSolicitud(idSolicitud: number, datos: NuevaSolicitud) {
+  return enviar<Solicitud>("put", `/api/v1/solicitudes/${idSolicitud}`, datos);
 }
 
-export async function obtenerTriage(page: number, pageSize: number, texto: string) {
+/** Estatus en los que una solicitud todavia admite edicion (Enviada, En analisis, Aprobada). */
+export const ESTATUS_SOLICITUD_EDITABLE = [2, 3, 4];
+
+/** Sin estatus = pendientes (Enviada, En Analisis, Aprobada); [-1] = todas. */
+export async function obtenerMisSolicitudes(estatus: number[] = []) {
+  const params = new URLSearchParams();
+  estatus.forEach((e) => params.append("estatus", String(e)));
+  return obtener<Solicitud[]>("/api/v1/solicitudes/mias", params);
+}
+
+export async function obtenerTriage(
+  page: number, pageSize: number, texto: string,
+  ordenarPor: string | null = null, ordenDescendente = false,
+) {
   const params = new URLSearchParams();
   params.set("page", String(page));
   params.set("pageSize", String(pageSize));
   if (texto.trim()) params.set("texto", texto.trim());
+  if (ordenarPor) {
+    params.set("ordenarPor", ordenarPor);
+    params.set("ordenDescendente", String(ordenDescendente));
+  }
   return obtener<ResultadoPaginado<Solicitud>>("/api/v1/solicitudes", params);
 }
 

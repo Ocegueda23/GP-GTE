@@ -11,6 +11,7 @@ public class ProyectoCrearRequest
     public DateTime? FechaInicioPlan { get; set; }
     public DateTime? FechaFinPlan { get; set; }
     public bool EsMantenimiento { get; set; }
+    public bool Administrado { get; set; }
 }
 
 public class ProyectoEditarRequest
@@ -22,6 +23,7 @@ public class ProyectoEditarRequest
     public DateTime? FechaInicioPlan { get; set; }
     public DateTime? FechaFinPlan { get; set; }
     public bool EsMantenimiento { get; set; }
+    public bool Administrado { get; set; }
 }
 
 public class CambiarEstatusProyectoRequest

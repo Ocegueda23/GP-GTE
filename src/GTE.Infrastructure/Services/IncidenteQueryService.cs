@@ -47,9 +47,35 @@ public class IncidenteQueryService(FabricaContexto fabrica) : IIncidenteQuerySer
         var page = Math.Max(1, filtro.Page);
         var pageSize = Math.Clamp(filtro.PageSize, 1, 200);
 
-        var items = await consulta
-            .OrderBy(i => i.IdSeveridad)
-            .ThenByDescending(i => i.FechaOcurrencia)
+        var ordenada = filtro.OrdenarPor switch
+        {
+            "folio" => filtro.OrdenDescendente
+                ? consulta.OrderByDescending(i => i.Folio)
+                : consulta.OrderBy(i => i.Folio),
+            "titulo" => filtro.OrdenDescendente
+                ? consulta.OrderByDescending(i => i.Titulo)
+                : consulta.OrderBy(i => i.Titulo),
+            "proyecto" => filtro.OrdenDescendente
+                ? consulta.OrderByDescending(i => i.Proyecto)
+                : consulta.OrderBy(i => i.Proyecto),
+            "severidad" => filtro.OrdenDescendente
+                ? consulta.OrderByDescending(i => i.IdSeveridad)
+                : consulta.OrderBy(i => i.IdSeveridad),
+            "estatus" => filtro.OrdenDescendente
+                ? consulta.OrderByDescending(i => i.IdEstatus)
+                : consulta.OrderBy(i => i.IdEstatus),
+            "fechaOcurrencia" => filtro.OrdenDescendente
+                ? consulta.OrderByDescending(i => i.FechaOcurrencia)
+                : consulta.OrderBy(i => i.FechaOcurrencia),
+            "fechaResolucion" => filtro.OrdenDescendente
+                ? consulta.OrderBy(i => i.FechaResolucion == null).ThenByDescending(i => i.FechaResolucion)
+                : consulta.OrderBy(i => i.FechaResolucion == null).ThenBy(i => i.FechaResolucion),
+            _ => consulta
+                .OrderBy(i => i.IdSeveridad)
+                .ThenByDescending(i => i.FechaOcurrencia)
+        };
+
+        var items = await ordenada
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);
@@ -77,6 +103,23 @@ public class IncidenteQueryService(FabricaContexto fabrica) : IIncidenteQuerySer
         await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
         return await Proyectar(contexto)
             .FirstOrDefaultAsync(i => i.IdIncidente == idIncidente, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<IncidenteResponse>> ObtenerRelevantesAsync(
+        int idUsuario, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
+
+        var idsProyectosResponsable = await contexto.TblProyecto.AsNoTracking()
+            .Where(p => p.IdResponsable == idUsuario)
+            .Select(p => p.IdProyecto)
+            .ToListAsync(cancellationToken);
+
+        return await Proyectar(contexto)
+            .Where(i => i.IdEstatus != EstatusIncidente.Cerrado && idsProyectosResponsable.Contains(i.IdProyecto))
+            .OrderBy(i => i.IdSeveridad)
+            .ThenByDescending(i => i.FechaOcurrencia)
+            .ToListAsync(cancellationToken);
     }
 
     private static IQueryable<IncidenteResponse> Proyectar(DbContextGTE contexto)

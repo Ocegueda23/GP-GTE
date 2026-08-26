@@ -48,7 +48,7 @@ export interface ColumnaTablero {
 }
 
 export interface Tablero {
-  idEquipo: number;
+  idEquipo: number | null;
   equipo: string;
   idSprintActivo: number | null;
   sprintActivo: string | null;
@@ -78,6 +78,15 @@ export async function crearSprint(datos: {
   return enviar<Sprint>("post", "/api/v1/sprints", datos);
 }
 
+export async function editarSprint(idSprint: number, datos: {
+  nombre: string;
+  objetivo: string | null;
+  fechaInicio: string;
+  fechaFin: string;
+}) {
+  return enviar<Sprint>("put", `/api/v1/sprints/${idSprint}`, datos);
+}
+
 export async function cambiarEstatusSprint(
   idSprint: number,
   datos: { accion: string; destinoItemsAbiertos?: string },
@@ -104,6 +113,13 @@ export async function obtenerBacklog(idProyecto: number) {
   return obtener<Backlog>(`/api/v1/proyectos/${idProyecto}/backlog`);
 }
 
+/** Backlog de todos los proyectos a la vez, para consulta/busqueda (solo lectura). */
+export async function obtenerBacklogGlobal(texto?: string) {
+  const params = new URLSearchParams();
+  if (texto?.trim()) params.set("texto", texto.trim());
+  return obtener<Backlog>("/api/v1/backlog", params);
+}
+
 export async function reordenarBacklog(idsEnOrden: number[]) {
   return enviar<object>("put", "/api/v1/backlog/orden", { idsEnOrden });
 }
@@ -112,8 +128,11 @@ export async function asignarSprint(idWorkItem: number, idSprint: number | null)
   return enviar<object>("put", `/api/v1/workitems/${idWorkItem}/sprint`, { idSprint });
 }
 
-export async function obtenerTablero(idEquipo: number) {
-  return obtener<Tablero>(`/api/v1/equipos/${idEquipo}/tablero`);
+/** Sin idEquipo: vista consolidada de todos los equipos y usuarios a la vez. */
+export async function obtenerTablero(idEquipo?: number) {
+  const params = new URLSearchParams();
+  if (idEquipo !== undefined) params.set("idEquipo", String(idEquipo));
+  return obtener<Tablero>("/api/v1/tablero", params);
 }
 
 export async function moverTarjeta(idWorkItem: number, idEstatusDestino: number) {

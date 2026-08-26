@@ -12,7 +12,7 @@ namespace GTE.Api.Tests;
 
 /// <summary>
 /// E2E del modulo WorkItems por HTTP contra una bdsGTE real (LocalDB): crear con
-/// folio propio, RN-REQ-01 (suspension automatica), RN-REQ-03 (cierre sin avance
+/// folio propio, RN-GTE-008 (suspension automatica), RN-GTE-010 (cierre sin avance
 /// bloqueado), registro de tiempo y cierre. Se omite si no hay LocalDB.
 /// </summary>
 public class WorkItemsApiTests(WebApplicationFactory<Program> fabricaApp)
@@ -48,7 +48,7 @@ public class WorkItemsApiTests(WebApplicationFactory<Program> fabricaApp)
 
         // lgarcia (Desarrollador) y no aviramontes (Administrador): desde el bypass
         // acotado de cierre (WI.OmitirValidacionCierre, 2026-08-02) Administrador ya
-        // no se bloquea en el paso 4, asi que la regla general (RN-REQ-03) necesita
+        // no se bloquea en el paso 4, asi que la regla general (RN-GTE-010) necesita
         // una identidad sin ese permiso -- mismo patron que otras pruebas del repo
         // (ArchivosApiTests, ComentariosApiTests) usan "lgarcia" como usuario comun.
         var cliente = await FabricaApiAutenticada.CrearClienteAsync(fabricaApp, "lgarcia");
@@ -67,7 +67,11 @@ public class WorkItemsApiTests(WebApplicationFactory<Program> fabricaApp)
             {
                 Clave = clave,
                 Nombre = $"Proyecto E2E {sufijo}",
-                IdCategoriaProyecto = 1,
+                // Categoria TI (2), no Desarrollo (1): esta prueba verifica RN-GTE-010
+                // (cierre sin avance bloqueado), no RN-GTE-030 (QA obligatorio en Desarrollo,
+                // 2026-08-04) -- un proyecto Desarrollo exigiria WI.SaltarPruebas antes de
+                // llegar siquiera al 400 de RN-GTE-010.
+                IdCategoriaProyecto = 2,
                 IdEstatusProyecto = 3,
                 UsuarioRegistro = "e2e",
                 Activo = true
@@ -108,12 +112,12 @@ public class WorkItemsApiTests(WebApplicationFactory<Program> fabricaApp)
             Assert.Equal($"{clave}-0002", itemB.GetProperty("folio").GetString());
             await CambiarEstatusAsync(cliente, idItemB, "INICIAR", "En Proceso");
 
-            // 3. RN-REQ-01: iniciar A suspende B automaticamente
+            // 3. RN-GTE-008: iniciar A suspende B automaticamente
             await CambiarEstatusAsync(cliente, idItemA, "INICIAR", "En Proceso");
             var detalleB = await ObtenerDetalleAsync(cliente, itemB.GetProperty("folio").GetString()!);
             Assert.Equal("Suspendido", detalleB.GetProperty("estatus").GetString());
 
-            // 4. RN-REQ-03: terminar sin avance registrado se bloquea (400)
+            // 4. RN-GTE-010: terminar sin avance registrado se bloquea (400)
             var respuestaCierre = await cliente.PutAsJsonAsync(
                 $"/api/v1/workitems/{idItemA}/estatus", new { accion = "TERMINAR" });
             Assert.Equal(HttpStatusCode.BadRequest, respuestaCierre.StatusCode);
@@ -148,7 +152,7 @@ public class WorkItemsApiTests(WebApplicationFactory<Program> fabricaApp)
     }
 
     /// <summary>
-    /// RN-REQ-05 (decision del equipo 2026-08-02): una tarea SIN asignar cuenta como
+    /// RN-GTE-012 (decision del equipo 2026-08-02): una tarea SIN asignar cuenta como
     /// "ajena" igual que una asignada a otra persona -- nadie "toma" trabajo del backlog
     /// solo con INICIAR o registrando tiempo; un Lider/Admin con WI.ModificarAjeno debe
     /// asignarla primero. Reportado por el usuario con una cuenta Desarrollador real
@@ -194,6 +198,7 @@ public class WorkItemsApiTests(WebApplicationFactory<Program> fabricaApp)
                 idTipoWorkItem = 3,
                 titulo = $"Sin asignar {sufijo}",
                 idPrioridad = 3,
+                idComplejidad = await FabricaApiAutenticada.ObtenerOCrearComplejidadAsync(),
                 fechaCompromiso = DateTime.Today.AddDays(5)
             });
             respuestaCrear.EnsureSuccessStatusCode();
@@ -218,7 +223,7 @@ public class WorkItemsApiTests(WebApplicationFactory<Program> fabricaApp)
     }
 
     /// <summary>
-    /// RN-REQ-05: registrar tiempo en un item ajeno (asignado a otra persona) exige
+    /// RN-GTE-012: registrar tiempo en un item ajeno (asignado a otra persona) exige
     /// WI.ModificarAjeno, igual que editar campos o cambiar estatus -- este comando se
     /// quedo sin el gate cuando se agrego a los otros dos (2026-08-02), reportado por
     /// el usuario al probar con una cuenta Desarrollador real.
@@ -308,7 +313,7 @@ public class WorkItemsApiTests(WebApplicationFactory<Program> fabricaApp)
     }
 
     /// <summary>
-    /// RN-REQ-05: marcar un hallazgo como CORREGIDO en un WorkItem ajeno exige
+    /// RN-GTE-012: marcar un hallazgo como CORREGIDO en un WorkItem ajeno exige
     /// WI.ModificarAjeno -- mismo hueco que RegistrarTiempoCommand, encontrado al
     /// revisar el resto del modulo (adjuntos, comentarios, revisiones) tras el fix
     /// de tiempo. `CrearRevisionCommand` (reportar) sigue sin gate a proposito
@@ -573,12 +578,14 @@ public class WorkItemsApiTests(WebApplicationFactory<Program> fabricaApp)
     private static async Task<JsonElement> CrearItemAsync(
         HttpClient cliente, int idProyecto, int idAsignado, string titulo)
     {
+        var idComplejidad = await FabricaApiAutenticada.ObtenerOCrearComplejidadAsync();
         var respuesta = await cliente.PostAsJsonAsync("/api/v1/workitems", new
         {
             idProyecto,
             idTipoWorkItem = 3,   // Historia
             titulo,
             idPrioridad = 3,
+            idComplejidad,
             idAsignado,
             fechaCompromiso = DateTime.Today.AddDays(5)
         });

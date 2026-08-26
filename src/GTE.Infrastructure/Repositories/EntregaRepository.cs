@@ -114,7 +114,8 @@ public class EntregaRepository(FabricaContexto fabrica, AuditContext auditoria)
             .Where(w => w.IdWorkItem == idWorkItem && w.Activo)
             .Select(w => new CandidatoRelease(
                 w.IdWorkItem, w.Folio, w.Titulo, w.IdEstatusWorkItem, w.Revisado,
-                contexto.TblRevision.Count(r => r.IdWorkItem == w.IdWorkItem && !r.Corregido && r.Activo)))
+                contexto.TblRevision.Count(r => r.IdWorkItem == w.IdWorkItem && !r.Corregido && r.Activo
+                    && r.IdSeveridad != null && r.IdSeveridad <= Severidad.S2Alta)))
             .FirstOrDefaultAsync(cancellationToken);
     }
 
@@ -147,6 +148,49 @@ public class EntregaRepository(FabricaContexto fabrica, AuditContext auditoria)
         MarcarMovimientoItem(item);
         await contexto.SaveChangesAsync(cancellationToken);
         await RegistrarBitacoraAsync("Release", idRelease, "QUITAR_ITEM", item.Folio, cancellationToken);
+    }
+
+    public async Task<string?> QuitarArtefactoAsync(
+        int idRelease, int idArtefacto, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
+
+        var vinculo = await contexto.TblReleaseArtefacto
+            .FirstOrDefaultAsync(
+                ra => ra.IdRelease == idRelease && ra.IdArtefacto == idArtefacto && ra.Activo,
+                cancellationToken);
+        if (vinculo is null)
+        {
+            return null;
+        }
+
+        // Si otro artefacto del release lo tiene como reversa, quitarlo lo dejaria sin
+        // rollback y el release se atoraria en RN-GTE-032 sin decir por que.
+        var dependiente = await (
+            from ra in contexto.TblReleaseArtefacto.AsNoTracking()
+            join a in contexto.TblArtefacto.AsNoTracking() on ra.IdArtefacto equals a.IdArtefacto
+            where ra.IdRelease == idRelease && ra.IdArtefactoRollback == idArtefacto && ra.Activo
+            select a.Nombre).FirstOrDefaultAsync(cancellationToken);
+        if (dependiente is not null)
+        {
+            return dependiente;
+        }
+
+        var artefacto = await contexto.TblArtefacto
+            .FirstOrDefaultAsync(a => a.IdArtefacto == idArtefacto, cancellationToken);
+
+        // tblReleaseArtefacto no tiene columnas de movimiento; la baja queda en bitacora.
+        vinculo.Activo = false;
+        if (artefacto is not null)
+        {
+            artefacto.Activo = false;
+            MarcarMovimientoArtefacto(artefacto);
+        }
+        await contexto.SaveChangesAsync(cancellationToken);
+
+        await RegistrarBitacoraAsync("Release", idRelease, "QUITAR_ARTEFACTO",
+            artefacto?.Nombre ?? idArtefacto.ToString(), cancellationToken);
+        return null;
     }
 
     public async Task<IReadOnlyList<CandidatoRelease>> ObtenerContenidoAsync(
@@ -212,6 +256,43 @@ public class EntregaRepository(FabricaContexto fabrica, AuditContext auditoria)
 
     /* ---------- Aprobaciones ---------- */
 
+    public async Task<IReadOnlyList<string>> ObtenerCadenaAprobacionConfiguradaAsync(
+        int idProyecto, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
+        return await contexto.TblCadenaAprobacionProyecto.AsNoTracking()
+            .Where(c => c.IdProyecto == idProyecto)
+            .OrderBy(c => c.Orden)
+            .Select(c => c.Rol)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task GuardarCadenaAprobacionConfiguradaAsync(
+        int idProyecto, IReadOnlyList<string> roles, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
+
+        var existentes = await contexto.TblCadenaAprobacionProyecto
+            .Where(c => c.IdProyecto == idProyecto)
+            .ToListAsync(cancellationToken);
+        contexto.TblCadenaAprobacionProyecto.RemoveRange(existentes);
+
+        for (var i = 0; i < roles.Count; i++)
+        {
+            contexto.TblCadenaAprobacionProyecto.Add(new TblCadenaAprobacionProyecto
+            {
+                IdProyecto = idProyecto,
+                Orden = i + 1,
+                Rol = roles[i],
+                UsuarioRegistro = Auditoria.Usuario
+            });
+        }
+        await contexto.SaveChangesAsync(cancellationToken);
+
+        await RegistrarBitacoraAsync("Proyecto", idProyecto, "CONFIGURAR_CADENA_APROBACION",
+            roles.Count > 0 ? string.Join(", ", roles) : "(default)", cancellationToken);
+    }
+
     public async Task CrearCadenaAprobacionAsync(
         int idRelease, IReadOnlyList<string> roles, CancellationToken cancellationToken = default)
     {
@@ -245,6 +326,24 @@ public class EntregaRepository(FabricaContexto fabrica, AuditContext auditoria)
 
         await RegistrarBitacoraAsync("Release", idRelease, "CREAR_CADENA_APROBACION",
             string.Join(", ", roles), cancellationToken);
+    }
+
+    public async Task InvalidarCadenaAprobacionAsync(
+        int idRelease, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
+        var vigentes = await contexto.TblAprobacion
+            .Where(a => a.Entidad == EntidadAprobacion && a.IdEntidad == idRelease && a.Activo)
+            .ToListAsync(cancellationToken);
+
+        foreach (var aprobacion in vigentes)
+        {
+            aprobacion.Activo = false;
+        }
+        await contexto.SaveChangesAsync(cancellationToken);
+
+        await RegistrarBitacoraAsync("Release", idRelease, "INVALIDAR_CADENA_APROBACION",
+            $"{vigentes.Count} firma(s) dada(s) de baja", cancellationToken);
     }
 
     public async Task<IReadOnlyList<AprobacionRelease>> ObtenerAprobacionesAsync(
@@ -356,61 +455,22 @@ public class EntregaRepository(FabricaContexto fabrica, AuditContext auditoria)
 
     /* ---------- Calidad del release ---------- */
 
-    public async Task<IReadOnlyList<string>> ObtenerFallasSinBugAsync(
+    public async Task<IReadOnlyList<string>> ObtenerHallazgosCriticosAbiertosAsync(
         int idRelease, CancellationToken cancellationToken = default)
     {
         await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
 
-        // Ultima ejecucion de cada caso de los planes ligados al release
-        var ultimas = await (
-            from e in contexto.TblEjecucionPrueba.AsNoTracking()
-            join c in contexto.TblCasoPrueba.AsNoTracking() on e.IdCasoPrueba equals c.IdCasoPrueba
-            join p in contexto.TblPlanPrueba.AsNoTracking() on c.IdPlanPrueba equals p.IdPlanPrueba
-            where p.IdRelease == idRelease && p.Activo && c.Activo
-            group new { e.IdEjecucionPrueba, e.IdResultadoPrueba, c.Titulo, c.Folio }
-                by e.IdCasoPrueba into g
-            select g.OrderByDescending(x => x.IdEjecucionPrueba).First()
-            ).ToListAsync(cancellationToken);
-
-        var fallas = ultimas.Where(u => u.IdResultadoPrueba == ResultadoPrueba.Falla).ToList();
-        if (fallas.Count == 0)
-        {
-            return [];
-        }
-
-        var idsEjecucion = fallas.Select(f => f.IdEjecucionPrueba).ToList();
-        var conBug = await contexto.TblWorkItem.AsNoTracking()
-            .Where(w => w.IdEjecucionPruebaOrigen != null
-                        && idsEjecucion.Contains(w.IdEjecucionPruebaOrigen.Value) && w.Activo)
-            .Select(w => w.IdEjecucionPruebaOrigen!.Value)
-            .ToListAsync(cancellationToken);
-
-        return fallas
-            .Where(f => !conBug.Contains(f.IdEjecucionPrueba))
-            .Select(f => $"{f.Folio ?? "caso"} - {f.Titulo}")
-            .ToList();
-    }
-
-    public async Task<IReadOnlyList<string>> ObtenerBugsCriticosAbiertosAsync(
-        int idRelease, CancellationToken cancellationToken = default)
-    {
-        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
-
-        // Bugs abiertos del proyecto del release con prioridad Critica o Alta
-        var idProyecto = await contexto.TblRelease.AsNoTracking()
-            .Where(r => r.IdRelease == idRelease)
-            .Select(r => r.IdProyecto)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        return await contexto.TblWorkItem.AsNoTracking()
-            .Where(w => w.IdProyecto == idProyecto
-                        && w.IdTipoWorkItem == 5                    // Bug
-                        && w.IdPrioridad <= 2                       // Critica o Alta
-                        && w.IdEstatusWorkItem != EstatusWorkItem.Terminado
-                        && w.IdEstatusWorkItem != EstatusWorkItem.Cancelado
-                        && w.Activo)
-            .Select(w => $"{w.Folio} - {w.Titulo}")
-            .ToListAsync(cancellationToken);
+        // WorkItems del contenido del release con un hallazgo S1/S2 sin corregir. La
+        // cobertura de pruebas (si el item se probo o no) la decide QA al aprobar la fase
+        // En Pruebas del propio item -- este gate solo mira defectos ya encontrados.
+        return await (
+            from r in contexto.TblRevision.AsNoTracking()
+            join w in contexto.TblWorkItem.AsNoTracking() on r.IdWorkItem equals w.IdWorkItem
+            where w.IdRelease == idRelease && w.Activo
+                  && !r.Corregido && r.Activo
+                  && r.IdSeveridad != null && r.IdSeveridad <= Severidad.S2Alta
+            select $"{w.Folio} - {w.Titulo}"
+            ).Distinct().ToListAsync(cancellationToken);
     }
 
     private void MarcarMovimiento(TblRelease entidad)
@@ -420,6 +480,12 @@ public class EntregaRepository(FabricaContexto fabrica, AuditContext auditoria)
     }
 
     private void MarcarMovimientoItem(TblWorkItem entidad)
+    {
+        entidad.UsuarioMovto = Auditoria.Usuario.Length > 50 ? Auditoria.Usuario[..50] : Auditoria.Usuario;
+        entidad.FechaMovto = DateTime.Now;
+    }
+
+    private void MarcarMovimientoArtefacto(TblArtefacto entidad)
     {
         entidad.UsuarioMovto = Auditoria.Usuario.Length > 50 ? Auditoria.Usuario[..50] : Auditoria.Usuario;
         entidad.FechaMovto = DateTime.Now;

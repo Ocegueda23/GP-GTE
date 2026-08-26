@@ -61,6 +61,7 @@ public class ComentariosApiTests(WebApplicationFactory<Program> fabricaApp)
             idTipoWorkItem = 3,
             titulo = "Item para comentarios",
             idPrioridad = 3,
+            idComplejidad = await FabricaApiAutenticada.ObtenerOCrearComplejidadAsync(),
             fechaCompromiso = DateTime.Today.AddDays(5)
         });
         respuesta.EnsureSuccessStatusCode();

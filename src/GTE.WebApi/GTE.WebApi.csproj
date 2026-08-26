@@ -17,6 +17,12 @@
          Program.cs). Sin esto, el .exe publicado corre como consola normal y sc start
          truena con error 1053 (nunca le avisa a Windows que ya esta RUNNING). -->
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="8.0.*" />
+    <!-- Hangfire (LGPLv3, libre para uso comercial sin licencia de paga): trabajos en
+         segundo plano (A4 del roadmap). Primer consumidor: snapshot nocturno de KPIs
+         personalizados del Dashboard Ejecutivo P18 (dbo.spSnapshotKpi). Storage propio:
+         mismo bdsGTE, schema [HangFire] separado que la libreria crea/migra sola. -->
+    <PackageReference Include="Hangfire.AspNetCore" Version="1.8.14" />
+    <PackageReference Include="Hangfire.SqlServer" Version="1.8.14" />
   </ItemGroup>
 
   <ItemGroup>
@@ -25,6 +31,19 @@
          entidades a DTO construidas en servidor y System.Text.Json limita la
          deserializacion de payloads a 64 niveles. Revisar si cambia el uso. -->
     <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-rvv3-g6hj-g44x" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- appsettings.Local.json son overrides POR MAQUINA (la cadena de conexion de cada
+         desarrollador), gitignored y cargados por Program.cs. NUNCA deben salir en el
+         paquete de publicacion: el SDK web los barre por el glob appsettings*.json y, al
+         copiarse a C:\Servicios\GTE, pisarian la configuracion de produccion. Es
+         exactamente lo que tumbo el login del servicio el 2026-08-23 (se publico un
+         appsettings.Local.json de desarrollo que repunto el servicio a una instancia de
+         SQL donde LocalSystem no tiene acceso). CopyToPublishDirectory=Never los deja
+         fuera del publish pero los sigue copiando al bin de desarrollo. -->
+    <Content Update="appsettings.Local.json" CopyToPublishDirectory="Never" />
+    <Content Update="appsettings.*.Local.json" CopyToPublishDirectory="Never" />
   </ItemGroup>
 
   <ItemGroup>

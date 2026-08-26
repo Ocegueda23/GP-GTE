@@ -10,6 +10,10 @@ import { ErrorApi } from "../../shared/api/http";
 import {
   cambiarEstatus, formatearMinutos, obtenerMiDia, type MiDiaItem,
 } from "../../shared/api/workitems";
+import { colorEstatusTicket, type Ticket } from "../../shared/api/tickets";
+import { colorEstatusIncidente, colorSeveridad, type Incidente } from "../../shared/api/incidentes";
+import { colorEstatusSolicitud, type Solicitud } from "../../shared/api/solicitudes";
+import { colorEstatusRelease, type Release } from "../../shared/api/entregas";
 import { ModalTiempo } from "../trabajo/ModalTiempo";
 import { BotonesAcciones } from "../workitem/BotonesAcciones";
 
@@ -62,6 +66,107 @@ function ListaItems({ titulo, items, color, alIniciar, vacio }: PropsLista) {
           ))}
         </List>
       )}
+    </Paper>
+  );
+}
+
+function TarjetaTickets({ items }: { items: Ticket[] }) {
+  const ahora = new Date();
+  return (
+    <Paper variant="outlined" sx={{ p: 2, flex: 1, minWidth: 280 }}>
+      <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+        Tickets asignados ({items.length})
+      </Typography>
+      <Stack spacing={0.5}>
+        {items.map((t) => {
+          const vencido = t.fechaLimiteResolucion !== null
+            && new Date(t.fechaLimiteResolucion) < ahora && t.fechaResolucion === null;
+          return (
+            <Stack key={t.idTicket} direction="row" spacing={1} sx={{ alignItems: "center" }}>
+              <Link component={RouterLink} to={`/tickets/${t.folio}`} underline="hover"
+                sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>
+                {t.folio}
+              </Link>
+              <Typography variant="body2" noWrap sx={{ flex: 1, minWidth: 0 }}>{t.titulo}</Typography>
+              <Chip size="small" label={t.estatus} color={colorEstatusTicket(t.idEstatus)} sx={{ height: 18 }} />
+              {vencido && <Chip size="small" color="error" label="Vencido" sx={{ height: 18 }} />}
+            </Stack>
+          );
+        })}
+      </Stack>
+    </Paper>
+  );
+}
+
+function TarjetaIncidentes({ items }: { items: Incidente[] }) {
+  return (
+    <Paper variant="outlined" sx={{ p: 2, flex: 1, minWidth: 280 }}>
+      <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+        Incidentes ({items.length})
+      </Typography>
+      <Stack spacing={0.5}>
+        {items.map((i) => (
+          <Stack key={i.idIncidente} direction="row" spacing={1} sx={{ alignItems: "center" }}>
+            <Link component={RouterLink} to={`/operacion/incidentes/${i.folio}`} underline="hover"
+              sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>
+              {i.folio}
+            </Link>
+            <Typography variant="body2" noWrap sx={{ flex: 1, minWidth: 0 }}>{i.titulo}</Typography>
+            <Chip size="small" label={i.severidad} color={colorSeveridad(i.idSeveridad)} sx={{ height: 18 }} />
+            <Chip size="small" label={i.estatus} color={colorEstatusIncidente(i.idEstatus)} sx={{ height: 18 }} />
+          </Stack>
+        ))}
+      </Stack>
+    </Paper>
+  );
+}
+
+function TarjetaSolicitudes({ items }: { items: Solicitud[] }) {
+  return (
+    <Paper variant="outlined" sx={{ p: 2, flex: 1, minWidth: 280 }}>
+      <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+        Mis solicitudes pendientes ({items.length})
+      </Typography>
+      <Stack spacing={0.5}>
+        {items.map((s) => (
+          <Stack key={s.idSolicitud} direction="row" spacing={1} sx={{ alignItems: "center" }}>
+            <Link component={RouterLink} to="/solicitudes" underline="hover"
+              sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>
+              {s.folio ?? `#${s.idSolicitud}`}
+            </Link>
+            <Typography variant="body2" noWrap sx={{ flex: 1, minWidth: 0 }}>{s.titulo}</Typography>
+            <Chip size="small" label={s.estatus} color={colorEstatusSolicitud(s.idEstatus)} sx={{ height: 18 }} />
+            <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: "nowrap" }}>
+              {s.diasEspera}d
+            </Typography>
+          </Stack>
+        ))}
+      </Stack>
+    </Paper>
+  );
+}
+
+function TarjetaReleases({ items }: { items: Release[] }) {
+  return (
+    <Paper variant="outlined" sx={{ p: 2, flex: 1, minWidth: 280 }}>
+      <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+        Releases ({items.length})
+      </Typography>
+      <Stack spacing={0.5}>
+        {items.map((r) => (
+          <Stack key={r.idRelease} direction="row" spacing={1} sx={{ alignItems: "center" }}>
+            <Link component={RouterLink} to="/releases" underline="hover"
+              sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>
+              {r.claveProyecto} {r.version}
+            </Link>
+            <Typography variant="body2" noWrap sx={{ flex: 1, minWidth: 0 }}>{r.proyecto}</Typography>
+            <Chip size="small" label={r.estatus} color={colorEstatusRelease(r.idEstatus)} sx={{ height: 18 }} />
+            {r.aprobacionesPendientes > 0 && (
+              <Chip size="small" color="warning" label={`${r.aprobacionesPendientes} firma(s)`} sx={{ height: 18 }} />
+            )}
+          </Stack>
+        ))}
+      </Stack>
     </Paper>
   );
 }
@@ -170,6 +275,25 @@ export function MiDiaPage() {
         <ListaItems titulo="Proximos 7 dias" items={datos.proximas} alIniciar={iniciar}
           vacio="Sin pendientes proximos." />
       </Stack>
+
+      {datos.triagePendientes > 0 && (
+        <Alert severity="info" sx={{ mt: 2 }}
+          action={<Button component={RouterLink} to="/triage" size="small">Ir a revision</Button>}>
+          {datos.triagePendientes === 1
+            ? "Hay 1 solicitud esperando revision de triage."
+            : `Hay ${datos.triagePendientes} solicitudes esperando revision de triage.`}
+        </Alert>
+      )}
+
+      {(datos.ticketsAsignados.length > 0 || datos.incidentesRelevantes.length > 0
+        || datos.solicitudesPendientes.length > 0 || datos.releasesRelevantes.length > 0) && (
+        <Stack direction={{ xs: "column", lg: "row" }} spacing={2} sx={{ mt: 2 }}>
+          {datos.ticketsAsignados.length > 0 && <TarjetaTickets items={datos.ticketsAsignados} />}
+          {datos.incidentesRelevantes.length > 0 && <TarjetaIncidentes items={datos.incidentesRelevantes} />}
+          {datos.solicitudesPendientes.length > 0 && <TarjetaSolicitudes items={datos.solicitudesPendientes} />}
+          {datos.releasesRelevantes.length > 0 && <TarjetaReleases items={datos.releasesRelevantes} />}
+        </Stack>
+      )}
 
       {modalTiempo && (
         <ModalTiempo

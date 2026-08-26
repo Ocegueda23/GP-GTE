@@ -1,5 +1,7 @@
 import { useEffect } from "react";
-import { Box, IconButton, Stack, Typography } from "@mui/material";
+import {
+  Box, FormControl, IconButton, MenuItem, Select, Stack, Typography, type SelectChangeEvent,
+} from "@mui/material";
 import FormatBoldIcon from "@mui/icons-material/FormatBold";
 import FormatItalicIcon from "@mui/icons-material/FormatItalic";
 import FormatListBulletedIcon from "@mui/icons-material/FormatListBulleted";
@@ -7,9 +9,12 @@ import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import { useQueryClient } from "@tanstack/react-query";
-import { subirArchivo } from "../api/archivos";
+import { subirArchivo, subirArchivoBorrador, type Archivo } from "../api/archivos";
 import { ImagenProtegida } from "./ImagenProtegida";
+import { FontSize } from "./FontSize";
 import { normalizarHtmlLegado } from "./textoPlano";
+
+const TAMANOS_LETRA = ["12px", "14px", "16px", "18px", "24px"];
 
 interface Props {
   value: string;
@@ -17,8 +22,14 @@ interface Props {
   label?: string;
   placeholder?: string;
   minHeight?: number;
-  /** Si no se da, pegar una imagen se rechaza (no hay a que WorkItem adjuntarla todavia). */
+  /** WorkItem al que adjuntar las imagenes pegadas cuando el item ya existe. */
   idWorkItemParaAdjuntos?: number;
+  /**
+   * Subida de imagen generica para entidades distintas a WorkItem (ej. Solicitud): recibe el
+   * archivo pegado y devuelve el GUID ya adjuntado. Tiene prioridad sobre idWorkItemParaAdjuntos
+   * si ambos se pasan.
+   */
+  onSubirImagen?: (archivo: File) => Promise<{ dato: Archivo; mensaje: string } | undefined>;
   onError?: (mensaje: string) => void;
   /** Util para deshabilitar un boton de envio: un editor "vacio" sigue siendo HTML no-vacio (ej. "<p></p>"). */
   onVacioChange?: (vacio: boolean) => void;
@@ -31,15 +42,24 @@ interface Props {
  * boton de enviar (es un input controlado, no un formulario de comentario).
  */
 export function EditorEnriquecido({
-  value, onChange, label, placeholder, minHeight = 80, idWorkItemParaAdjuntos, onError, onVacioChange,
+  value, onChange, label, placeholder, minHeight = 80, idWorkItemParaAdjuntos, onSubirImagen, onError, onVacioChange,
 }: Props) {
   const clienteQuery = useQueryClient();
+  // Sin entidad destino (formulario de alta) la imagen se sube en borrador: queda sin vinculo
+  // y el comando de alta la adjunta al guardar, leyendo el GUID del contenido. Antes aqui se
+  // rechazaba el pegado, lo que obligaba a guardar, reabrir y volver a guardar -- y en la base
+  // de conocimiento eso dejaba el articulo en version 2 recien creado.
+  const subir = onSubirImagen
+    ?? (idWorkItemParaAdjuntos
+      ? (archivo: File) => subirArchivo(idWorkItemParaAdjuntos, archivo)
+      : (archivo: File) => subirArchivoBorrador(archivo));
 
   const editor = useEditor({
     extensions: [
       StarterKit,
       Placeholder.configure({ placeholder: placeholder ?? "" }),
       ImagenProtegida,
+      FontSize,
     ],
     content: normalizarHtmlLegado(value),
     editorProps: {
@@ -51,16 +71,14 @@ export function EditorEnriquecido({
         if (!archivo) return false;
 
         event.preventDefault();
-        if (!idWorkItemParaAdjuntos) {
-          onError?.("Guarda el elemento antes de poder pegar imagenes aqui.");
-          return true;
-        }
-        subirArchivo(idWorkItemParaAdjuntos, archivo)
+        subir(archivo)
           .then((resultado) => {
             if (!resultado) return;
             const nodo = view.state.schema.nodes.imagenProtegida.create({ guid: resultado.dato.guidArchivo });
             view.dispatch(view.state.tr.replaceSelectionWith(nodo));
-            void clienteQuery.invalidateQueries({ queryKey: ["archivos", idWorkItemParaAdjuntos] });
+            if (idWorkItemParaAdjuntos) {
+              void clienteQuery.invalidateQueries({ queryKey: ["archivos", idWorkItemParaAdjuntos] });
+            }
           })
           .catch((error: unknown) => {
             onError?.(error instanceof Error ? error.message : "No se pudo subir la imagen pegada.");
@@ -70,7 +88,7 @@ export function EditorEnriquecido({
     },
     onUpdate: ({ editor: instancia }) => onChange(instancia.getHTML()),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idWorkItemParaAdjuntos]);
+  }, [idWorkItemParaAdjuntos, onSubirImagen]);
 
   // Sincroniza resets externos (ej. reabrir el modal con otro item); las
   // ediciones propias no disparan esto porque `value` ya coincide con
@@ -90,8 +108,15 @@ export function EditorEnriquecido({
       negrita: instancia.isActive("bold"),
       cursiva: instancia.isActive("italic"),
       lista: instancia.isActive("bulletList"),
+      tamanoLetra: (instancia.getAttributes("textStyle").fontSize as string | undefined) ?? "",
     }),
   });
+
+  const cambiarTamano = (evento: SelectChangeEvent<string>) => {
+    const tamano = evento.target.value;
+    if (!tamano) editor?.chain().focus().unsetFontSize().run();
+    else editor?.chain().focus().setFontSize(tamano).run();
+  };
   const vacio = useEditorState({ editor, selector: ({ editor: instancia }) => instancia.isEmpty });
 
   useEffect(() => {
@@ -119,6 +144,15 @@ export function EditorEnriquecido({
           onClick={() => editor?.chain().focus().toggleBulletList().run()}>
           <FormatListBulletedIcon fontSize="small" />
         </IconButton>
+        <FormControl size="small" variant="standard" sx={{ minWidth: 72, ml: 0.5 }}>
+          <Select displayEmpty value={activo.tamanoLetra} onChange={cambiarTamano}
+            sx={{ fontSize: 13 }}>
+            <MenuItem value="">Normal</MenuItem>
+            {TAMANOS_LETRA.map((tamano) => (
+              <MenuItem key={tamano} value={tamano}>{tamano}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
       </Stack>
       <Box sx={{
         border: "1px solid", borderColor: "divider", borderRadius: 1, p: 1, minHeight,

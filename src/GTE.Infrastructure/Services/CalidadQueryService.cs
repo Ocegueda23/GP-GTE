@@ -1,6 +1,5 @@
 using GTE.Application.DTOs.Responses.Calidad;
 using GTE.Application.Interfaces;
-using GTE.Domain.Calidad;
 using GTE.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,92 +7,48 @@ namespace GTE.Infrastructure.Services;
 
 public class CalidadQueryService(FabricaContexto fabrica) : ICalidadQueryService
 {
-    public async Task<IReadOnlyList<PlanPruebaResponse>> ObtenerPlanesAsync(
-        int? idProyecto, CancellationToken cancellationToken = default)
-    {
-        await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
-
-        var consulta = Proyectar(contexto);
-        if (idProyecto.HasValue)
-        {
-            consulta = consulta.Where(p => p.IdProyecto == idProyecto.Value);
-        }
-
-        return await consulta.OrderByDescending(p => p.IdPlanPrueba).ToListAsync(cancellationToken);
-    }
-
-    public async Task<PlanPruebaResponse?> ObtenerPlanAsync(
-        int idPlanPrueba, CancellationToken cancellationToken = default)
-    {
-        await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
-        return await Proyectar(contexto)
-            .FirstOrDefaultAsync(p => p.IdPlanPrueba == idPlanPrueba, cancellationToken);
-    }
-
-    public async Task<IReadOnlyList<CicloPruebaResponse>> ObtenerCiclosAsync(
-        int idPlanPrueba, CancellationToken cancellationToken = default)
-    {
-        await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
-
-        var totalCasos = await contexto.TblCasoPrueba.AsNoTracking()
-            .CountAsync(c => c.IdPlanPrueba == idPlanPrueba && c.Activo, cancellationToken);
-
-        var ciclos = await contexto.TblCicloPrueba.AsNoTracking()
-            .Where(c => c.IdPlanPrueba == idPlanPrueba && c.Activo)
-            .OrderByDescending(c => c.IdCicloPrueba)
-            .Select(c => new { c.IdCicloPrueba, c.IdPlanPrueba, c.Nombre, c.FechaInicio, c.FechaFin })
-            .ToListAsync(cancellationToken);
-
-        var resultado = new List<CicloPruebaResponse>();
-        foreach (var ciclo in ciclos)
-        {
-            // Ultima ejecucion por caso dentro del ciclo
-            var ultimas = await contexto.TblEjecucionPrueba.AsNoTracking()
-                .Where(e => e.IdCicloPrueba == ciclo.IdCicloPrueba)
-                .GroupBy(e => e.IdCasoPrueba)
-                .Select(g => g.OrderByDescending(e => e.IdEjecucionPrueba).First().IdResultadoPrueba)
-                .ToListAsync(cancellationToken);
-
-            resultado.Add(new CicloPruebaResponse
-            {
-                IdCicloPrueba = ciclo.IdCicloPrueba,
-                IdPlanPrueba = ciclo.IdPlanPrueba,
-                Nombre = ciclo.Nombre,
-                FechaInicio = ciclo.FechaInicio,
-                FechaFin = ciclo.FechaFin,
-                TotalCasos = totalCasos,
-                Ejecutados = ultimas.Count,
-                Pasa = ultimas.Count(r => r == ResultadoPrueba.Pasa),
-                Falla = ultimas.Count(r => r == ResultadoPrueba.Falla),
-                Bloqueado = ultimas.Count(r => r == ResultadoPrueba.Bloqueado)
-            });
-        }
-        return resultado;
-    }
-
-    public async Task<IReadOnlyList<CasoPruebaResponse>> ObtenerCasosAsync(
-        int idPlanPrueba, int? idCicloPrueba, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<CasoPruebaResponse>> ObtenerCasosDisponiblesAsync(
+        int idProyecto, CancellationToken cancellationToken = default)
     {
         await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
 
         var casos = await (
             from c in contexto.TblCasoPrueba.AsNoTracking()
             join t in contexto.TblTipoPrueba.AsNoTracking() on c.IdTipoPrueba equals t.Id
-            join w in contexto.TblWorkItem.AsNoTracking() on c.IdWorkItem equals w.IdWorkItem into items
-            from w in items.DefaultIfEmpty()
-            where c.IdPlanPrueba == idPlanPrueba && c.Activo
-            orderby c.IdCasoPrueba
+            where c.IdProyecto == idProyecto && c.Activo && c.Reutilizable
+            orderby c.Titulo
             select new CasoPruebaResponse
             {
                 IdCasoPrueba = c.IdCasoPrueba,
                 Folio = c.Folio,
-                IdPlanPrueba = c.IdPlanPrueba,
                 Titulo = c.Titulo,
                 Precondiciones = c.Precondiciones,
                 ResultadoEsperado = c.ResultadoEsperado,
-                TipoPrueba = t.Nombre,
-                IdWorkItem = c.IdWorkItem,
-                FolioWorkItem = w != null ? w.Folio : null
+                TipoPrueba = t.Nombre
+            }).ToListAsync(cancellationToken);
+
+        await CargarPasosAsync(contexto, casos, cancellationToken);
+        return casos;
+    }
+
+    public async Task<IReadOnlyList<CasoAsignadoResponse>> ObtenerCasosAsignadosAsync(
+        int idWorkItem, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
+
+        var casos = await (
+            from a in contexto.TblWorkItemCasoPrueba.AsNoTracking()
+            join c in contexto.TblCasoPrueba.AsNoTracking() on a.IdCasoPrueba equals c.IdCasoPrueba
+            join t in contexto.TblTipoPrueba.AsNoTracking() on c.IdTipoPrueba equals t.Id
+            where a.IdWorkItem == idWorkItem && a.Activo && c.Activo
+            orderby c.Titulo
+            select new CasoAsignadoResponse
+            {
+                IdWorkItemCasoPrueba = a.IdWorkItemCasoPrueba,
+                IdCasoPrueba = c.IdCasoPrueba,
+                Folio = c.Folio,
+                Titulo = c.Titulo,
+                TipoPrueba = t.Nombre
             }).ToListAsync(cancellationToken);
 
         if (casos.Count == 0)
@@ -101,10 +56,10 @@ public class CalidadQueryService(FabricaContexto fabrica) : ICalidadQueryService
             return casos;
         }
 
-        var ids = casos.Select(c => c.IdCasoPrueba).ToList();
+        var idsCaso = casos.Select(c => c.IdCasoPrueba).ToList();
 
         var pasos = await contexto.TblCasoPruebaPaso.AsNoTracking()
-            .Where(p => ids.Contains(p.IdCasoPrueba))
+            .Where(p => idsCaso.Contains(p.IdCasoPrueba))
             .OrderBy(p => p.NumeroPaso)
             .Select(p => new { p.IdCasoPrueba, Paso = new PasoCasoResponse
             {
@@ -114,19 +69,15 @@ public class CalidadQueryService(FabricaContexto fabrica) : ICalidadQueryService
             } })
             .ToListAsync(cancellationToken);
 
-        // Ultima ejecucion de cada caso (del ciclo indicado, si se pidio uno)
         var ejecuciones = await (
             from e in contexto.TblEjecucionPrueba.AsNoTracking()
             join r in contexto.TblResultadoPrueba.AsNoTracking() on e.IdResultadoPrueba equals r.Id
-            where ids.Contains(e.IdCasoPrueba)
-                  && (idCicloPrueba == null || e.IdCicloPrueba == idCicloPrueba)
-            select new { e.IdEjecucionPrueba, e.IdCasoPrueba, e.IdResultadoPrueba, Resultado = r.Nombre }
-            ).ToListAsync(cancellationToken);
-
-        var bugs = await contexto.TblWorkItem.AsNoTracking()
-            .Where(w => w.IdEjecucionPruebaOrigen != null && w.Activo)
-            .Select(w => new { IdEjecucion = w.IdEjecucionPruebaOrigen!.Value, w.Folio })
-            .ToListAsync(cancellationToken);
+            where e.IdWorkItem == idWorkItem && idsCaso.Contains(e.IdCasoPrueba)
+            select new
+            {
+                e.IdEjecucionPrueba, e.IdCasoPrueba, e.IdResultadoPrueba,
+                Resultado = r.Nombre, e.FechaEjecucion
+            }).ToListAsync(cancellationToken);
 
         foreach (var caso in casos)
         {
@@ -142,100 +93,93 @@ public class CalidadQueryService(FabricaContexto fabrica) : ICalidadQueryService
                 caso.IdEjecucion = ultima.IdEjecucionPrueba;
                 caso.IdUltimoResultado = ultima.IdResultadoPrueba;
                 caso.UltimoResultado = ultima.Resultado;
-                caso.FolioBug = bugs.FirstOrDefault(b => b.IdEjecucion == ultima.IdEjecucionPrueba)?.Folio;
+                caso.FechaUltimaEjecucion = ultima.FechaEjecucion;
             }
         }
 
         return casos;
     }
 
-    public async Task<IReadOnlyList<TrazabilidadResponse>> ObtenerTrazabilidadAsync(
-        int idPlanPrueba, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<CasoAdminResponse>> ObtenerCatalogoCasosAsync(
+        int idProyecto, CancellationToken cancellationToken = default)
     {
         await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
 
-        var plan = await contexto.TblPlanPrueba.AsNoTracking()
-            .Where(p => p.IdPlanPrueba == idPlanPrueba)
-            .Select(p => new { p.IdProyecto, p.IdRelease })
-            .FirstOrDefaultAsync(cancellationToken);
-        if (plan is null)
-        {
-            return [];
-        }
-
-        // Requisitos del proyecto (o del release si el plan esta ligado a uno)
-        var requisitos = await contexto.TblWorkItem.AsNoTracking()
-            .Where(w => w.IdProyecto == plan.IdProyecto && w.Activo
-                        && (plan.IdRelease == null || w.IdRelease == plan.IdRelease)
-                        && (w.IdTipoWorkItem == 3 || w.IdTipoWorkItem == 2))   // Historia o Feature
-            .Select(w => new { w.IdWorkItem, w.Folio, w.Titulo })
-            .ToListAsync(cancellationToken);
-
-        var cobertura = await (
+        var casos = await (
             from c in contexto.TblCasoPrueba.AsNoTracking()
-            where c.IdPlanPrueba == idPlanPrueba && c.Activo && c.IdWorkItem != null
-            select new
+            join t in contexto.TblTipoPrueba.AsNoTracking() on c.IdTipoPrueba equals t.Id
+            where c.IdProyecto == idProyecto
+            orderby c.Titulo
+            select new CasoAdminResponse
             {
-                IdWorkItem = c.IdWorkItem!.Value,
-                c.IdCasoPrueba,
-                UltimoResultado = contexto.TblEjecucionPrueba
-                    .Where(e => e.IdCasoPrueba == c.IdCasoPrueba)
-                    .OrderByDescending(e => e.IdEjecucionPrueba)
-                    .Select(e => (int?)e.IdResultadoPrueba)
-                    .FirstOrDefault()
+                IdCasoPrueba = c.IdCasoPrueba,
+                Folio = c.Folio,
+                Titulo = c.Titulo,
+                Precondiciones = c.Precondiciones,
+                ResultadoEsperado = c.ResultadoEsperado,
+                IdTipoPrueba = c.IdTipoPrueba,
+                TipoPrueba = t.Nombre,
+                Reutilizable = c.Reutilizable,
+                Activo = c.Activo
             }).ToListAsync(cancellationToken);
 
-        return requisitos.Select(r =>
+        if (casos.Count == 0)
         {
-            var casos = cobertura.Where(c => c.IdWorkItem == r.IdWorkItem).ToList();
-            return new TrazabilidadResponse
+            return casos;
+        }
+
+        var idsCaso = casos.Select(c => c.IdCasoPrueba).ToList();
+
+        var asignaciones = await contexto.TblWorkItemCasoPrueba.AsNoTracking()
+            .Where(a => idsCaso.Contains(a.IdCasoPrueba) && a.Activo)
+            .GroupBy(a => a.IdCasoPrueba)
+            .Select(g => new { IdCasoPrueba = g.Key, Total = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        var pasos = await contexto.TblCasoPruebaPaso.AsNoTracking()
+            .Where(p => idsCaso.Contains(p.IdCasoPrueba))
+            .OrderBy(p => p.NumeroPaso)
+            .Select(p => new { p.IdCasoPrueba, Paso = new PasoCasoResponse
             {
-                IdWorkItem = r.IdWorkItem,
-                Folio = r.Folio,
-                Titulo = r.Titulo,
-                TotalCasos = casos.Count,
-                CasosPasa = casos.Count(c => c.UltimoResultado == ResultadoPrueba.Pasa),
-                CasosFalla = casos.Count(c => c.UltimoResultado == ResultadoPrueba.Falla),
-                SinCobertura = casos.Count == 0
-            };
-        }).ToList();
+                NumeroPaso = p.NumeroPaso,
+                Accion = p.Accion,
+                ResultadoEsperado = p.ResultadoEsperado
+            } })
+            .ToListAsync(cancellationToken);
+
+        foreach (var caso in casos)
+        {
+            caso.TotalAsignaciones = asignaciones.FirstOrDefault(a => a.IdCasoPrueba == caso.IdCasoPrueba)?.Total ?? 0;
+            caso.Pasos = pasos.Where(p => p.IdCasoPrueba == caso.IdCasoPrueba).Select(p => p.Paso).ToList();
+        }
+
+        return casos;
     }
 
-    private static IQueryable<PlanPruebaResponse> Proyectar(DbContextGTE contexto)
+    private static async Task CargarPasosAsync(
+        DbContextGTE contexto, IReadOnlyList<CasoPruebaResponse> casos, CancellationToken cancellationToken)
     {
-        return from p in contexto.TblPlanPrueba.AsNoTracking()
-               join pr in contexto.TblProyecto.AsNoTracking() on p.IdProyecto equals pr.IdProyecto
-               join rel in contexto.TblRelease.AsNoTracking() on p.IdRelease equals rel.IdRelease into releases
-               from rel in releases.DefaultIfEmpty()
-               where p.Activo
-               select new PlanPruebaResponse
-               {
-                   IdPlanPrueba = p.IdPlanPrueba,
-                   IdProyecto = p.IdProyecto,
-                   Proyecto = pr.Nombre,
-                   IdRelease = p.IdRelease,
-                   Release = rel != null ? rel.Version : null,
-                   Nombre = p.Nombre,
-                   Descripcion = p.Descripcion,
-                   FechaRegistro = p.FechaRegistro,
-                   TotalCasos = contexto.TblCasoPrueba.Count(c => c.IdPlanPrueba == p.IdPlanPrueba && c.Activo),
-                   CasosEjecutados = contexto.TblCasoPrueba
-                       .Count(c => c.IdPlanPrueba == p.IdPlanPrueba && c.Activo
-                                   && contexto.TblEjecucionPrueba.Any(e => e.IdCasoPrueba == c.IdCasoPrueba)),
-                   CasosPasa = contexto.TblCasoPrueba
-                       .Count(c => c.IdPlanPrueba == p.IdPlanPrueba && c.Activo
-                                   && contexto.TblEjecucionPrueba
-                                       .Where(e => e.IdCasoPrueba == c.IdCasoPrueba)
-                                       .OrderByDescending(e => e.IdEjecucionPrueba)
-                                       .Select(e => e.IdResultadoPrueba)
-                                       .FirstOrDefault() == ResultadoPrueba.Pasa),
-                   CasosFalla = contexto.TblCasoPrueba
-                       .Count(c => c.IdPlanPrueba == p.IdPlanPrueba && c.Activo
-                                   && contexto.TblEjecucionPrueba
-                                       .Where(e => e.IdCasoPrueba == c.IdCasoPrueba)
-                                       .OrderByDescending(e => e.IdEjecucionPrueba)
-                                       .Select(e => e.IdResultadoPrueba)
-                                       .FirstOrDefault() == ResultadoPrueba.Falla)
-               };
+        if (casos.Count == 0)
+        {
+            return;
+        }
+
+        var idsCaso = casos.Select(c => c.IdCasoPrueba).ToList();
+        var pasos = await contexto.TblCasoPruebaPaso.AsNoTracking()
+            .Where(p => idsCaso.Contains(p.IdCasoPrueba))
+            .OrderBy(p => p.NumeroPaso)
+            .Select(p => new { p.IdCasoPrueba, Paso = new PasoCasoResponse
+            {
+                NumeroPaso = p.NumeroPaso,
+                Accion = p.Accion,
+                ResultadoEsperado = p.ResultadoEsperado
+            } })
+            .ToListAsync(cancellationToken);
+
+        foreach (var caso in casos)
+        {
+            caso.Pasos = pasos.Where(p => p.IdCasoPrueba == caso.IdCasoPrueba)
+                .Select(p => p.Paso).ToList();
+        }
     }
 }

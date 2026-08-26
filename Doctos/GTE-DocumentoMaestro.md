@@ -906,21 +906,21 @@ técnica base.
 
 **Reglas de negocio:**
 
-- RN-ADM-01: un usuario no puede ser su propio jefe ni formar ciclos en la jerarquía
+- RN-GTE-001: un usuario no puede ser su propio jefe ni formar ciclos en la jerarquía
   (validación con CTE recursivo antes de guardar).
-- RN-ADM-02: el rol Administrador no cortocircuita las validaciones de negocio (a
+- RN-GTE-002: el rol Administrador no cortocircuita las validaciones de negocio (a
   diferencia del `EsAdmin` del GT); solo otorga todos los permisos. Las reglas duras
   (p. ej. no cerrar un WorkItem con revisiones pendientes) aplican a todos. **Excepcion
-  acotada (decision del equipo, 2026-08-02):** el cierre de WorkItems (RN-REQ-03) y el
-  ownership de cambios de estatus (WI.ModificarAjeno, ver RN-REQ-05) SI se saltan para
+  acotada (decision del equipo, 2026-08-02):** el cierre de WorkItems (RN-GTE-010) y el
+  ownership de cambios de estatus (WI.ModificarAjeno, ver RN-GTE-012) SI se saltan para
   quien tenga el permiso nuevo `WI.OmitirValidacionCierre` (sembrado solo para
   Administrador, mismo patron RBAC data-driven, sin cortocircuito de codigo por rol). El
-  resto de reglas duras del proceso (RN-REQ-01 una sola tarea En Proceso por persona,
-  RN-REQ-02 fecha compromiso) NO se saltan ni para Administrador. Ver
+  resto de reglas duras del proceso (RN-GTE-008 una sola tarea En Proceso por persona,
+  RN-GTE-009 fecha compromiso) NO se saltan ni para Administrador. Ver
   `CambiarEstatusWorkItemHandler` y `14_2026-08-02_INSERT_bdsGTE_PermisoOmitirValidacionCierre.sql`.
-- RN-ADM-03: la jerarquía jefe-subordinado define el alcance de visibilidad por defecto
+- RN-GTE-003: la jerarquía jefe-subordinado define el alcance de visibilidad por defecto
   de bandejas y reportes (CTE recursivo, heredado del GT); los permisos pueden ampliarlo.
-- RN-ADM-04: cambios de nivel de un usuario NO recalculan presupuestos de WorkItems ya
+- RN-GTE-004: cambios de nivel de un usuario NO recalculan presupuestos de WorkItems ya
   asignados (el presupuesto se fija al asignar y queda en el historial de campo).
 
 ### 3.2 Gestión de proyectos (Portafolio)
@@ -942,12 +942,12 @@ costo, riesgo.
 
 **Reglas de negocio:**
 
-- RN-PRY-01: un proyecto con WorkItems abiertos no puede cerrarse (409 con lista de
+- RN-GTE-005: un proyecto con WorkItems abiertos no puede cerrarse (409 con lista de
   pendientes — patrón de conflicto estructurado).
-- RN-PRY-02: proyectos `EsMantenimiento = 1` conservan las reglas especiales del GT:
+- RN-GTE-006: proyectos `EsMantenimiento = 1` conservan las reglas especiales del GT:
   cerrar un WorkItem exige permiso `WI.TerminarMantenimiento`; mover un WorkItem fuera del
   proyecto exige permiso de administrador del proyecto.
-- RN-PRY-03: la exposición de riesgo >= 15 (de 25) notifica automáticamente al
+- RN-GTE-007: la exposición de riesgo >= 15 (de 25) notifica automáticamente al
   responsable del proyecto y aparece en el dashboard ejecutivo.
 
 ### 3.3 Requerimientos
@@ -968,20 +968,20 @@ costo, riesgo.
 
 **Reglas de negocio (núcleo — heredadas del GT y formalizadas):**
 
-- RN-REQ-01 (**una tarea En Proceso por persona**): al ejecutar la acción INICIAR sobre un
+- RN-GTE-008 (**una tarea En Proceso por persona**): al ejecutar la acción INICIAR sobre un
   WorkItem, si el asignado tiene otro item En Proceso, este se suspende automáticamente
   registrando historial **en el item suspendido** (corrige el bug #4 del GT que escribía
   el historial en la tarea equivocada). La regla es configurable por tipo de item.
-- RN-REQ-02: INICIAR exige `FechaCompromiso` capturada.
-- RN-REQ-03: TERMINAR exige: al menos un registro de tiempo o subtarea hija terminada, y
+- RN-GTE-009: INICIAR exige `FechaCompromiso` capturada.
+- RN-GTE-010: TERMINAR exige: al menos un registro de tiempo o subtarea hija terminada, y
   cero revisiones con `Corregido = 0`. Una sola implementación en el dominio (corrige los
   dos caminos inconsistentes de FrmRegistro vs FrmTareaSTS.btnTerminar). Bypass acotado
-  para `WI.OmitirValidacionCierre` (ver RN-ADM-02).
-- RN-REQ-04: `FechaCompromiso` no puede ser anterior a hoy, salvo permiso
+  para `WI.OmitirValidacionCierre` (ver RN-GTE-002).
+- RN-GTE-011: `FechaCompromiso` no puede ser anterior a hoy, salvo permiso
   `WI.ModificarCompromiso`.
-- RN-REQ-05: editar un item Terminado exige `WI.ModificarTerminado`; editar, cambiar el
+- RN-GTE-012: editar un item Terminado exige `WI.ModificarTerminado`; editar, cambiar el
   estatus (INICIAR/TERMINAR/etc.), registrar tiempo, o marcar CORREGIDO un hallazgo (no
-  reabrirlo, eso es RN-QA-02) en un item ajeno exige `WI.ModificarAjeno` -- el gate de
+  reabrirlo, eso es RN-GTE-026) en un item ajeno exige `WI.ModificarAjeno` -- el gate de
   ownership aplica igual en `ActualizarWorkItemCommand`, `CambiarEstatusWorkItemCommand`,
   `RegistrarTiempoCommand` y `CorregirRevisionCommand` (unificado 2026-08-02; los dos
   ultimos se quedaron sin el gate en pasadas anteriores del mismo dia y se corrigieron al
@@ -993,14 +993,14 @@ costo, riesgo.
   gate (no es un hueco, es el diseño): comentar, adjuntar archivos y reportar un hallazgo
   -- son acciones de colaboracion/revision hechas por definicion por alguien mas, no una
   modificacion del registro propio del WorkItem.
-- RN-REQ-06: eliminar solo en estatus Borrador/Pendiente con permiso `WI.Eliminar` (hard
+- RN-GTE-013: eliminar solo en estatus Borrador/Pendiente con permiso `WI.Eliminar` (hard
   delete si Borrador, baja lógica si Pendiente).
-- RN-REQ-07: COPIAR duplica el item limpiando: estatus (lo fija el backend), compromiso,
+- RN-GTE-014: COPIAR duplica el item limpiando: estatus (lo fija el backend), compromiso,
   historial; complejidad siempre la mínima; sufijo " - Copia" (regla vigente del GT,
   commits e6b2c81/bec2388).
-- RN-REQ-08: al asignar un item, `MinutosPresupuesto` se calcula de
+- RN-GTE-015: al asignar un item, `MinutosPresupuesto` se calcula de
   `tblMatrizPresupuesto(IdComplejidad, Nivel del asignado)` y se congela.
-- RN-REQ-09: los estatus con más de N días sin movimiento generan alerta al líder
+- RN-GTE-016: los estatus con más de N días sin movimiento generan alerta al líder
   (parámetro por proyecto).
 
 ### 3.4 Planeación
@@ -1020,12 +1020,12 @@ costo, riesgo.
 
 **Reglas de negocio:**
 
-- RN-PLA-01: asignar más puntos que la velocidad histórica +20% al planear un sprint
+- RN-GTE-017: asignar más puntos que la velocidad histórica +20% al planear un sprint
   requiere confirmación explícita (soft warning, no bloqueo).
-- RN-PLA-02: cerrar un sprint mueve automáticamente los items no terminados al backlog o
+- RN-GTE-018: cerrar un sprint mueve automáticamente los items no terminados al backlog o
   al siguiente sprint (decisión del usuario en el cierre), registrando el movimiento.
-- RN-PLA-03: un WorkItem solo puede estar en un sprint a la vez.
-- RN-PLA-04: exceder el límite WIP de una columna bloquea el drop con explicación (o
+- RN-GTE-019: un WorkItem solo puede estar en un sprint a la vez.
+- RN-GTE-020: exceder el límite WIP de una columna bloquea el drop con explicación (o
   permite override con permiso `PLA.SaltarWip`, registrado en bitácora).
 
 ### 3.5 Desarrollo
@@ -1044,11 +1044,11 @@ duplicar a Gitea.
 
 **Reglas de negocio:**
 
-- RN-DEV-01: los webhooks se autentican por secreto compartido por repositorio; payloads
+- RN-GTE-022: los webhooks se autentican por secreto compartido por repositorio; payloads
   no autenticados se descartan y se registran.
-- RN-DEV-02: la vinculación commit-WorkItem es por folio en el mensaje; un commit puede
+- RN-GTE-023: la vinculación commit-WorkItem es por folio en el mensaje; un commit puede
   vincular varios items.
-- RN-DEV-03: las transiciones automáticas por eventos Git son configurables por proyecto
+- RN-GTE-024: las transiciones automáticas por eventos Git son configurables por proyecto
   y siempre pasan por el motor de workflow (nunca UPDATE directo de estatus).
 
 ### 3.6 QA (Calidad)
@@ -1069,25 +1069,25 @@ duplicar a Gitea.
 
 **Reglas de negocio:**
 
-- RN-QA-01: un release no puede aprobarse con casos Falla sin bug asociado o bugs S1/S2
+- RN-GTE-025: un release no puede aprobarse con casos Falla sin bug asociado o bugs S1/S2
   abiertos (409 estructurado con la lista).
-- RN-QA-02: reabrir un hallazgo corregido exige rol Líder (regla vigente del GT).
-- RN-QA-03: el estatus del WorkItem reacciona a las revisiones: alguna con Corregido=0
+- RN-GTE-026: reabrir un hallazgo corregido exige rol Líder (regla vigente del GT).
+- RN-GTE-027: el estatus del WorkItem reacciona a las revisiones: alguna con Corregido=0
   regresa el item de Terminado a Corrección vía workflow (formaliza
   `ValidarSiHayRevisionesPendientes`).
-- RN-QA-04 (2026-08-02): aprobar (TERMINAR) o rechazar (RECHAZAR_QA) la fase de pruebas de
+- RN-GTE-028 (2026-08-02): aprobar (TERMINAR) o rechazar (RECHAZAR_QA) la fase de pruebas de
   un WorkItem, desde En Pruebas, exige el permiso `WI.AprobarPruebas` (sembrado para el rol
   QA por datos en `tblTransicionConfig.RequierePermiso`, no un cortocircuito de código). El
   TERMINAR desde En Proceso (la ruta "proyectos sin fase QA") sigue sin exigirlo.
-- RN-QA-05 (2026-08-02): no autoaprobación ni autorechazo -- quien aprueba/rechaza la fase
+- RN-GTE-029 (2026-08-02): no autoaprobación ni autorechazo -- quien aprueba/rechaza la fase
   de pruebas no puede ser el propio asignado del WorkItem. Por esto mismo, el gate de "item
-  ajeno" (RN-REQ-05) se excluye a propósito para estas dos transiciones: lo normal es que
+  ajeno" (RN-GTE-012) se excluye a propósito para estas dos transiciones: lo normal es que
   el revisor sea otra persona.
-- RN-QA-06 (2026-08-02): no se puede rechazar (RECHAZAR_QA desde En Pruebas) sin que ya
+- RN-GTE-030 (2026-08-02): no se puede rechazar (RECHAZAR_QA desde En Pruebas) sin que ya
   exista un Hallazgo/Revisión pendiente registrado para el WorkItem -- un motivo de texto
   libre ya no basta. Implementado en `CambiarEstatusWorkItemHandler.ValidarRevisionPruebasAsync`;
   las tres reglas anteriores tienen bypass acotado con `WI.OmitirValidacionCierre`
-  (Administrador, ver RN-ADM-02).
+  (Administrador, ver RN-GTE-002).
 
 ### 3.7 Releases (Entregas)
 
@@ -1105,11 +1105,11 @@ duplicar a Gitea.
 
 **Reglas de negocio:**
 
-- RN-REL-01: solo WorkItems en estatus Terminado y revisados pueden agregarse a un release.
-- RN-REL-02: todo script SQL de despliegue debe tener script de rollback asociado o
+- RN-GTE-031: solo WorkItems en estatus Terminado y revisados pueden agregarse a un release.
+- RN-GTE-032: todo script SQL de despliegue debe tener script de rollback asociado o
   justificación explícita de irreversibilidad (campo obligatorio).
-- RN-REL-03: el paso a PROD exige todas las aprobaciones de la cadena en Aprobado.
-- RN-REL-04: publicar un release notifica a solicitantes de los WorkItems incluidos
+- RN-GTE-033: el paso a PROD exige todas las aprobaciones de la cadena en Aprobado.
+- RN-GTE-034: publicar un release notifica a solicitantes de los WorkItems incluidos
   ("tu petición SOL-2026-0045 se liberó en la versión 2.11").
 
 ### 3.8 Producción (Operación)
@@ -1126,10 +1126,10 @@ duplicar a Gitea.
 
 **Reglas de negocio:**
 
-- RN-OPS-01: incidente S1 notifica de inmediato por todos los canales al responsable del
+- RN-GTE-035: incidente S1 notifica de inmediato por todos los canales al responsable del
   sistema y al líder (escalamiento a los 30 min sin atención).
-- RN-OPS-02: cerrar un incidente S1/S2 exige causa raíz documentada.
-- RN-OPS-03: un incidente puede degradarse/escalarse de severidad solo con motivo
+- RN-GTE-036: cerrar un incidente S1/S2 exige causa raíz documentada.
+- RN-GTE-037: un incidente puede degradarse/escalarse de severidad solo con motivo
   registrado.
 
 ### 3.9 Soporte (Mesa de ayuda)
@@ -1147,11 +1147,11 @@ duplicar a Gitea.
 
 **Reglas de negocio:**
 
-- RN-SUP-01: el reloj de SLA corre solo en horario laboral del equipo asignado y se pausa
+- RN-GTE-038: el reloj de SLA corre solo en horario laboral del equipo asignado y se pausa
   en "Esperando Usuario".
-- RN-SUP-02: 80% del tiempo de SLA consumido sin resolución -> alerta al agente; 100% ->
+- RN-GTE-039: 80% del tiempo de SLA consumido sin resolución -> alerta al agente; 100% ->
   escalamiento al líder + registro de incumplimiento.
-- RN-SUP-03: un ticket Resuelto se cierra automáticamente a los 5 días hábiles sin
+- RN-GTE-040: un ticket Resuelto se cierra automáticamente a los 5 días hábiles sin
   respuesta del usuario.
 
 ### 3.10 Dashboard Ejecutivo (Indicadores)
@@ -1267,13 +1267,13 @@ Estatus: `Pendiente, En Proceso, En Pruebas, Correccion, Suspendido, Terminado, 
 ```mermaid
 stateDiagram-v2
     [*] --> Pendiente : alta (estatus lo fija el backend)
-    Pendiente --> EnProceso : INICIAR (RN-REQ-01 y 02)
+    Pendiente --> EnProceso : INICIAR (RN-GTE-008 y 02)
     EnProceso --> Suspendido : SUSPENDER (auto al iniciar otro item)
     Suspendido --> EnProceso : REANUDAR
     EnProceso --> EnPruebas : ENVIAR_PRUEBAS (PR merged puede automatizarlo)
     EnPruebas --> Correccion : RECHAZAR_QA (defecto o revision Corregido=0)
     Correccion --> EnProceso : INICIAR
-    EnPruebas --> Terminado : TERMINAR (RN-REQ-03)
+    EnPruebas --> Terminado : TERMINAR (RN-GTE-010)
     EnProceso --> Terminado : TERMINAR (proyectos sin fase QA)
     Terminado --> Suspendido : REVERTIR (solo Lider/Admin - regla GT)
     Pendiente --> Cancelado : CANCELAR (motivo)
@@ -1399,7 +1399,7 @@ cognitiva del grid único del GT.
 +------+---------------------------------------------------------------------------+
 ```
 
-- **Componentes:** tarjeta "En proceso ahora" (refleja RN-REQ-01: solo hay una), lista
+- **Componentes:** tarjeta "En proceso ahora" (refleja RN-GTE-008: solo hay una), lista
   "para hoy" ordenada por compromiso/prioridad, vencidas en rojo, resumen de sprint,
   feed de notificaciones.
 - **Acciones:** Iniciar/Pausar/Terminar directo desde la tarjeta (llaman acciones de
@@ -1495,7 +1495,7 @@ imagen, "Crear bug" precargado al fallar. Barra de avance del ciclo.
 ### 5.9 P14 — Detalle de release
 
 Contenido (WorkItems agrupados por tipo — vista previa de notas de versión), artefactos
-con hash y validación de rollback pareado (RN-REL-02 en rojo si falta), cadena de
+con hash y validación de rollback pareado (RN-GTE-032 en rojo si falta), cadena de
 aprobaciones con estado por firma, historial de despliegues por ambiente, botón Rollback
 (confirmación fuerte: teclear el folio).
 
@@ -1707,7 +1707,7 @@ POST   /workitems                     alta (estatus inicial lo fija el backend)
 GET    /workitems/{folio}             detalle completo
 PUT    /workitems/{id}                edición de campos (valida permisos por regla)
 DELETE /workitems/{id}                borrador: hard delete; pendiente: baja lógica
-POST   /workitems/{id}/copiar         RN-REQ-07
+POST   /workitems/{id}/copiar         RN-GTE-014
 GET    /workitems/{id}/timeline       historial unificado (estatus+campos+git+pruebas)
 GET    /workitems/{id}/hijos
 POST   /workitems/{id}/vinculos       body { idDestino, tipoVinculo }
@@ -1787,7 +1787,7 @@ POST   /ia/resumir                    { entidad, id } -> resumen de timeline
 // Request
 { "accion": "TERMINAR" }
 
-// Response 409 (conflicto accionable - RN-REQ-03)
+// Response 409 (conflicto accionable - RN-GTE-010)
 {
   "code": "CONFLICT",
   "success": false,
@@ -2126,15 +2126,15 @@ límites de tasa y presupuesto mensual configurable.
 | CU-01 Capturar solicitud | Solicitante | Portal -> formulario -> ENVIAR -> folio SOL | Workflow 4.3 |
 | CU-02 Triage | Líder | Bandeja -> revisar -> Aprobar/Rechazar/Devolver/Derivar | RN-REQ, A07 |
 | CU-03 Convertir solicitud | Líder | Aprobada -> desglose (manual o IA-01) -> WorkItems trazados | uiId pattern |
-| CU-04 Planear sprint | Líder | Backlog -> arrastrar a sprint contra capacidad -> activar | RN-PLA-01/03 |
-| CU-05 Trabajar un item | Desarrollador | Mi Día -> INICIAR -> branch -> commits -> registrar tiempo -> ENVIAR_PRUEBAS | RN-REQ-01/02/03 |
-| CU-06 Revisar código | Líder/Par | PR en Gitea + hallazgos de revisión en GTE -> corregir -> cerrar | RN-QA-02/03 |
-| CU-07 Ejecutar ciclo de pruebas | QA | Runner -> resultados -> bugs precargados | RN-QA-01 |
-| CU-08 Armar y aprobar release | Líder/QA/Negocio | Contenido -> congelar -> firmas -> aprobar | RN-REL-01/02/03 |
+| CU-04 Planear sprint | Líder | Backlog -> arrastrar a sprint contra capacidad -> activar | RN-GTE-017/03 |
+| CU-05 Trabajar un item | Desarrollador | Mi Día -> INICIAR -> branch -> commits -> registrar tiempo -> ENVIAR_PRUEBAS | RN-GTE-008/02/03 |
+| CU-06 Revisar código | Líder/Par | PR en Gitea + hallazgos de revisión en GTE -> corregir -> cerrar | RN-GTE-026/03 |
+| CU-07 Ejecutar ciclo de pruebas | QA | Runner -> resultados -> bugs precargados | RN-GTE-025 |
+| CU-08 Armar y aprobar release | Líder/QA/Negocio | Contenido -> congelar -> firmas -> aprobar | RN-GTE-031/02/03 |
 | CU-09 Desplegar y liberar | Ops | Despliegue por ambiente -> bitácora -> notificar | A10/A11 |
-| CU-10 Rollback | Ops | Release liberado -> ROLLBACK -> scripts inversos -> Revertido | RN-REL-02 |
-| CU-11 Atender ticket | Soporte | Bandeja -> asignar -> atender/escalar -> resolver -> encuesta | RN-SUP-01/02/03 |
-| CU-12 Gestionar incidente | Ops | Detectar -> atender -> mitigar -> causa raíz -> correctivo | RN-OPS-01/02 |
+| CU-10 Rollback | Ops | Release liberado -> ROLLBACK -> scripts inversos -> Revertido | RN-GTE-032 |
+| CU-11 Atender ticket | Soporte | Bandeja -> asignar -> atender/escalar -> resolver -> encuesta | RN-GTE-038/02/03 |
+| CU-12 Gestionar incidente | Ops | Detectar -> atender -> mitigar -> causa raíz -> correctivo | RN-GTE-035/02 |
 | CU-13 Solicitar ausencia | Todos | Solicitud -> aprobación del jefe -> capacidad ajustada | A12 |
 | CU-14 Consultar dashboard | Ejecutivo | Widgets, drill-down a listas subyacentes | Seccion 3.10 |
 | CU-15 Administrar workflow | Admin | Editor -> transiciones -> pruebas -> publicar | Seccion 4.9 |
@@ -2154,7 +2154,7 @@ límites de tasa y presupuesto mensual configurable.
 - HU-04: Como ejecutivo quiero ver costo real vs presupuesto por proyecto, para decidir
   inversión. (P18/R09; criterios: horas x tarifa vigente; drill-down a detalle.)
 - HU-05: Como agente de soporte quiero que el reloj de SLA se pause cuando espero al
-  usuario, para que el indicador sea justo. (RN-SUP-01; criterios: pausa/reanuda
+  usuario, para que el indicador sea justo. (RN-GTE-038; criterios: pausa/reanuda
   automática por estatus; semáforo consistente.)
 
 ### 15.3 Diccionario de datos y catálogo de pantallas

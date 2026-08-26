@@ -1,13 +1,5 @@
 namespace GTE.Application.DTOs.Request.Calidad;
 
-public class PlanPruebaCrearRequest
-{
-    public int IdProyecto { get; set; }
-    public int? IdRelease { get; set; }
-    public string Nombre { get; set; } = string.Empty;
-    public string? Descripcion { get; set; }
-}
-
 public class PasoCasoRequest
 {
     public int NumeroPaso { get; set; }
@@ -15,21 +7,31 @@ public class PasoCasoRequest
     public string? ResultadoEsperado { get; set; }
 }
 
+/// <summary>Crea un caso y lo asigna al WorkItem en el mismo paso.</summary>
 public class CasoPruebaCrearRequest
 {
     public string Titulo { get; set; } = string.Empty;
     public string? Precondiciones { get; set; }
     public string? ResultadoEsperado { get; set; }
     public int IdTipoPrueba { get; set; } = 1;
-    public int? IdWorkItem { get; set; }
+
+    /// <summary>false = caso libre, solo para esta asignacion; no aparece en el catalogo reutilizable.</summary>
+    public bool Reutilizable { get; set; } = true;
     public List<PasoCasoRequest> Pasos { get; set; } = [];
 }
 
-public class CicloPruebaCrearRequest
+public class CasoPruebaEditarRequest
 {
-    public string Nombre { get; set; } = string.Empty;
-    public DateOnly? FechaInicio { get; set; }
-    public DateOnly? FechaFin { get; set; }
+    public string Titulo { get; set; } = string.Empty;
+    public string? Precondiciones { get; set; }
+    public string? ResultadoEsperado { get; set; }
+    public int IdTipoPrueba { get; set; } = 1;
+    public List<PasoCasoRequest> Pasos { get; set; } = [];
+}
+
+public class AsignarCasoRequest
+{
+    public int IdCasoPrueba { get; set; }
 }
 
 public class EjecucionRegistrarRequest
@@ -37,14 +39,7 @@ public class EjecucionRegistrarRequest
     public int IdCasoPrueba { get; set; }
     public int IdResultadoPrueba { get; set; }
     public string? Observaciones { get; set; }
-}
 
-/// <summary>Bug precargado desde una ejecucion fallida; si no se manda titulo se arma del caso.</summary>
-public class BugDesdeEjecucionRequest
-{
-    public string? Titulo { get; set; }
-    public string? Descripcion { get; set; }
-    public int IdPrioridad { get; set; } = 2;
-    public int? IdAsignado { get; set; }
-    public DateTime? FechaCompromiso { get; set; }
+    /// <summary>Obligatoria cuando IdResultadoPrueba es Falla: decide si el hallazgo bloquea.</summary>
+    public int? IdSeveridad { get; set; }
 }

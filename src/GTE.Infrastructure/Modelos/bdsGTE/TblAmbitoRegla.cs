@@ -1,15 +1,15 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace GTE.Infrastructure.Modelos.bdsGTE;
 
-public partial class TblPlanPrueba
+public partial class TblAmbitoRegla
 {
-    public int IdPlanPrueba { get; set; }
+    public int IdAmbitoRegla { get; set; }
 
     public int IdProyecto { get; set; }
 
-    public int? IdRelease { get; set; }
+    public int IdTipoAmbitoRegla { get; set; }
 
     public string Nombre { get; set; } = null!;
 
@@ -27,9 +27,7 @@ public partial class TblPlanPrueba
 
     public virtual TblProyecto IdProyectoNavigation { get; set; } = null!;
 
-    public virtual TblRelease? IdReleaseNavigation { get; set; }
+    public virtual TblTipoAmbitoRegla IdTipoAmbitoReglaNavigation { get; set; } = null!;
 
-    public virtual ICollection<TblCasoPrueba> TblCasoPrueba { get; set; } = new List<TblCasoPrueba>();
-
-    public virtual ICollection<TblCicloPrueba> TblCicloPrueba { get; set; } = new List<TblCicloPrueba>();
+    public virtual ICollection<TblReglaNegocio> TblReglaNegocio { get; set; } = new List<TblReglaNegocio>();
 }

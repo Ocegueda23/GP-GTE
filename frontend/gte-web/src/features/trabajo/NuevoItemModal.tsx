@@ -1,11 +1,16 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  Button, Dialog, DialogActions, DialogContent, DialogTitle,
-  FormControl, InputLabel, MenuItem, Select, TextField,
+  Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Typography,
 } from "@mui/material";
 import { useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
+import { ComboBuscable } from "../../shared/components/ComboBuscable";
+import { EditorEnriquecido } from "../../shared/editor/EditorEnriquecido";
+import { useSesion } from "../../shared/api/sesion";
 import { crearWorkItem, type CatalogosBandeja } from "../../shared/api/workitems";
+
+const ID_PRIORIDAD_MEDIA = 3;
+const CATEGORIA_PROYECTO_TI = "TI";
 
 interface Props {
   abierto: boolean;
@@ -15,28 +20,56 @@ interface Props {
   alError: (mensaje: string) => void;
   /** Al capturarse, el alta crea una subtarea: proyecto bloqueado al del padre. */
   padre?: { idWorkItem: number; folio: string; idProyecto: number };
+  /** Al copiar un elemento existente, prellena sus datos (no fecha compromiso: se recalcula igual que en una alta nueva). */
+  copiaDe?: {
+    idProyecto: number; idTipo: number | ""; idPrioridad: number | ""; titulo: string;
+    descripcion: string | null; idAsignado: number | null;
+  };
+}
+
+function hoyIso(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
 /** Alta rapida de elementos: el folio y el estatus inicial los fija el backend. */
-export function NuevoItemModal({ abierto, catalogos, alCerrar, alExito, alError, padre }: Props) {
-  const [idProyecto, setIdProyecto] = useState<number | "">(padre?.idProyecto ?? "");
-  const [idTipo, setIdTipo] = useState<number | "">("");
-  const [idPrioridad, setIdPrioridad] = useState<number | "">("");
-  const [idAsignado, setIdAsignado] = useState<number | "">("");
-  const [titulo, setTitulo] = useState("");
-  const [descripcion, setDescripcion] = useState("");
+export function NuevoItemModal({ abierto, catalogos, alCerrar, alExito, alError, padre, copiaDe }: Props) {
+  const sesion = useSesion((estado) => estado.sesion);
+  const [idProyecto, setIdProyecto] = useState<number | "">(padre?.idProyecto ?? copiaDe?.idProyecto ?? "");
+  const [idTipo, setIdTipo] = useState<number | "">(copiaDe?.idTipo ?? "");
+  const [idPrioridad, setIdPrioridad] = useState<number | "">(copiaDe?.idPrioridad ?? ID_PRIORIDAD_MEDIA);
+  const [idAsignado, setIdAsignado] = useState<number | "">(
+    copiaDe ? (copiaDe.idAsignado ?? "") : (sesion?.idUsuario ?? ""),
+  );
+  const [idComplejidad, setIdComplejidad] = useState<number | "">("");
+  const [titulo, setTitulo] = useState(copiaDe ? `Copia de ${copiaDe.titulo}` : "");
+  const [descripcion, setDescripcion] = useState(copiaDe?.descripcion ?? "");
+  const [descripcionVacia, setDescripcionVacia] = useState(true);
   const [compromiso, setCompromiso] = useState("");
   const [enviando, setEnviando] = useState(false);
   const clienteQuery = useQueryClient();
 
-  const valido = idProyecto !== "" && idTipo !== "" && idPrioridad !== "" && titulo.trim().length > 0;
+  const valido = idProyecto !== "" && idTipo !== "" && idPrioridad !== "" && idComplejidad !== ""
+    && titulo.trim().length > 0;
 
   const limpiar = () => {
     setTitulo("");
     setDescripcion("");
+    setDescripcionVacia(true);
     setCompromiso("");
-    setIdAsignado("");
+    setIdAsignado(sesion?.idUsuario ?? "");
+    setIdComplejidad("");
   };
+
+  // Proyectos de categoria TI suelen iniciarse el mismo dia: precargar la fecha
+  // de hoy si el usuario todavia no capturo una (no pisa una fecha ya escrita).
+  useEffect(() => {
+    if (compromiso !== "") return;
+    const proyecto = catalogos?.proyectos.find((p) => p.id === idProyecto);
+    if (proyecto?.categoriaProyecto === CATEGORIA_PROYECTO_TI) {
+      setCompromiso(hoyIso());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo reacciona al cambio de proyecto
+  }, [idProyecto, catalogos?.proyectos]);
 
   const guardar = async () => {
     if (!valido) return;
@@ -46,8 +79,9 @@ export function NuevoItemModal({ abierto, catalogos, alCerrar, alExito, alError,
         idProyecto: idProyecto as number,
         idTipoWorkItem: idTipo as number,
         titulo: titulo.trim(),
-        descripcion: descripcion.trim() || null,
+        descripcion: descripcionVacia ? null : descripcion,
         idPrioridad: idPrioridad as number,
+        idComplejidad: idComplejidad as number,
         idAsignado: idAsignado === "" ? null : (idAsignado as number),
         fechaCompromiso: compromiso || null,
         idPadre: padre?.idWorkItem,
@@ -68,26 +102,25 @@ export function NuevoItemModal({ abierto, catalogos, alCerrar, alExito, alError,
 
   return (
     <Dialog open={abierto} onClose={alCerrar} fullWidth maxWidth="sm">
-      <DialogTitle>{padre ? `Nueva subtarea de ${padre.folio}` : "Nuevo elemento de trabajo"}</DialogTitle>
+      <DialogTitle>
+        {padre ? `Nueva subtarea de ${padre.folio}` : copiaDe ? "Copiar elemento de trabajo" : "Nuevo elemento de trabajo"}
+      </DialogTitle>
       <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
-        <FormControl size="small" required disabled={padre !== undefined}>
-          <InputLabel>Proyecto</InputLabel>
-          <Select label="Proyecto" value={idProyecto}
-            onChange={(e) => setIdProyecto(e.target.value as number | "")}>
-            {catalogos?.proyectos.map((p) => (
-              <MenuItem key={p.id} value={p.id}>{p.clave} - {p.nombre}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <FormControl size="small" required>
-          <InputLabel>Tipo</InputLabel>
-          <Select label="Tipo" value={idTipo}
-            onChange={(e) => setIdTipo(e.target.value as number | "")}>
-            {catalogos?.tipos.map((t) => (
-              <MenuItem key={t.id} value={t.id}>{t.nombre}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+        <ComboBuscable
+          label="Proyecto"
+          required
+          disabled={padre !== undefined}
+          value={idProyecto}
+          onChange={(v) => setIdProyecto(v as number | "")}
+          opciones={(catalogos?.proyectos ?? []).map((p) => ({ valor: p.id, etiqueta: `${p.clave} - ${p.nombre}` }))}
+        />
+        <ComboBuscable
+          label="Tipo"
+          required
+          value={idTipo}
+          onChange={(v) => setIdTipo(v as number | "")}
+          opciones={(catalogos?.tipos ?? []).map((t) => ({ valor: t.id, etiqueta: t.nombre }))}
+        />
         <TextField
           size="small"
           required
@@ -96,33 +129,39 @@ export function NuevoItemModal({ abierto, catalogos, alCerrar, alExito, alError,
           onChange={(e) => setTitulo(e.target.value)}
           slotProps={{ htmlInput: { maxLength: 200 } }}
         />
-        <TextField
-          size="small"
+        <EditorEnriquecido
           label="Descripcion"
-          multiline
-          minRows={3}
           value={descripcion}
-          onChange={(e) => setDescripcion(e.target.value)}
+          onChange={setDescripcion}
+          onVacioChange={setDescripcionVacia}
+          onError={alError}
         />
-        <FormControl size="small" required>
-          <InputLabel>Prioridad</InputLabel>
-          <Select label="Prioridad" value={idPrioridad}
-            onChange={(e) => setIdPrioridad(e.target.value as number | "")}>
-            {catalogos?.prioridades.map((p) => (
-              <MenuItem key={p.id} value={p.id}>{p.nombre}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <FormControl size="small">
-          <InputLabel>Asignado</InputLabel>
-          <Select label="Asignado" value={idAsignado}
-            onChange={(e) => setIdAsignado(e.target.value as number | "")}>
-            <MenuItem value="">Sin asignar</MenuItem>
-            {catalogos?.usuarios.map((u) => (
-              <MenuItem key={u.id} value={u.id}>{u.nombre}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+        <ComboBuscable
+          label="Prioridad"
+          required
+          value={idPrioridad}
+          onChange={(v) => setIdPrioridad(v as number | "")}
+          opciones={(catalogos?.prioridades ?? []).map((p) => ({ valor: p.id, etiqueta: p.nombre }))}
+        />
+        <ComboBuscable
+          label="Complejidad"
+          required
+          value={idComplejidad}
+          onChange={(v) => setIdComplejidad(v as number | "")}
+          opciones={(catalogos?.complejidades ?? []).map((c) => ({ valor: c.id, etiqueta: c.nombre }))}
+        />
+        <Typography variant="caption" color="text.secondary" sx={{ mt: -1.5 }}>
+          Define automaticamente el presupuesto de horas y puntos de historia (segun el nivel del asignado).
+        </Typography>
+        <ComboBuscable
+          label="Asignado"
+          value={idAsignado}
+          onChange={(v) => setIdAsignado(v as number | "")}
+          opciones={[
+            { valor: "", etiqueta: "Sin asignar" },
+            ...(catalogos?.usuarios ?? []).map((u) => ({ valor: u.id, etiqueta: u.nombre })),
+          ]}
+        />
         <TextField
           size="small"
           type="date"
@@ -134,7 +173,7 @@ export function NuevoItemModal({ abierto, catalogos, alCerrar, alExito, alError,
         />
       </DialogContent>
       <DialogActions>
-        <Button onClick={alCerrar}>Cancelar</Button>
+        <Button color="error" onClick={alCerrar}>Cancelar</Button>
         <Button variant="contained" disabled={enviando || !valido} onClick={() => void guardar()}>
           Crear
         </Button>

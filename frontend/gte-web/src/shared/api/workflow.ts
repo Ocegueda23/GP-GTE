@@ -60,3 +60,13 @@ export async function obtenerDefinicionWorkflow(proceso: string) {
 export async function guardarTransicionesWorkflow(proceso: string, transiciones: TransicionConfigGuardar[]) {
   return enviar<object>("put", `/api/v1/workflow/${proceso}/transiciones`, transiciones);
 }
+
+/** Vacia = el proyecto usa el default fijo (QA, Lider, Negocio). */
+export async function obtenerCadenaAprobacion(idProyecto: number) {
+  return obtener<string[]>(`/api/v1/proyectos/${idProyecto}/cadena-aprobacion`);
+}
+
+/** Lista vacia para volver a dejar al proyecto en el default fijo. */
+export async function guardarCadenaAprobacion(idProyecto: number, roles: string[]) {
+  return enviar<object>("put", `/api/v1/proyectos/${idProyecto}/cadena-aprobacion`, { roles });
+}

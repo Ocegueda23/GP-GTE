@@ -2,21 +2,26 @@ import { useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import {
   Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
-  Divider, FormControl, InputLabel, LinearProgress, Link, MenuItem, Paper, Select,
-  Snackbar, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField,
-  Tooltip, Typography,
+  Divider, FormControl, FormControlLabel, IconButton, InputLabel, LinearProgress, Link,
+  MenuItem, Paper, Select, Snackbar, Stack, Switch, Table, TableBody, TableCell,
+  TableContainer, TableHead, TableRow, TextField, Tooltip, Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
+import { ComboBuscable, ComboBuscableMultiple } from "../../shared/components/ComboBuscable";
+import { EncabezadoOrdenable } from "../../shared/components/EncabezadoOrdenable";
+import { useOrdenTabla } from "../../shared/hooks/useOrdenTabla";
 import {
   agregarArtefacto, agregarContenido, cambiarEstatusRelease, colorEstatusRelease,
-  crearRelease, generarNotas, obtenerMatrizAmbientes, obtenerRelease, obtenerReleases,
+  crearRelease, generarNotas, obtenerCandidatosContenido, obtenerCatalogosEntregas,
+  obtenerMatrizAmbientes, obtenerRelease, obtenerReleases, quitarArtefacto, quitarContenido,
   registrarDespliegue, resolverAprobacion,
 } from "../../shared/api/entregas";
-import { filtroInicial, obtenerBandeja, obtenerCatalogosBandeja } from "../../shared/api/workitems";
+import { obtenerCatalogosBandeja } from "../../shared/api/workitems";
 
 function formatearFecha(iso: string | null): string {
   if (!iso) return "-";
@@ -33,21 +38,32 @@ export function ReleasesPage() {
   const [modalArtefacto, setModalArtefacto] = useState(false);
   const [modalDespliegue, setModalDespliegue] = useState(false);
   const [modalRechazo, setModalRechazo] = useState<number | null>(null);
+  const [modalReabrir, setModalReabrir] = useState(false);
+  const [motivoReabrir, setMotivoReabrir] = useState("");
   const [idProyectoNuevo, setIdProyectoNuevo] = useState<number | "">("");
   const [version, setVersion] = useState("");
   const [seleccionados, setSeleccionados] = useState<number[]>([]);
+  const [idSprintFiltro, setIdSprintFiltro] = useState<number | "">("");
+  const [textoCandidatos, setTextoCandidatos] = useState("");
+  const [tipoCandidatos, setTipoCandidatos] = useState("");
+  const [ocultarBloqueados, setOcultarBloqueados] = useState(false);
   const [nombreArtefacto, setNombreArtefacto] = useState("");
-  const [idTipoArtefacto, setIdTipoArtefacto] = useState(1);
+  const [idTipoArtefacto, setIdTipoArtefacto] = useState<number | "">("");
   const [justificacion, setJustificacion] = useState("");
   const [idAmbiente, setIdAmbiente] = useState<number | "">("");
   const [esRollback, setEsRollback] = useState(false);
   const [bitacora, setBitacora] = useState("");
   const [comentario, setComentario] = useState("");
   const [enviando, setEnviando] = useState(false);
+  const [busquedaMatriz, setBusquedaMatriz] = useState("");
+  const [busquedaReleases, setBusquedaReleases] = useState("");
   const clienteQuery = useQueryClient();
 
   const catalogos = useQuery({
     queryKey: ["catalogos-bandeja"], queryFn: obtenerCatalogosBandeja, staleTime: 5 * 60_000,
+  });
+  const catalogosEntregas = useQuery({
+    queryKey: ["catalogos-entregas"], queryFn: obtenerCatalogosEntregas, staleTime: 5 * 60_000,
   });
   const releases = useQuery({ queryKey: ["releases"], queryFn: () => obtenerReleases() });
   const actual = idRelease === "" ? releases.data?.[0]?.idRelease : (idRelease as number);
@@ -59,14 +75,53 @@ export function ReleasesPage() {
   });
 
   const candidatos = useQuery({
-    queryKey: ["candidatos", detalle.data?.idProyecto],
-    queryFn: () => obtenerBandeja({
-      ...filtroInicial, pageSize: 100, estatus: [6], idProyecto: detalle.data!.idProyecto,
-    }),
-    enabled: modalContenido && detalle.data !== undefined,
+    queryKey: ["candidatos-release", actual],
+    queryFn: () => obtenerCandidatosContenido(actual!),
+    enabled: modalContenido && actual !== undefined,
   });
 
+  // El filtro por sprint se arma con los sprints que de verdad tienen candidatos: asi no
+  // hay que pedir el catalogo de sprints ni ofrecer opciones que no traerian nada. El id 0
+  // representa "terminados fuera de un sprint", que no tienen IdSprint.
+  const sprintsConCandidatos = [...new Map(
+    (candidatos.data ?? []).map((c) => [
+      c.idSprint ?? 0,
+      { id: c.idSprint, nombre: c.sprint ?? "Sin sprint" },
+    ]),
+  ).values()].sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+  const tiposConCandidatos = [...new Set((candidatos.data ?? []).map((c) => c.tipo))].sort();
+  const hayBloqueados = (candidatos.data ?? []).some((c) => c.hallazgosPendientes > 0);
+
+  const candidatosFiltrados = (candidatos.data ?? []).filter((c) => {
+    if (idSprintFiltro !== "" && (c.idSprint ?? 0) !== idSprintFiltro) return false;
+    if (tipoCandidatos && c.tipo !== tipoCandidatos) return false;
+    if (ocultarBloqueados && c.hallazgosPendientes > 0) return false;
+    const texto = textoCandidatos.trim().toLowerCase();
+    if (texto && !c.folio.toLowerCase().includes(texto)
+        && !c.titulo.toLowerCase().includes(texto)) return false;
+    return true;
+  });
+
+  const releasesFiltrados = (releases.data ?? []).filter((rel) => {
+    const texto = busquedaReleases.trim().toLowerCase();
+    if (!texto) return true;
+    return rel.claveProyecto.toLowerCase().includes(texto)
+      || rel.proyecto.toLowerCase().includes(texto)
+      || rel.version.toLowerCase().includes(texto)
+      || (rel.folio ?? "").toLowerCase().includes(texto);
+  });
+  const { datosOrdenados: releasesOrdenados, ordenarPor: ordenReleases, descendente: descReleases, ordenar: ordenarReleases }
+    = useOrdenTabla(releasesFiltrados);
+
   const matriz = useQuery({ queryKey: ["matriz-ambientes"], queryFn: obtenerMatrizAmbientes });
+  const matrizFiltrada = (matriz.data ?? []).filter((f) => {
+    const texto = busquedaMatriz.trim().toLowerCase();
+    if (!texto) return true;
+    return f.ambiente.toLowerCase().includes(texto) || (f.claveProyecto ?? "").toLowerCase().includes(texto);
+  });
+  const { datosOrdenados: matrizOrdenada, ordenarPor: ordenMatriz, descendente: descMatriz, ordenar: ordenarMatriz }
+    = useOrdenTabla(matrizFiltrada);
 
   const refrescar = () => Promise.all([
     clienteQuery.invalidateQueries({ queryKey: ["releases"] }),
@@ -106,23 +161,56 @@ export function ReleasesPage() {
     <Box sx={{ p: 2 }}>
       <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", mb: 2 }}>
         <Typography variant="h5" sx={{ fontWeight: 700 }}>Releases</Typography>
-        <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
-          <FormControl size="small" sx={{ minWidth: 240 }}>
-            <InputLabel>Release</InputLabel>
-            <Select label="Release" value={actual ?? ""}
-              onChange={(e) => setIdRelease(e.target.value as number)}>
-              {releases.data?.map((rel) => (
-                <MenuItem key={rel.idRelease} value={rel.idRelease}>
-                  {rel.claveProyecto} {rel.version} ({rel.estatus})
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setModalNuevo(true)}>
-            Nuevo release
-          </Button>
-        </Stack>
+        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setModalNuevo(true)}>
+          Nuevo release
+        </Button>
       </Stack>
+
+      <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+          Todos los releases ({releasesFiltrados.length})
+        </Typography>
+        <TextField size="small" placeholder="Buscar proyecto, version o folio..." value={busquedaReleases}
+          onChange={(e) => setBusquedaReleases(e.target.value)} sx={{ mb: 1.5, minWidth: 280 }} />
+        <TableContainer sx={{ maxHeight: 360, overflowY: "auto" }}>
+          <Table size="small" stickyHeader>
+            <TableHead>
+              <TableRow sx={{ "& th": { fontWeight: 700 } }}>
+                <EncabezadoOrdenable clave="folio" ordenActual={ordenReleases} descendente={descReleases} onOrdenar={ordenarReleases}>Folio</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="claveProyecto" ordenActual={ordenReleases} descendente={descReleases} onOrdenar={ordenarReleases}>Proyecto</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="version" ordenActual={ordenReleases} descendente={descReleases} onOrdenar={ordenarReleases}>Version</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="estatus" ordenActual={ordenReleases} descendente={descReleases} onOrdenar={ordenarReleases}>Estatus</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="fechaPlan" ordenActual={ordenReleases} descendente={descReleases} onOrdenar={ordenarReleases}>Fecha plan</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="fechaLiberacion" ordenActual={ordenReleases} descendente={descReleases} onOrdenar={ordenarReleases}>Liberado</EncabezadoOrdenable>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {releasesOrdenados.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6}>
+                    <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: "center" }}>
+                      Sin releases con esa busqueda.
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              )}
+              {releasesOrdenados.map((rel) => (
+                <TableRow key={rel.idRelease} hover selected={rel.idRelease === actual}
+                  sx={{ cursor: "pointer" }} onClick={() => setIdRelease(rel.idRelease)}>
+                  <TableCell sx={{ whiteSpace: "nowrap" }}>{rel.folio ?? "-"}</TableCell>
+                  <TableCell sx={{ whiteSpace: "nowrap" }}>{rel.claveProyecto} - {rel.proyecto}</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>{rel.version}</TableCell>
+                  <TableCell>
+                    <Chip size="small" label={rel.estatus} color={colorEstatusRelease(rel.idEstatus)} />
+                  </TableCell>
+                  <TableCell>{formatearFecha(rel.fechaPlan)}</TableCell>
+                  <TableCell>{formatearFecha(rel.fechaLiberacion)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
 
       {releases.data?.length === 0 && (
         <Alert severity="info">No hay releases. Crea uno para empezar a preparar una entrega.</Alert>
@@ -150,10 +238,22 @@ export function ReleasesPage() {
               <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", alignItems: "flex-start" }}>
                 {r.idEstatus === 1 && (
                   <>
-                    <Button size="small" variant="outlined" onClick={() => setModalContenido(true)}>
+                    <Button size="small" variant="outlined" onClick={() => {
+                      setIdSprintFiltro("");
+                      setTextoCandidatos("");
+                      setTipoCandidatos("");
+                      setOcultarBloqueados(false);
+                      setSeleccionados([]);
+                      setModalContenido(true);
+                    }}>
                       Agregar contenido
                     </Button>
-                    <Button size="small" variant="outlined" onClick={() => setModalArtefacto(true)}>
+                    <Button size="small" variant="outlined" onClick={() => {
+                      if (idTipoArtefacto === "") {
+                        setIdTipoArtefacto(catalogosEntregas.data?.tiposArtefacto[0]?.id ?? "");
+                      }
+                      setModalArtefacto(true);
+                    }}>
                       Agregar artefacto
                     </Button>
                     <Button size="small" variant="contained"
@@ -167,6 +267,12 @@ export function ReleasesPage() {
                 {(r.idEstatus === 3 || r.idEstatus === 4) && (
                   <Button size="small" variant="contained" onClick={() => setModalDespliegue(true)}>
                     Registrar despliegue
+                  </Button>
+                )}
+                {r.idEstatus === 3 && (
+                  <Button size="small" color="warning" variant="outlined"
+                    onClick={() => setModalReabrir(true)}>
+                    Reabrir
                   </Button>
                 )}
                 <Button size="small" onClick={() => void manejar(
@@ -212,7 +318,17 @@ export function ReleasesPage() {
                     {item.folio}
                   </Link>
                   <Chip size="small" variant="outlined" label={item.tipo} sx={{ height: 18 }} />
-                  <Typography variant="body2" noWrap>{item.titulo}</Typography>
+                  <Typography variant="body2" noWrap sx={{ flex: 1 }}>{item.titulo}</Typography>
+                  {r.idEstatus === 1 && (
+                    <Tooltip title="Quitar del release">
+                      <IconButton size="small" disabled={enviando}
+                        onClick={() => void manejar(
+                          () => quitarContenido(r.idRelease, item.idWorkItem),
+                          "No se pudo quitar el elemento del release.")}>
+                        <DeleteOutlinedIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  )}
                 </Stack>
               ))}
 
@@ -241,6 +357,18 @@ export function ReleasesPage() {
                           {a.justificacionIrreversible && ` - ${a.justificacionIrreversible}`}
                         </Typography>
                       </TableCell>
+                      {r.idEstatus === 1 && (
+                        <TableCell align="right" sx={{ width: 40 }}>
+                          <Tooltip title="Quitar artefacto">
+                            <IconButton size="small" disabled={enviando}
+                              onClick={() => void manejar(
+                                () => quitarArtefacto(r.idRelease, a.idArtefacto),
+                                "No se pudo quitar el artefacto.")}>
+                              <DeleteOutlinedIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -329,17 +457,19 @@ export function ReleasesPage() {
         <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
           Version viva por ambiente
         </Typography>
+        <TextField size="small" placeholder="Buscar ambiente o proyecto..." value={busquedaMatriz}
+          onChange={(e) => setBusquedaMatriz(e.target.value)} sx={{ mb: 1.5, minWidth: 280 }} />
         <Table size="small">
           <TableHead>
             <TableRow sx={{ "& th": { fontWeight: 700 } }}>
-              <TableCell>Ambiente</TableCell>
-              <TableCell>Proyecto</TableCell>
-              <TableCell>Version</TableCell>
-              <TableCell>Desplegado</TableCell>
+              <EncabezadoOrdenable clave="ambiente" ordenActual={ordenMatriz} descendente={descMatriz} onOrdenar={ordenarMatriz}>Ambiente</EncabezadoOrdenable>
+              <EncabezadoOrdenable clave="claveProyecto" ordenActual={ordenMatriz} descendente={descMatriz} onOrdenar={ordenarMatriz}>Proyecto</EncabezadoOrdenable>
+              <EncabezadoOrdenable clave="versionDesplegada" ordenActual={ordenMatriz} descendente={descMatriz} onOrdenar={ordenarMatriz}>Version</EncabezadoOrdenable>
+              <EncabezadoOrdenable clave="fechaDespliegue" ordenActual={ordenMatriz} descendente={descMatriz} onOrdenar={ordenarMatriz}>Desplegado</EncabezadoOrdenable>
             </TableRow>
           </TableHead>
           <TableBody>
-            {matriz.data?.map((fila) => (
+            {matrizOrdenada.map((fila) => (
               <TableRow key={fila.idAmbiente}>
                 <TableCell><Chip size="small" label={fila.ambiente} /></TableCell>
                 <TableCell>{fila.claveProyecto ?? "-"}</TableCell>
@@ -354,21 +484,19 @@ export function ReleasesPage() {
       <Dialog open={modalNuevo} onClose={() => setModalNuevo(false)} fullWidth maxWidth="xs">
         <DialogTitle>Nuevo release</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
-          <FormControl size="small" required>
-            <InputLabel>Proyecto</InputLabel>
-            <Select label="Proyecto" value={idProyectoNuevo}
-              onChange={(e) => setIdProyectoNuevo(e.target.value as number)}>
-              {catalogos.data?.proyectos.map((p) => (
-                <MenuItem key={p.id} value={p.id}>{p.clave} - {p.nombre}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <ComboBuscable
+            label="Proyecto"
+            required
+            value={idProyectoNuevo}
+            onChange={(v) => setIdProyectoNuevo(v as number | "")}
+            opciones={(catalogos.data?.proyectos ?? []).map((p) => ({ valor: p.id, etiqueta: `${p.clave} - ${p.nombre}` }))}
+          />
           <TextField size="small" required label="Version" value={version} placeholder="2.11.0"
             onChange={(e) => setVersion(e.target.value)}
             helperText="Versionado semantico" />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setModalNuevo(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setModalNuevo(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || idProyectoNuevo === "" || !version.trim()}
             onClick={() => { setModalNuevo(false); void manejar(() => crearRelease({
               idProyecto: idProyectoNuevo as number, version: version.trim(), fechaPlan: null,
@@ -380,25 +508,89 @@ export function ReleasesPage() {
 
       <Dialog open={modalContenido} onClose={() => setModalContenido(false)} fullWidth maxWidth="sm">
         <DialogTitle>Agregar contenido al release</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            Solo aparecen los elementos terminados del proyecto.
+        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
+          <Typography variant="body2" color="text.secondary">
+            Solo aparecen los elementos terminados del proyecto que todavia no estan en ningun
+            release, ordenados por folio.
           </Typography>
-          <FormControl size="small" fullWidth>
-            <InputLabel>Elementos</InputLabel>
-            <Select multiple label="Elementos" value={seleccionados}
-              onChange={(e) => setSeleccionados(e.target.value as number[])}
-              renderValue={(sel) => `${sel.length} seleccionado(s)`}>
-              {candidatos.data?.items.map((item) => (
-                <MenuItem key={item.idWorkItem} value={item.idWorkItem}>
-                  {item.folio} - {item.titulo}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+
+          {/* Los filtros se arman con los propios candidatos: acotan la lista Y el boton de
+              seleccionar todo, que es lo que permite meter un sprint completo de un clic. */}
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+            <TextField size="small" label="Folio o titulo" value={textoCandidatos} sx={{ flex: 1 }}
+              onChange={(e) => setTextoCandidatos(e.target.value)} />
+            {sprintsConCandidatos.length > 0 && (
+              <FormControl size="small" sx={{ minWidth: 160 }}>
+                <InputLabel>Sprint</InputLabel>
+                <Select label="Sprint" value={idSprintFiltro}
+                  onChange={(e) => {
+                    const valor = e.target.value as number | "";
+                    setIdSprintFiltro(valor === "" ? "" : Number(valor));
+                    setSeleccionados([]);
+                  }}>
+                  <MenuItem value="">Todos los sprints</MenuItem>
+                  {sprintsConCandidatos.map((s) => (
+                    <MenuItem key={s.id ?? 0} value={s.id ?? 0}>{s.nombre}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
+            {tiposConCandidatos.length > 1 && (
+              <FormControl size="small" sx={{ minWidth: 140 }}>
+                <InputLabel>Tipo</InputLabel>
+                <Select label="Tipo" value={tipoCandidatos}
+                  onChange={(e) => { setTipoCandidatos(e.target.value); setSeleccionados([]); }}>
+                  <MenuItem value="">Todos los tipos</MenuItem>
+                  {tiposConCandidatos.map((t) => (
+                    <MenuItem key={t} value={t}>{t}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
+          </Stack>
+
+          {hayBloqueados && (
+            <FormControlLabel
+              control={<Switch size="small" checked={ocultarBloqueados}
+                onChange={(e) => { setOcultarBloqueados(e.target.checked); setSeleccionados([]); }} />}
+              label="Ocultar los que tienen hallazgos pendientes"
+              slotProps={{ typography: { variant: "body2" } }}
+            />
+          )}
+
+          <ComboBuscableMultiple
+            label="Elementos"
+            resumenSimple
+            value={seleccionados}
+            onChange={(valores) => setSeleccionados(valores as number[])}
+            opciones={candidatosFiltrados.map((item) => ({
+              valor: item.idWorkItem,
+              etiqueta: item.hallazgosPendientes > 0
+                ? `${item.folio} - ${item.titulo} (hallazgos pendientes)`
+                : `${item.folio} - ${item.titulo}`,
+            }))}
+          />
+
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+            <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
+              {candidatosFiltrados.length} de {(candidatos.data ?? []).length} elemento(s)
+              {seleccionados.length > 0 && ` - ${seleccionados.length} seleccionado(s)`}
+            </Typography>
+            {candidatosFiltrados.length > 1 && (
+              <Button size="small"
+                onClick={() => setSeleccionados(candidatosFiltrados.map((i) => i.idWorkItem))}>
+                Seleccionar los {candidatosFiltrados.length}
+              </Button>
+            )}
+            {seleccionados.length > 0 && (
+              <Button size="small" color="inherit" onClick={() => setSeleccionados([])}>
+                Limpiar
+              </Button>
+            )}
+          </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setModalContenido(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setModalContenido(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || seleccionados.length === 0}
             onClick={() => { setModalContenido(false); void manejar(
               () => agregarContenido(r!.idRelease, seleccionados).then((res) => {
@@ -418,13 +610,12 @@ export function ReleasesPage() {
             <InputLabel>Tipo</InputLabel>
             <Select label="Tipo" value={idTipoArtefacto}
               onChange={(e) => setIdTipoArtefacto(Number(e.target.value))}>
-              <MenuItem value={1}>Paquete</MenuItem>
-              <MenuItem value={2}>Script SQL</MenuItem>
-              <MenuItem value={3}>Archivo de configuracion</MenuItem>
-              <MenuItem value={4}>Otro</MenuItem>
+              {(catalogosEntregas.data?.tiposArtefacto ?? []).map((t) => (
+                <MenuItem key={t.id} value={t.id}>{t.nombre}</MenuItem>
+              ))}
             </Select>
           </FormControl>
-          {idTipoArtefacto === 2 && (
+          {idTipoArtefacto === catalogosEntregas.data?.idTipoArtefactoScriptSql && (
             <TextField size="small" multiline minRows={2}
               label="Justificacion si no hay script de reversa"
               value={justificacion} onChange={(e) => setJustificacion(e.target.value)}
@@ -432,12 +623,13 @@ export function ReleasesPage() {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setModalArtefacto(false)}>Cancelar</Button>
-          <Button variant="contained" disabled={enviando || !nombreArtefacto.trim()}
+          <Button color="error" onClick={() => setModalArtefacto(false)}>Cancelar</Button>
+          <Button variant="contained"
+            disabled={enviando || !nombreArtefacto.trim() || idTipoArtefacto === ""}
             onClick={() => { setModalArtefacto(false); void manejar(
               () => agregarArtefacto(r!.idRelease, {
                 nombre: nombreArtefacto.trim(),
-                idTipoArtefacto,
+                idTipoArtefacto: idTipoArtefacto as number,
                 ordenEjecucion: null,
                 idArtefactoRollback: null,
                 justificacionIrreversible: justificacion.trim() || null,
@@ -451,15 +643,13 @@ export function ReleasesPage() {
       <Dialog open={modalDespliegue} onClose={() => setModalDespliegue(false)} fullWidth maxWidth="xs">
         <DialogTitle>Registrar despliegue</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
-          <FormControl size="small" required>
-            <InputLabel>Ambiente</InputLabel>
-            <Select label="Ambiente" value={idAmbiente}
-              onChange={(e) => setIdAmbiente(e.target.value as number)}>
-              {matriz.data?.map((a) => (
-                <MenuItem key={a.idAmbiente} value={a.idAmbiente}>{a.ambiente}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <ComboBuscable
+            label="Ambiente"
+            required
+            value={idAmbiente}
+            onChange={(v) => setIdAmbiente(v as number | "")}
+            opciones={(matriz.data ?? []).map((a) => ({ valor: a.idAmbiente, etiqueta: a.ambiente }))}
+          />
           <FormControl size="small">
             <InputLabel>Tipo</InputLabel>
             <Select label="Tipo" value={esRollback ? 1 : 0}
@@ -472,7 +662,7 @@ export function ReleasesPage() {
             value={bitacora} onChange={(e) => setBitacora(e.target.value)} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setModalDespliegue(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setModalDespliegue(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || idAmbiente === ""}
             onClick={() => { setModalDespliegue(false); void manejar(
               () => registrarDespliegue(r!.idRelease, {
@@ -497,7 +687,7 @@ export function ReleasesPage() {
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setModalRechazo(null)}>Cancelar</Button>
+          <Button color="error" onClick={() => setModalRechazo(null)}>Cancelar</Button>
           <Button variant="contained" color="error"
             disabled={enviando || !comentario.trim()}
             onClick={() => { const id = modalRechazo!; setModalRechazo(null); void manejar(
@@ -505,6 +695,31 @@ export function ReleasesPage() {
                 setComentario(""); return res;
               }), "No se pudo rechazar."); }}>
             Rechazar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={modalReabrir} onClose={() => setModalReabrir(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Reabrir release</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            El release regresa a preparacion para agregar contenido o artefactos. Esto invalida
+            las firmas ya puestas: al volver a solicitar aprobacion, QA/Lider/Negocio deben firmar
+            de nuevo.
+          </Typography>
+          <TextField autoFocus fullWidth multiline minRows={2} margin="dense"
+            label="Motivo de la reapertura (obligatorio)"
+            value={motivoReabrir} onChange={(e) => setMotivoReabrir(e.target.value)} />
+        </DialogContent>
+        <DialogActions>
+          <Button color="error" onClick={() => setModalReabrir(false)}>Cancelar</Button>
+          <Button variant="contained" color="warning"
+            disabled={enviando || !motivoReabrir.trim()}
+            onClick={() => { setModalReabrir(false); void manejar(
+              () => cambiarEstatusRelease(r!.idRelease, "REABRIR", motivoReabrir.trim()).then((res) => {
+                setMotivoReabrir(""); return res;
+              }), "No se pudo reabrir el release."); }}>
+            Reabrir
           </Button>
         </DialogActions>
       </Dialog>

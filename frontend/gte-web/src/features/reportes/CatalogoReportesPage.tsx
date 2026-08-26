@@ -12,7 +12,9 @@ import {
 import { ComboBuscable } from "../../shared/components/ComboBuscable";
 import { EncabezadoOrdenable } from "../../shared/components/EncabezadoOrdenable";
 import { useOrdenTabla } from "../../shared/hooks/useOrdenTabla";
+import { useSesion } from "../../shared/api/sesion";
 import { obtenerCatalogosBandeja } from "../../shared/api/workitems";
+import { useColorSerie } from "../../shared/graficas/coloresGrafica";
 import {
   descargarReporteExcel,
   obtenerReporteBugsDefectos, obtenerReporteCargaTrabajo, obtenerReporteCostos,
@@ -26,21 +28,22 @@ type ClaveReporte =
   | "productividad" | "horas" | "retrabajo" | "bugs" | "releases" | "riesgos"
   | "solicitantes" | "costos" | "rentabilidad" | "sla" | "kpis" | "carga" | "flujo" | "auditoria";
 
-const REPORTES: { clave: ClaveReporte; titulo: string }[] = [
-  { clave: "productividad", titulo: "R01 - Productividad" },
-  { clave: "horas", titulo: "R02 - Horas registradas" },
-  { clave: "retrabajo", titulo: "R03 - Retrabajo" },
-  { clave: "bugs", titulo: "R04 - Bugs y defectos" },
-  { clave: "releases", titulo: "R05 - Versiones/Releases" },
-  { clave: "riesgos", titulo: "R06 - Riesgos" },
-  { clave: "solicitantes", titulo: "R07 - Clientes/solicitantes" },
-  { clave: "costos", titulo: "R08 - Costos" },
-  { clave: "rentabilidad", titulo: "R09 - Rentabilidad" },
-  { clave: "sla", titulo: "R10 - SLA" },
-  { clave: "kpis", titulo: "R11 - KPIs / DORA" },
-  { clave: "carga", titulo: "R12 - Carga de trabajo" },
-  { clave: "flujo", titulo: "R13 - Flujo (CFD)" },
-  { clave: "auditoria", titulo: "R14 - Auditoria" },
+/** Permiso 1:1 con el ExigirPermisoAsync de cada handler en GTE.Application.Reportes.Queries. */
+const REPORTES: { clave: ClaveReporte; titulo: string; permiso: string }[] = [
+  { clave: "productividad", titulo: "R01 - Productividad", permiso: "RPT.Ver" },
+  { clave: "horas", titulo: "R02 - Horas registradas", permiso: "RPT.Ver" },
+  { clave: "retrabajo", titulo: "R03 - Retrabajo", permiso: "RPT.Ver" },
+  { clave: "bugs", titulo: "R04 - Bugs y defectos", permiso: "RPT.Ver" },
+  { clave: "releases", titulo: "R05 - Versiones/Releases", permiso: "RPT.Ver" },
+  { clave: "riesgos", titulo: "R06 - Riesgos", permiso: "RPT.Ver" },
+  { clave: "solicitantes", titulo: "R07 - Clientes/solicitantes", permiso: "RPT.Ver" },
+  { clave: "costos", titulo: "R08 - Costos", permiso: "RPT.Costos" },
+  { clave: "rentabilidad", titulo: "R09 - Rentabilidad", permiso: "RPT.Costos" },
+  { clave: "sla", titulo: "R10 - SLA", permiso: "RPT.Ver" },
+  { clave: "kpis", titulo: "R11 - KPIs / DORA", permiso: "RPT.Ver" },
+  { clave: "carga", titulo: "R12 - Carga de trabajo", permiso: "RPT.Ver" },
+  { clave: "flujo", titulo: "R13 - Flujo (CFD)", permiso: "RPT.Ver" },
+  { clave: "auditoria", titulo: "R14 - Auditoria", permiso: "RPT.Auditoria" },
 ];
 
 function primerDiaMes(): string {
@@ -204,6 +207,7 @@ function ReporteRetrabajo() {
         {consulta.data?.reaperturasSinDatos && <Chip size="small" label="Reaperturas: sin dato" />}
       </Stack>
       {consulta.isLoading && <LinearProgress />}
+      {consulta.isError && <Alert severity="error">No se pudo cargar el reporte.</Alert>}
       {consulta.data && (
         <TableContainer component={Paper} variant="outlined">
           <Table size="small">
@@ -249,6 +253,7 @@ function ReporteBugs() {
         <BotonExportar ruta="bugs-defectos" filtro={{ desde, hasta, idProyecto: idProyecto || null }} nombreArchivo="BugsDefectos.xlsx" />
       </Stack>
       {consulta.isLoading && <LinearProgress />}
+      {consulta.isError && <Alert severity="error">No se pudo cargar el reporte.</Alert>}
       {consulta.data && (
         <TableContainer component={Paper} variant="outlined">
           <Table size="small">
@@ -289,6 +294,7 @@ function ReporteReleases() {
         {consulta.data && <Chip size="small" label={`${consulta.data.totalReleases} releases - ${consulta.data.frecuenciaPorSemana}/semana`} />}
       </Stack>
       {consulta.isLoading && <LinearProgress />}
+      {consulta.isError && <Alert severity="error">No se pudo cargar el reporte.</Alert>}
       {consulta.data && (
         <TableContainer component={Paper} variant="outlined">
           <Table size="small">
@@ -333,6 +339,7 @@ function ReporteRiesgos() {
         )}
       </Stack>
       {consulta.isLoading && <LinearProgress />}
+      {consulta.isError && <Alert severity="error">No se pudo cargar el reporte.</Alert>}
       {consulta.data && (
         <TableContainer component={Paper} variant="outlined">
           <Table size="small">
@@ -369,6 +376,7 @@ function ReporteSolicitantes() {
         {consulta.data?.satisfaccionSinDatos && <Chip size="small" label="Satisfaccion: sin dato" />}
       </Stack>
       {consulta.isLoading && <LinearProgress />}
+      {consulta.isError && <Alert severity="error">No se pudo cargar el reporte.</Alert>}
       {consulta.data && (
         <TableContainer component={Paper} variant="outlined">
           <Table size="small">
@@ -406,6 +414,7 @@ function ReporteCostos() {
         <BotonExportar ruta="costos" filtro={{ anio, idProyecto: idProyecto || null }} nombreArchivo="Costos.xlsx" />
       </Stack>
       {consulta.isLoading && <LinearProgress />}
+      {consulta.isError && <Alert severity="error">No se pudo cargar el reporte.</Alert>}
       {consulta.data && (
         <Stack spacing={2}>
           <Typography variant="subtitle2">Por proyecto / mes</Typography>
@@ -453,6 +462,7 @@ function ReporteRentabilidad() {
         <BotonExportar ruta="rentabilidad" filtro={{ anio }} nombreArchivo="Rentabilidad.xlsx" />
       </Stack>
       {consulta.isLoading && <LinearProgress />}
+      {consulta.isError && <Alert severity="error">No se pudo cargar el reporte.</Alert>}
       {consulta.data && (
         <TableContainer component={Paper} variant="outlined">
           <Table size="small">
@@ -489,6 +499,7 @@ function ReporteSla() {
         {consulta.data && <Chip size="small" label={`CSAT: ${consulta.data.csat ?? "s/d"}`} />}
       </Stack>
       {consulta.isLoading && <LinearProgress />}
+      {consulta.isError && <Alert severity="error">No se pudo cargar el reporte.</Alert>}
       {consulta.data && (
         <Stack spacing={2}>
           <Typography variant="subtitle2">Por prioridad</Typography>
@@ -526,6 +537,7 @@ function ReporteSla() {
 }
 
 function ReporteKpis() {
+  const colorSerie = useColorSerie();
   const [anio, setAnio] = useState(new Date().getFullYear());
   const [anioComparativo, setAnioComparativo] = useState<number | "">(anio - 1);
   const consulta = useQuery({
@@ -540,6 +552,7 @@ function ReporteKpis() {
         <TextField size="small" type="number" label="Comparar contra" value={anioComparativo} onChange={(e) => setAnioComparativo(e.target.value === "" ? "" : Number(e.target.value))} sx={{ width: 130 }} />
       </Stack>
       {consulta.isLoading && <LinearProgress />}
+      {consulta.isError && <Alert severity="error">No se pudo cargar el reporte.</Alert>}
       {consulta.data && consulta.data.kpis.length === 0 && <Typography color="text.secondary">Sin KPIs personalizados definidos todavia.</Typography>}
       {consulta.data && consulta.data.kpis.map((kpi) => {
         const combinado = kpi.serieAnioActual.map((p, i) => ({
@@ -556,7 +569,7 @@ function ReporteKpis() {
                   <YAxis tick={{ fontSize: 10 }} />
                   <RechartsTooltip />
                   <Legend />
-                  <Line type="monotone" dataKey="actual" name={String(anio)} stroke="#334155" dot={false} />
+                  <Line type="monotone" dataKey="actual" name={String(anio)} stroke={colorSerie("#334155")} dot={false} />
                   {anioComparativo !== "" && <Line type="monotone" dataKey="comparativo" name={String(anioComparativo)} stroke="#94a3b8" strokeDasharray="4 4" dot={false} />}
                 </LineChart>
               </ResponsiveContainer>
@@ -584,6 +597,7 @@ function ReporteCarga() {
         <BotonExportar ruta="carga-trabajo" filtro={{ idEquipo: idEquipo || null }} nombreArchivo="CargaTrabajo.xlsx" />
       </Stack>
       {consulta.isLoading && <LinearProgress />}
+      {consulta.isError && <Alert severity="error">No se pudo cargar el reporte.</Alert>}
       {consulta.data && (
         <TableContainer component={Paper} variant="outlined">
           <Table size="small">
@@ -611,6 +625,7 @@ function ReporteCarga() {
 }
 
 function ReporteFlujo() {
+  const colorSerie = useColorSerie();
   const [desde, setDesde] = useState(primerDiaMes());
   const [hasta, setHasta] = useState(hoyIso());
   const [idProyecto, setIdProyecto] = useState<number | "">("");
@@ -632,6 +647,7 @@ function ReporteFlujo() {
       </Stack>
       {idProyecto === "" && <Typography color="text.secondary">Selecciona un proyecto para ver su diagrama de flujo acumulado.</Typography>}
       {consulta.isLoading && <LinearProgress />}
+      {consulta.isError && <Alert severity="error">No se pudo cargar el reporte.</Alert>}
       {consulta.data && (
         <Paper variant="outlined" sx={{ p: 1.5 }}>
           <Box sx={{ height: 320 }}>
@@ -644,8 +660,8 @@ function ReporteFlujo() {
                 <Legend />
                 {consulta.data.estatus.map((e, i) => (
                   <Area key={e} type="monotone" dataKey={e} stackId="1"
-                    stroke={["#0f766e", "#334155", "#f59e0b", "#ef4444", "#94a3b8", "#8b5cf6", "#22c55e"][i % 7]}
-                    fill={["#0f766e", "#334155", "#f59e0b", "#ef4444", "#94a3b8", "#8b5cf6", "#22c55e"][i % 7]} />
+                    stroke={colorSerie(["#0f766e", "#334155", "#f59e0b", "#ef4444", "#94a3b8", "#8b5cf6", "#22c55e"][i % 7])}
+                    fill={colorSerie(["#0f766e", "#334155", "#f59e0b", "#ef4444", "#94a3b8", "#8b5cf6", "#22c55e"][i % 7])} />
                 ))}
               </AreaChart>
             </ResponsiveContainer>
@@ -677,6 +693,7 @@ function ReporteAuditoria() {
         <TextField size="small" label="Entidad" value={entidad} onChange={(e) => setEntidad(e.target.value)} sx={{ width: 160 }} />
       </Stack>
       {consulta.isLoading && <LinearProgress />}
+      {consulta.isError && <Alert severity="error">No se pudo cargar el reporte.</Alert>}
       {consulta.data && (
         <TableContainer component={Paper} variant="outlined">
           <Table size="small">
@@ -706,14 +723,30 @@ function ReporteAuditoria() {
 }
 
 export function CatalogoReportesPage() {
-  const [reporteActivo, setReporteActivo] = useState<ClaveReporte>("productividad");
+  const { puede } = useSesion();
+  const disponibles = REPORTES.filter((r) => puede(r.permiso));
+  const [reporteElegido, setReporteElegido] = useState<ClaveReporte | null>(null);
+  // Si el reporte elegido ya no esta disponible (o nunca se eligio), cae en el primero
+  // disponible -- nunca en uno oculto por permiso, ni siquiera navegando directo a la URL.
+  const reporteActivo = disponibles.some((r) => r.clave === reporteElegido)
+    ? reporteElegido
+    : disponibles[0]?.clave;
+
+  if (disponibles.length === 0) {
+    return (
+      <Box sx={{ p: 2 }}>
+        <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>Reportes</Typography>
+        <Alert severity="warning">No tienes permiso para ver esta sección.</Alert>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ display: "flex", p: 2, gap: 2 }}>
       <Paper variant="outlined" sx={{ width: 240, flexShrink: 0 }}>
         <List dense>
-          {REPORTES.map((r) => (
-            <ListItemButton key={r.clave} selected={reporteActivo === r.clave} onClick={() => setReporteActivo(r.clave)}>
+          {disponibles.map((r) => (
+            <ListItemButton key={r.clave} selected={reporteActivo === r.clave} onClick={() => setReporteElegido(r.clave)}>
               <ListItemText primary={r.titulo} sx={{ "& .MuiListItemText-primary": { fontSize: 13 } }} />
             </ListItemButton>
           ))}

@@ -18,6 +18,7 @@ public class UsuarioResponse
     public DateTime? FechaAlta { get; set; }
     public DateTime? FechaBaja { get; set; }
     public bool Activo { get; set; }
+    public string? UrlFoto { get; set; }
 }
 
 /// <summary>Respuesta del alta de usuario: trae la password temporal una sola vez.</summary>

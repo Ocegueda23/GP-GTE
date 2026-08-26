@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import {
-  Box, Button, Chip, FormControl, FormControlLabel, InputLabel,
-  MenuItem, Select, Switch, TextField,
+  Box, Button, FormControlLabel, Switch, TextField,
 } from "@mui/material";
+import { ComboBuscable, ComboBuscableMultiple } from "../../shared/components/ComboBuscable";
 import type { CatalogosBandeja } from "../../shared/api/workitems";
 import { useFiltrosBandeja } from "./storeFiltros";
 
@@ -38,80 +38,49 @@ export function BarraFiltros({ catalogos }: Props) {
         sx={{ minWidth: 260 }}
       />
 
-      <FormControl size="small" sx={{ minWidth: 180 }}>
-        <InputLabel>Estatus</InputLabel>
-        <Select
-          multiple
-          label="Estatus"
-          value={filtro.estatus}
-          onChange={(e) => establecer({ estatus: e.target.value as number[] })}
-          renderValue={(seleccion) =>
-            seleccion.includes(-1) ? (
-              <Chip size="small" label="Todos" />
-            ) : (
-              <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
-                {seleccion.map((id) => (
-                  <Chip
-                    key={id}
-                    size="small"
-                    label={catalogos?.estatus.find((c) => c.id === id)?.nombre ?? id}
-                  />
-                ))}
-              </Box>
-            )
-          }
-        >
-          <MenuItem value={-1}>Todos</MenuItem>
-          {catalogos?.estatus.map((c) => (
-            <MenuItem key={c.id} value={c.id}>{c.nombre}</MenuItem>
-          ))}
-        </Select>
-      </FormControl>
+      <ComboBuscableMultiple
+        label="Estatus"
+        value={filtro.estatus}
+        onChange={(valores) => establecer({ estatus: valores as number[] })}
+        opciones={[
+          { valor: -1, etiqueta: "Todos" },
+          ...(catalogos?.estatus ?? []).map((c) => ({ valor: c.id, etiqueta: c.nombre })),
+        ]}
+        sx={{ minWidth: 180 }}
+      />
 
-      <FormControl size="small" sx={{ minWidth: 180 }}>
-        <InputLabel>Proyecto</InputLabel>
-        <Select
-          label="Proyecto"
-          value={filtro.idProyecto ?? ""}
-          onChange={(e) =>
-            establecer({ idProyecto: (e.target.value as number | "") === "" ? null : Number(e.target.value) })}
-        >
-          <MenuItem value="">Todos</MenuItem>
-          {catalogos?.proyectos.map((p) => (
-            <MenuItem key={p.id} value={p.id}>{p.clave} - {p.nombre}</MenuItem>
-          ))}
-        </Select>
-      </FormControl>
+      <ComboBuscable
+        label="Proyecto"
+        value={filtro.idProyecto ?? ""}
+        onChange={(v) => establecer({ idProyecto: v === "" ? null : Number(v) })}
+        opciones={[
+          { valor: "", etiqueta: "Todos" },
+          ...(catalogos?.proyectos ?? []).map((p) => ({ valor: p.id, etiqueta: `${p.clave} - ${p.nombre}` })),
+        ]}
+        sx={{ minWidth: 180 }}
+      />
 
-      <FormControl size="small" sx={{ minWidth: 160 }}>
-        <InputLabel>Asignado</InputLabel>
-        <Select
-          label="Asignado"
-          value={filtro.idAsignado ?? ""}
-          onChange={(e) =>
-            establecer({ idAsignado: (e.target.value as number | "") === "" ? null : Number(e.target.value) })}
-        >
-          <MenuItem value="">Todos</MenuItem>
-          {catalogos?.usuarios.map((u) => (
-            <MenuItem key={u.id} value={u.id}>{u.nombre}</MenuItem>
-          ))}
-        </Select>
-      </FormControl>
+      <ComboBuscable
+        label="Asignado"
+        value={filtro.idAsignado ?? ""}
+        onChange={(v) => establecer({ idAsignado: v === "" ? null : Number(v) })}
+        opciones={[
+          { valor: "", etiqueta: "Todos" },
+          ...(catalogos?.usuarios ?? []).map((u) => ({ valor: u.id, etiqueta: u.nombre })),
+        ]}
+        sx={{ minWidth: 160 }}
+      />
 
-      <FormControl size="small" sx={{ minWidth: 140 }}>
-        <InputLabel>Tipo</InputLabel>
-        <Select
-          label="Tipo"
-          value={filtro.idTipo ?? ""}
-          onChange={(e) =>
-            establecer({ idTipo: (e.target.value as number | "") === "" ? null : Number(e.target.value) })}
-        >
-          <MenuItem value="">Todos</MenuItem>
-          {catalogos?.tipos.map((t) => (
-            <MenuItem key={t.id} value={t.id}>{t.nombre}</MenuItem>
-          ))}
-        </Select>
-      </FormControl>
+      <ComboBuscable
+        label="Tipo"
+        value={filtro.idTipo ?? ""}
+        onChange={(v) => establecer({ idTipo: v === "" ? null : Number(v) })}
+        opciones={[
+          { valor: "", etiqueta: "Todos" },
+          ...(catalogos?.tipos ?? []).map((t) => ({ valor: t.id, etiqueta: t.nombre })),
+        ]}
+        sx={{ minWidth: 140 }}
+      />
 
       <FormControlLabel
         control={

@@ -2,18 +2,20 @@ import { useState } from "react";
 import { Link as RouterLink, useParams } from "react-router-dom";
 import {
   Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
-  FormControl, InputLabel, Link, MenuItem, Paper, Rating, Select, Snackbar, Stack,
+  Link, Paper, Rating, Snackbar, Stack,
   TextField, Typography,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
+import { ComboBuscable } from "../../shared/components/ComboBuscable";
 import { obtenerCatalogosBandeja, type AccionDisponible } from "../../shared/api/workitems";
 import { useSesion } from "../../shared/api/sesion";
 import {
   cambiarEstatusTicket, colorEstatusTicket, escalarTicket, obtenerAccionesTicket,
   obtenerTicketPorFolio, registrarEncuestaTicket,
 } from "../../shared/api/tickets";
+import { PanelComentarios } from "../workitem/PanelComentarios";
 
 const ESTATUS_RESUELTO = 5;
 const ESTATUS_CERRADO = 6;
@@ -186,6 +188,10 @@ export function DetalleTicketPage() {
         )}
       </Paper>
 
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <PanelComentarios idTicket={ticket.idTicket} alError={(mensaje) => setAviso({ tipo: "error", mensaje })} />
+      </Paper>
+
       <Snackbar open={aviso !== null} autoHideDuration={6000} onClose={() => setAviso(null)}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>
         <Alert severity={aviso?.tipo ?? "success"} variant="filled" onClose={() => setAviso(null)}>
@@ -257,7 +263,7 @@ function BotonesAccionesTicket({ idTicket, folio, acciones, alExito, alError }: 
             label="Motivo (obligatorio)" value={motivo} onChange={(e) => setMotivo(e.target.value)} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAccionConMotivo(null)}>Cancelar</Button>
+          <Button color="error" onClick={() => setAccionConMotivo(null)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || motivo.trim().length === 0}
             onClick={() => accionConMotivo && void ejecutar(accionConMotivo.accion, motivo.trim())}>
             Confirmar
@@ -268,17 +274,16 @@ function BotonesAccionesTicket({ idTicket, folio, acciones, alExito, alError }: 
       <Dialog open={dialogoAsignar} onClose={() => setDialogoAsignar(false)} fullWidth maxWidth="xs">
         <DialogTitle>Asignar {folio}</DialogTitle>
         <DialogContent sx={{ pt: "12px !important" }}>
-          <FormControl size="small" fullWidth required>
-            <InputLabel>Agente</InputLabel>
-            <Select label="Agente" value={idAsignado} onChange={(e) => setIdAsignado(e.target.value as number | "")}>
-              {catalogos.data?.usuarios.map((u) => (
-                <MenuItem key={u.id} value={u.id}>{u.nombre}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <ComboBuscable
+            label="Agente"
+            required
+            value={idAsignado}
+            onChange={(v) => setIdAsignado(v as number | "")}
+            opciones={(catalogos.data?.usuarios ?? []).map((u) => ({ valor: u.id, etiqueta: u.nombre }))}
+          />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDialogoAsignar(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setDialogoAsignar(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || idAsignado === ""}
             onClick={() => void ejecutar("ASIGNAR", undefined, idAsignado as number)}>
             Asignar
@@ -297,7 +302,7 @@ function BotonesAccionesTicket({ idTicket, folio, acciones, alExito, alError }: 
             slotProps={{ htmlInput: { min: 1 } }} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDialogoResolver(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setDialogoResolver(false)}>Cancelar</Button>
           <Button variant="contained"
             disabled={enviando || solucion.trim().length === 0 || minutosSolucion === "" || minutosSolucion <= 0}
             onClick={() => void ejecutar("RESOLVER", undefined, undefined, solucion.trim(), minutosSolucion as number)}>
@@ -348,28 +353,27 @@ function BotonEscalar({ idTicket, folio, proyectos, usuarios, alExito, alError }
       <Dialog open={abierto} onClose={() => setAbierto(false)} fullWidth maxWidth="xs">
         <DialogTitle>Escalar {folio}</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
-          <FormControl size="small" fullWidth required>
-            <InputLabel>Proyecto destino</InputLabel>
-            <Select label="Proyecto destino" value={idProyecto} onChange={(e) => setIdProyecto(e.target.value as number | "")}>
-              {proyectos.map((p) => (
-                <MenuItem key={p.id} value={p.id}>{p.clave} - {p.nombre}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl size="small" fullWidth>
-            <InputLabel>Asignado (opcional)</InputLabel>
-            <Select label="Asignado (opcional)" value={idAsignado} onChange={(e) => setIdAsignado(e.target.value as number | "")}>
-              <MenuItem value="">Sin asignar</MenuItem>
-              {usuarios.map((u) => (
-                <MenuItem key={u.id} value={u.id}>{u.nombre}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <ComboBuscable
+            label="Proyecto destino"
+            required
+            value={idProyecto}
+            onChange={(v) => setIdProyecto(v as number | "")}
+            opciones={proyectos.map((p) => ({ valor: p.id, etiqueta: `${p.clave} - ${p.nombre}` }))}
+          />
+          <ComboBuscable
+            label="Asignado (opcional)"
+            value={idAsignado}
+            onChange={(v) => setIdAsignado(v as number | "")}
+            opciones={[
+              { valor: "", etiqueta: "Sin asignar" },
+              ...usuarios.map((u) => ({ valor: u.id, etiqueta: u.nombre })),
+            ]}
+          />
           <TextField size="small" type="date" label="Compromiso (opcional)" value={fechaCompromiso}
             onChange={(e) => setFechaCompromiso(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAbierto(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setAbierto(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || idProyecto === ""} onClick={() => void escalar()}>
             Escalar
           </Button>

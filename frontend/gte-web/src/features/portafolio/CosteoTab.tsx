@@ -1,12 +1,13 @@
 import { useState } from "react";
 import {
-  Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, FormControl,
-  Grid, InputLabel, LinearProgress, MenuItem, Paper, Select, Snackbar, Stack, Table, TableBody,
+  Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
+  Grid, LinearProgress, Paper, Snackbar, Stack, Table, TableBody,
   TableCell, TableContainer, TableHead, TableRow, TextField, Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
+import { ComboBuscable } from "../../shared/components/ComboBuscable";
 import { obtenerCatalogosAdministracion, obtenerProyectos } from "../../shared/api/administracion";
 import {
   actualizarPresupuesto, actualizarTarifa, crearPresupuesto, crearTarifa, obtenerCostoProyecto,
@@ -62,14 +63,13 @@ export function CosteoTab() {
 
       <Typography variant="subtitle1" sx={{ fontWeight: 700, mt: 4, mb: 1 }}>Presupuesto y costo real</Typography>
       <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
-        <FormControl size="small" sx={{ minWidth: 250 }}>
-          <InputLabel>Proyecto</InputLabel>
-          <Select label="Proyecto" value={idProyecto} onChange={(e) => setIdProyecto(e.target.value as number)}>
-            {proyectos.data?.map((p) => (
-              <MenuItem key={p.idProyecto} value={p.idProyecto}>{p.clave} - {p.nombre}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+        <ComboBuscable
+          label="Proyecto"
+          value={idProyecto}
+          onChange={(v) => setIdProyecto(v as number | "")}
+          opciones={(proyectos.data ?? []).map((p) => ({ valor: p.idProyecto, etiqueta: `${p.clave} - ${p.nombre}` }))}
+          sx={{ minWidth: 250 }}
+        />
         <TextField size="small" type="number" label="Anio" value={anio}
           onChange={(e) => setAnio(Number(e.target.value))} sx={{ width: 120 }} />
       </Stack>
@@ -259,19 +259,21 @@ function SeccionTarifas({ tarifas, niveles, puedeGestionar, alExito, alError }: 
         <Dialog open={modal} onClose={() => setModal(false)} fullWidth maxWidth="xs">
           <DialogTitle>{editando ? "Editar tarifa" : "Nueva tarifa"}</DialogTitle>
           <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
-            <FormControl size="small" required disabled={!!editando}>
-              <InputLabel>Nivel</InputLabel>
-              <Select label="Nivel" value={idNivel} onChange={(e) => setIdNivel(e.target.value as number)}>
-                {niveles.map((n) => <MenuItem key={n.id} value={n.id}>{n.nombre}</MenuItem>)}
-              </Select>
-            </FormControl>
+            <ComboBuscable
+              label="Nivel"
+              required
+              disabled={!!editando}
+              value={idNivel}
+              onChange={(v) => setIdNivel(v as number | "")}
+              opciones={niveles.map((n) => ({ valor: n.id, etiqueta: n.nombre }))}
+            />
             <TextField size="small" type="number" required label="Costo por hora" value={costoHora}
               onChange={(e) => setCostoHora(e.target.value)} slotProps={{ htmlInput: { min: 0, step: 0.01 } }} />
             <TextField size="small" type="date" required label="Vigente desde" value={vigenciaDesde}
               onChange={(e) => setVigenciaDesde(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setModal(false)}>Cancelar</Button>
+            <Button color="error" onClick={() => setModal(false)}>Cancelar</Button>
             <Button variant="contained" disabled={idNivel === "" || !costoHora || !vigenciaDesde} onClick={() => void guardar()}>
               Guardar
             </Button>
@@ -383,7 +385,7 @@ function SeccionPresupuesto({ idProyecto, anio, presupuestos, puedeGestionar, al
               onChange={(e) => setHoras(e.target.value)} slotProps={{ htmlInput: { min: 0, step: 0.5 } }} />
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setModal(false)}>Cancelar</Button>
+            <Button color="error" onClick={() => setModal(false)}>Cancelar</Button>
             <Button variant="contained" disabled={!monto || !horas} onClick={() => void guardar()}>Guardar</Button>
           </DialogActions>
         </Dialog>

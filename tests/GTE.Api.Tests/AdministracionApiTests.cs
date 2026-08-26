@@ -12,7 +12,7 @@ namespace GTE.Api.Tests;
 
 /// <summary>
 /// E2E del modulo Administracion por HTTP contra una bdsGTE real (LocalDB): folio de
-/// proyecto al autorizar, RN-PRY-01 (cierre bloqueado con WorkItems abiertos), RN-ADM-01
+/// proyecto al autorizar, RN-GTE-005 (cierre bloqueado con WorkItems abiertos), RN-GTE-001
 /// (ciclo de jerarquia rechazado), alta/baja de miembros de equipo y guardado en lote de
 /// la matriz rol-permiso. Se omite si no hay LocalDB.
 /// </summary>
@@ -92,7 +92,7 @@ public class AdministracionApiTests(WebApplicationFactory<Program> fabricaApp)
             // INICIAR: pasa a En Ejecucion
             await CambiarEstatusProyectoAsync(cliente, idProyecto, "INICIAR");
 
-            // Un WorkItem abierto del proyecto bloquea el CERRAR (RN-PRY-01, 409)
+            // Un WorkItem abierto del proyecto bloquea el CERRAR (RN-GTE-005, 409)
             await using (var contexto = fabricaDatos.ConectarContexto<DbContextGTE>())
             {
                 var item = new TblWorkItem

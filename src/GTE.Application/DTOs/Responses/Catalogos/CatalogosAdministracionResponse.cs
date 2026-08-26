@@ -13,3 +13,19 @@ public class CatalogosAdministracionResponse
     public List<CatalogoItemResponse> Roles { get; set; } = [];
     public List<CatalogoItemResponse> Horarios { get; set; } = [];
 }
+
+/// <summary>
+/// Catalogos de la pantalla de Releases. Existe porque el combo de tipo de artefacto
+/// estaba escrito a mano en el front y no reflejaba lo que se editara en el catalogo
+/// dbo.tblTipoArtefacto.
+/// </summary>
+public class CatalogosEntregasResponse
+{
+    public List<CatalogoItemResponse> TiposArtefacto { get; set; } = [];
+
+    /// <summary>
+    /// Id del tipo "Script SQL" (RN-GTE-032): el front lo necesita para saber cuando pedir
+    /// la justificacion de irreversibilidad, y asi no clava el 2 a mano.
+    /// </summary>
+    public int IdTipoArtefactoScriptSql { get; set; }
+}

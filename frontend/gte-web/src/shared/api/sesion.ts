@@ -26,6 +26,8 @@ export interface ResultadoLogin {
 }
 
 const CLAVE_TOKEN = "gte.token";
+const CLAVE_TOKEN_REAL = "gte.token.real";
+const CLAVE_NOMBRE_REAL = "gte.suplantador.nombre";
 
 export async function obtenerConfiguracionAuth() {
   return obtener<ConfiguracionAuth>("/api/v1/auth/configuracion");
@@ -79,10 +81,50 @@ export async function cambiarPassword(passwordActual: string, passwordNueva: str
 /** Limpia la sesion local (sessionStorage). Llamar despues de cerrarSesionServidor(). */
 export function cerrarSesion() {
   sessionStorage.removeItem(CLAVE_TOKEN);
+  sessionStorage.removeItem(CLAVE_TOKEN_REAL);
+  sessionStorage.removeItem(CLAVE_NOMBRE_REAL);
 }
 
 export function hayToken(): boolean {
   return sessionStorage.getItem(CLAVE_TOKEN) !== null;
+}
+
+/**
+ * "Iniciar sesion como" (soporte), auditado: exige el permiso ADM.Suplantar y la PROPIA
+ * contraseña de quien suplanta. Guarda el token real aparte (para poder salir de la
+ * suplantacion sin volver a iniciar sesion) y activa el token del suplantado.
+ */
+export async function iniciarSuplantacion(idUsuarioSuplantado: number, password: string) {
+  const tokenReal = sessionStorage.getItem(CLAVE_TOKEN);
+  const { dato, mensaje } = await enviar<{ token: string; expira: string; sesion: Sesion }>(
+    "post", "/api/v1/auth/suplantacion/iniciar", { idUsuarioSuplantado, password },
+  );
+  if (tokenReal) sessionStorage.setItem(CLAVE_TOKEN_REAL, tokenReal);
+  sessionStorage.setItem(CLAVE_NOMBRE_REAL, useSesion.getState().sesion?.nombre ?? "");
+  sessionStorage.setItem(CLAVE_TOKEN, dato.token);
+  return { sesion: dato.sesion, mensaje };
+}
+
+/** True mientras hay una suplantacion activa en este navegador. */
+export function estaSuplantando(): boolean {
+  return sessionStorage.getItem(CLAVE_TOKEN_REAL) !== null;
+}
+
+export function obtenerNombreSuplantador(): string | null {
+  return sessionStorage.getItem(CLAVE_NOMBRE_REAL);
+}
+
+/** Cierra la suplantacion activa y vuelve a dejar el token real como el activo. */
+export async function terminarSuplantacion() {
+  try {
+    await enviar<object>("post", "/api/v1/auth/suplantacion/terminar");
+  } catch {
+    // Aun si el aviso al servidor falla, el navegador debe poder volver al usuario real.
+  }
+  const tokenReal = sessionStorage.getItem(CLAVE_TOKEN_REAL);
+  if (tokenReal) sessionStorage.setItem(CLAVE_TOKEN, tokenReal);
+  sessionStorage.removeItem(CLAVE_TOKEN_REAL);
+  sessionStorage.removeItem(CLAVE_NOMBRE_REAL);
 }
 
 interface EstadoSesion {

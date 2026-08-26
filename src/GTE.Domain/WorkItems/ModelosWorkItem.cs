@@ -21,7 +21,7 @@ public record WorkItemNuevo(
 
 /// <summary>
 /// Datos editables de un elemento de trabajo. ActualizarPresupuesto distingue
-/// "recalcular a MinutosPresupuesto (incluso null)" de "conservar el congelado" (RN-REQ-08).
+/// "recalcular a MinutosPresupuesto (incluso null)" de "conservar el congelado" (RN-GTE-015).
 /// </summary>
 public record WorkItemEdicion(
     int IdWorkItem,
@@ -47,15 +47,23 @@ public record EstadoWorkItem(
     int? IdHorarioAsignado,
     int? IdComplejidad,
     DateTime? FechaCompromiso,
-    bool Activo);
+    bool Activo,
+    bool Administrado,
+    int IdCategoriaProyecto);
 
 /// <summary>Resumen de proyecto para reglas y folios.</summary>
-public record ProyectoResumen(int IdProyecto, string Clave, bool EsMantenimiento, bool Activo);
+public record ProyectoResumen(
+    int IdProyecto, string Clave, bool EsMantenimiento, bool Activo, int IdEstatusProyecto,
+    bool Administrado);
 
 /// <summary>Resumen de usuario para presupuesto y materializacion de tiempos.</summary>
 public record UsuarioResumen(int IdUsuario, int? IdNivel, int? IdHorario, bool Activo);
 
-/// <summary>Hallazgo de revision que bloquea el cierre (RN-REQ-03).</summary>
+/// <summary>RN-GTE-015: fila de tblMatrizPresupuesto (complejidad x nivel) -- minutos y puntos
+/// de historia se congelan juntos al asignar/reasignar o cambiar complejidad.</summary>
+public record PresupuestoMatriz(int Minutos, decimal? Puntos);
+
+/// <summary>Hallazgo de revision que bloquea el cierre (RN-GTE-010).</summary>
 public record RevisionPendiente(int IdRevision, string Revisor, string? Comentarios);
 
 /// <summary>Resultado de validar el cierre de un item.</summary>

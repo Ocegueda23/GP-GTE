@@ -7,6 +7,8 @@ public interface IPlaneacionRepository
 {
     Task<int> CrearSprintAsync(SprintNuevo datos, CancellationToken cancellationToken = default);
 
+    Task EditarSprintAsync(int idSprint, SprintEdicion datos, CancellationToken cancellationToken = default);
+
     Task<EstadoSprint?> ObtenerEstadoSprintAsync(int idSprint, CancellationToken cancellationToken = default);
 
     /// <summary>Sprint Activo del equipo (solo puede haber uno).</summary>
@@ -40,7 +42,7 @@ public interface IPlaneacionRepository
     Task<int> ContarItemsEnEstatusAsync(int idEquipo, int idEstatus, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Deja rastro de que alguien excedio el limite WIP con permiso (RN-PLA-04):
+    /// Deja rastro de que alguien excedio el limite WIP con permiso (RN-GTE-020):
     /// el limite se puede saltar, pero no en silencio.
     /// </summary>
     Task RegistrarSaltoWipAsync(

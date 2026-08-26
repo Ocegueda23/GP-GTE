@@ -3,6 +3,18 @@ import { Box } from "@mui/material";
 import { descargarArchivoBlob } from "../api/archivos";
 import { normalizarHtmlLegado } from "./textoPlano";
 
+interface Props {
+  html: string;
+  /**
+   * Modo PUBLICO (paginas anonimas de la base de conocimiento): resuelve cada imagen
+   * a una URL directa en vez de bajar el blob autenticado. Se puede usar como
+   * `<img src>` sin riesgo porque la ruta publica es anonima -- no hay token que
+   * exponer en la URL, que es la razon de ser del blob en el modo autenticado.
+   * Sin esta prop, el componente se comporta igual que siempre.
+   */
+  urlPublicaImagen?: (guid: string) => string;
+}
+
 /**
  * Renderiza HTML enriquecido guardado por EditorEnriquecido/EditorComentario.
  * El HTML persistido solo trae `data-guid` en las imagenes pegadas (nunca una
@@ -11,7 +23,7 @@ import { normalizarHtmlLegado } from "./textoPlano";
  * `dangerouslySetInnerHTML` no ejecuta NodeViews de React, por eso la
  * resolucion se hace a mano contra el DOM ya renderizado.
  */
-export function ContenidoEnriquecido({ html }: { html: string }) {
+export function ContenidoEnriquecido({ html, urlPublicaImagen }: Props) {
   const contenedorRef = useRef<HTMLDivElement>(null);
   const htmlNormalizado = useMemo(() => normalizarHtmlLegado(html), [html]);
 
@@ -23,27 +35,36 @@ export function ContenidoEnriquecido({ html }: { html: string }) {
       .map((img) => img.getAttribute("data-guid"))
       .filter((guid): guid is string => !!guid);
 
+    // Re-consulta el nodo actual por GUID en vez de confiar en la referencia
+    // capturada al inicio: bajo StrictMode (dev) el contenedor puede haberse
+    // vuelto a montar antes de que esta promesa resuelva, dejando el <img>
+    // original desconectado del documento (la asignacion no truena, pero no
+    // se ve nada porque ese nodo ya no esta en pantalla).
+    const asignar = (guid: string, url: string) => {
+      const imagenActual = contenedorRef.current?.querySelector<HTMLImageElement>(
+        `img[data-guid="${guid}"]`,
+      );
+      if (imagenActual) {
+        imagenActual.src = url;
+      }
+    };
+
+    if (urlPublicaImagen) {
+      guids.forEach((guid) => asignar(guid, urlPublicaImagen(guid)));
+      return;
+    }
+
     guids.forEach((guid) => {
       descargarArchivoBlob(guid)
         .then((blob) => {
           const url = URL.createObjectURL(blob);
           urls.push(url);
-          // Re-consulta el nodo actual por GUID en vez de confiar en la referencia
-          // capturada al inicio: bajo StrictMode (dev) el contenedor puede haberse
-          // vuelto a montar antes de que esta promesa resuelva, dejando el <img>
-          // original desconectado del documento (la asignacion no truena, pero no
-          // se ve nada porque ese nodo ya no esta en pantalla).
-          const imagenActual = contenedorRef.current?.querySelector<HTMLImageElement>(
-            `img[data-guid="${guid}"]`,
-          );
-          if (imagenActual) {
-            imagenActual.src = url;
-          }
+          asignar(guid, url);
         })
         .catch(() => {});
     });
     return () => urls.forEach((url) => URL.revokeObjectURL(url));
-  }, [htmlNormalizado]);
+  }, [htmlNormalizado, urlPublicaImagen]);
 
   return (
     <Box

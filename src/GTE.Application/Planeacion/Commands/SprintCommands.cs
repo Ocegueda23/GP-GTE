@@ -42,6 +42,46 @@ public class CrearSprintHandler(
     }
 }
 
+public record EditarSprintCommand(int IdSprint, SprintEditarRequest Datos) : IRequest<SprintResponse>;
+
+public class EditarSprintValidator : AbstractValidator<EditarSprintCommand>
+{
+    public EditarSprintValidator()
+    {
+        RuleFor(c => c.IdSprint).GreaterThan(0);
+        RuleFor(c => c.Datos.Nombre).NotEmpty().WithMessage("El nombre del sprint es obligatorio.")
+            .MaximumLength(100);
+        RuleFor(c => c.Datos.Objetivo).MaximumLength(500);
+        RuleFor(c => c.Datos.FechaFin).GreaterThan(c => c.Datos.FechaInicio)
+            .WithMessage("La fecha de fin debe ser posterior a la de inicio.");
+    }
+}
+
+/// <summary>Editar datos de un sprint (nombre, objetivo, fechas). Un sprint Cerrado no se puede tocar.</summary>
+public class EditarSprintHandler(
+    IPlaneacionRepository repositorio,
+    IPlaneacionQueryService consultas,
+    IVerificadorPermisos permisos) : IRequestHandler<EditarSprintCommand, SprintResponse>
+{
+    public async Task<SprintResponse> Handle(EditarSprintCommand command, CancellationToken cancellationToken)
+    {
+        await permisos.ExigirPermisoAsync(PermisosPlaneacion.ModificarSprint, null, cancellationToken);
+
+        var estado = await repositorio.ObtenerEstadoSprintAsync(command.IdSprint, cancellationToken)
+            ?? throw new NotFoundException("Sprint", command.IdSprint);
+
+        if (estado.IdEstatus == EstatusSprint.Cerrado)
+            throw new BusinessException("Un sprint cerrado no puede modificarse.");
+
+        await repositorio.EditarSprintAsync(command.IdSprint, new SprintEdicion(
+            command.Datos.Nombre.Trim(), command.Datos.Objetivo, command.Datos.FechaInicio, command.Datos.FechaFin),
+            cancellationToken);
+
+        return await consultas.ObtenerSprintAsync(command.IdSprint, cancellationToken)
+            ?? throw new NotFoundException("Sprint", command.IdSprint);
+    }
+}
+
 public record CambiarEstatusSprintCommand(int IdSprint, string Accion, string? DestinoItemsAbiertos)
     : IRequest<SprintResponse>;
 
@@ -57,7 +97,7 @@ public class CambiarEstatusSprintValidator : AbstractValidator<CambiarEstatusSpr
 /// <summary>
 /// ACTIVAR y CERRAR del sprint.
 /// Regla: solo un sprint Activo por equipo (409 accionable si ya hay otro).
-/// RN-PLA-02: al cerrar, los elementos abiertos se reubican en el backlog o en
+/// RN-GTE-018: al cerrar, los elementos abiertos se reubican en el backlog o en
 /// el siguiente sprint planeado, segun lo que pida quien cierra.
 /// </summary>
 public class CambiarEstatusSprintHandler(
@@ -69,7 +109,10 @@ public class CambiarEstatusSprintHandler(
     public async Task<SprintResponse> Handle(
         CambiarEstatusSprintCommand command, CancellationToken cancellationToken)
     {
-        await permisos.ExigirPermisoAsync(PermisosPlaneacion.GestionarSprints, null, cancellationToken);
+        var permisoRequerido = command.Accion == AccionesSprint.Cerrar
+            ? PermisosPlaneacion.CerrarSprint
+            : PermisosPlaneacion.CambiarEstatusSprint;
+        await permisos.ExigirPermisoAsync(permisoRequerido, null, cancellationToken);
 
         var estado = await repositorio.ObtenerEstadoSprintAsync(command.IdSprint, cancellationToken)
             ?? throw new NotFoundException("Sprint", command.IdSprint);

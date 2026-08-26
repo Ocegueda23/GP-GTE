@@ -44,6 +44,8 @@ export interface FiltroBandejaTickets {
   estatus: number[]; // vacio = abiertos (todos menos Cerrado); [-1] = todos
   texto: string;
   idAsignado: number | null;
+  ordenarPor: string | null;
+  ordenDescendente: boolean;
 }
 
 export const filtroBandejaTicketsInicial: FiltroBandejaTickets = {
@@ -52,14 +54,19 @@ export const filtroBandejaTicketsInicial: FiltroBandejaTickets = {
   estatus: [],
   texto: "",
   idAsignado: null,
+  ordenarPor: null,
+  ordenDescendente: false,
 };
 
 export async function crearTicket(datos: NuevoTicket) {
   return enviar<Ticket>("post", "/api/v1/tickets", datos);
 }
 
-export async function obtenerMisTickets() {
-  return obtener<Ticket[]>("/api/v1/tickets/mios");
+/** Sin estatus = abiertos (todos menos Cerrado); [-1] = todos. */
+export async function obtenerMisTickets(estatus: number[] = []) {
+  const params = new URLSearchParams();
+  estatus.forEach((e) => params.append("estatus", String(e)));
+  return obtener<Ticket[]>("/api/v1/tickets/mios", params);
 }
 
 export async function obtenerBandejaTickets(filtro: FiltroBandejaTickets) {
@@ -69,6 +76,10 @@ export async function obtenerBandejaTickets(filtro: FiltroBandejaTickets) {
   filtro.estatus.forEach((e) => params.append("estatus", String(e)));
   if (filtro.texto.trim()) params.set("texto", filtro.texto.trim());
   if (filtro.idAsignado) params.set("idAsignado", String(filtro.idAsignado));
+  if (filtro.ordenarPor) {
+    params.set("ordenarPor", filtro.ordenarPor);
+    params.set("ordenDescendente", String(filtro.ordenDescendente));
+  }
   return obtener<ResultadoPaginado<Ticket>>("/api/v1/tickets", params);
 }
 

@@ -181,3 +181,25 @@ public class ObtenerAmbientesHandler(IAdministracionQueryService consultas)
     public async Task<IReadOnlyList<AmbienteResponse>> Handle(ObtenerAmbientesQuery query, CancellationToken cancellationToken)
         => await consultas.ObtenerAmbientesAsync(query.IdProyecto, cancellationToken);
 }
+
+/* ---------- Areas ---------- */
+
+public record ObtenerAreasQuery : IRequest<IReadOnlyList<AreaResponse>>;
+
+public class ObtenerAreasHandler(IAdministracionQueryService consultas)
+    : IRequestHandler<ObtenerAreasQuery, IReadOnlyList<AreaResponse>>
+{
+    public async Task<IReadOnlyList<AreaResponse>> Handle(ObtenerAreasQuery query, CancellationToken cancellationToken)
+        => await consultas.ObtenerAreasAsync(cancellationToken);
+}
+
+/* ---------- Puestos ---------- */
+
+public record ObtenerPuestosQuery : IRequest<IReadOnlyList<PuestoResponse>>;
+
+public class ObtenerPuestosHandler(IAdministracionQueryService consultas)
+    : IRequestHandler<ObtenerPuestosQuery, IReadOnlyList<PuestoResponse>>
+{
+    public async Task<IReadOnlyList<PuestoResponse>> Handle(ObtenerPuestosQuery query, CancellationToken cancellationToken)
+        => await consultas.ObtenerPuestosAsync(cancellationToken);
+}

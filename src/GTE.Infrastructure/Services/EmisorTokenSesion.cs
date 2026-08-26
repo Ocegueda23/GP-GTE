@@ -38,6 +38,29 @@ public class EmisorTokenSesion(ClaveFirmaGte clave) : IEmisorTokenSesion
         return (new JwtSecurityTokenHandler().WriteToken(token), expira);
     }
 
+    public (string Token, DateTime Expira) EmitirTokenSuplantacion(SesionResponse suplantado, string dominioReal)
+    {
+        var expira = DateTime.UtcNow.AddMinutes(clave.MinutosVigenciaAcceso);
+        var credenciales = new SigningCredentials(
+            new SymmetricSecurityKey(clave.Clave), SecurityAlgorithms.HmacSha256);
+
+        var token = new JwtSecurityToken(
+            issuer: clave.Issuer,
+            audience: clave.Audience,
+            claims:
+            [
+                new Claim(JwtRegisteredClaimNames.Sub, suplantado.IdUsuario.ToString()),
+                new Claim("preferred_username", suplantado.Dominio),
+                new Claim("name", suplantado.Nombre),
+                new Claim(ClaimTypes.Email, suplantado.Correo ?? string.Empty),
+                new Claim("actor_real", dominioReal)
+            ],
+            expires: expira,
+            signingCredentials: credenciales);
+
+        return (new JwtSecurityTokenHandler().WriteToken(token), expira);
+    }
+
     public RefreshTokenGenerado GenerarRefreshToken()
     {
         var crudo = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));

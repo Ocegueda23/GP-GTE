@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.StaticFiles;
 
 namespace GTE.WebApi.Controllers;
 
-/// <summary>Adjuntos sobre WorkItem: subida, listado, descarga por streaming y baja del vinculo.</summary>
+/// <summary>Adjuntos sobre WorkItem y Solicitud: subida, listado, descarga por streaming y baja del vinculo.</summary>
 [ApiController]
 [Route("api/v1")]
 public class ArchivosController(IMediator mediator) : ControllerBase
@@ -40,6 +40,99 @@ public class ArchivosController(IMediator mediator) : ControllerBase
         var resultado = await mediator.Send(
             new SubirArchivoCommand(idWorkItem, contenido, nombreArchivo, archivo.Length), cancellationToken);
         return Ok(ApiResponse<ArchivoResponse>.Exito(resultado, $"{resultado.NombreArchivo} adjuntado."));
+    }
+
+    [HttpGet("solicitudes/{idSolicitud:int}/archivos")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<ArchivoResponse>>>> ObtenerPorSolicitud(
+        int idSolicitud, CancellationToken cancellationToken)
+    {
+        var resultado = await mediator.Send(new ObtenerArchivosSolicitudQuery(idSolicitud), cancellationToken);
+        return Ok(ApiResponse<IReadOnlyList<ArchivoResponse>>.Exito(resultado));
+    }
+
+    /// <summary>Tamano y extension se validan en el comando; este limite solo evita leer de mas del body.</summary>
+    [HttpPost("solicitudes/{idSolicitud:int}/archivos")]
+    [RequestSizeLimit(ConstantesArchivos.TamanoMaximoBytes)]
+    public async Task<ActionResult<ApiResponse<ArchivoResponse>>> SubirASolicitud(
+        int idSolicitud, IFormFile archivo, CancellationToken cancellationToken)
+    {
+        var nombreArchivo = Path.GetFileName(archivo.FileName);
+        if (nombreArchivo.Length > 200)
+        {
+            nombreArchivo = nombreArchivo[..200];
+        }
+
+        await using var contenido = archivo.OpenReadStream();
+        var resultado = await mediator.Send(
+            new SubirArchivoSolicitudCommand(idSolicitud, contenido, nombreArchivo, archivo.Length), cancellationToken);
+        return Ok(ApiResponse<ArchivoResponse>.Exito(resultado, $"{resultado.NombreArchivo} adjuntado."));
+    }
+
+    [HttpGet("revisiones/{idRevision:int}/archivos")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<ArchivoResponse>>>> ObtenerPorRevision(
+        int idRevision, CancellationToken cancellationToken)
+    {
+        var resultado = await mediator.Send(new ObtenerArchivosRevisionQuery(idRevision), cancellationToken);
+        return Ok(ApiResponse<IReadOnlyList<ArchivoResponse>>.Exito(resultado));
+    }
+
+    /// <summary>Tamano y extension se validan en el comando; este limite solo evita leer de mas del body.</summary>
+    [HttpPost("revisiones/{idRevision:int}/archivos")]
+    [RequestSizeLimit(ConstantesArchivos.TamanoMaximoBytes)]
+    public async Task<ActionResult<ApiResponse<ArchivoResponse>>> SubirARevision(
+        int idRevision, IFormFile archivo, CancellationToken cancellationToken)
+    {
+        var nombreArchivo = Path.GetFileName(archivo.FileName);
+        if (nombreArchivo.Length > 200)
+        {
+            nombreArchivo = nombreArchivo[..200];
+        }
+
+        await using var contenido = archivo.OpenReadStream();
+        var resultado = await mediator.Send(
+            new SubirArchivoRevisionCommand(idRevision, contenido, nombreArchivo, archivo.Length), cancellationToken);
+        return Ok(ApiResponse<ArchivoResponse>.Exito(resultado, $"{resultado.NombreArchivo} adjuntado."));
+    }
+
+    /// <summary>
+    /// Imagen pegada en un formulario de ALTA, cuando la entidad destino todavia no tiene Id:
+    /// se guarda sin vinculo y queda a nombre de quien la subio. Al guardar la entidad, su
+    /// comando de alta vincula los GUID que aparecen en el contenido. Tamano y extension se
+    /// validan en el comando (solo imagen); este limite solo evita leer de mas del body.
+    /// </summary>
+    [HttpPost("archivos/borrador")]
+    [RequestSizeLimit(ConstantesArchivos.TamanoMaximoBytes)]
+    public async Task<ActionResult<ApiResponse<ArchivoBorradorResponse>>> SubirBorrador(
+        IFormFile archivo, CancellationToken cancellationToken)
+    {
+        var nombreArchivo = Path.GetFileName(archivo.FileName);
+        if (nombreArchivo.Length > 200)
+        {
+            nombreArchivo = nombreArchivo[..200];
+        }
+
+        await using var contenido = archivo.OpenReadStream();
+        var resultado = await mediator.Send(
+            new SubirArchivoBorradorCommand(contenido, nombreArchivo, archivo.Length), cancellationToken);
+        return Ok(ApiResponse<ArchivoBorradorResponse>.Exito(resultado, "Imagen lista para adjuntarse al guardar."));
+    }
+
+    /// <summary>Reemplaza la foto de perfil del usuario (desvincula la anterior si habia una).</summary>
+    [HttpPost("usuarios/{idUsuario:int}/foto")]
+    [RequestSizeLimit(ConstantesArchivos.TamanoMaximoBytes)]
+    public async Task<ActionResult<ApiResponse<ArchivoResponse>>> SubirFotoUsuario(
+        int idUsuario, IFormFile archivo, CancellationToken cancellationToken)
+    {
+        var nombreArchivo = Path.GetFileName(archivo.FileName);
+        if (nombreArchivo.Length > 200)
+        {
+            nombreArchivo = nombreArchivo[..200];
+        }
+
+        await using var contenido = archivo.OpenReadStream();
+        var resultado = await mediator.Send(
+            new SubirFotoUsuarioCommand(idUsuario, contenido, nombreArchivo, archivo.Length), cancellationToken);
+        return Ok(ApiResponse<ArchivoResponse>.Exito(resultado, "Foto de perfil actualizada."));
     }
 
     /// <summary>

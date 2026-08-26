@@ -2,13 +2,14 @@ import { useState } from "react";
 import { Link as RouterLink, useParams } from "react-router-dom";
 import {
   Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
-  FormControl, InputLabel, Link, MenuItem, Paper, Select, Snackbar, Stack,
+  Link, Paper, Snackbar, Stack,
   TextField, Typography,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import EditIcon from "@mui/icons-material/Edit";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
+import { ComboBuscable } from "../../shared/components/ComboBuscable";
 import { obtenerCatalogosBandeja, type AccionDisponible } from "../../shared/api/workitems";
 import {
   actualizarIncidente, cambiarEstatusIncidente, cambiarSeveridadIncidente, colorEstatusIncidente,
@@ -191,7 +192,7 @@ function BotonesAccionesIncidente({ idIncidente, folio, acciones, alExito, alErr
             label="Motivo (obligatorio)" value={motivo} onChange={(e) => setMotivo(e.target.value)} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAccionConMotivo(null)}>Cancelar</Button>
+          <Button color="error" onClick={() => setAccionConMotivo(null)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || motivo.trim().length === 0}
             onClick={() => accionConMotivo && void ejecutar(accionConMotivo.accion, motivo.trim())}>
             Confirmar
@@ -257,7 +258,7 @@ function BotonEditar({ incidente, alExito, alError }: {
             onChange={(e) => setMinutos(e.target.value)} slotProps={{ htmlInput: { min: 0 } }} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAbierto(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setAbierto(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || titulo.trim().length === 0} onClick={() => void guardar()}>
             Guardar
           </Button>
@@ -299,17 +300,18 @@ function BotonSeveridad({ idIncidente, folio, idSeveridadActual, severidades, al
       <Dialog open={abierto} onClose={() => setAbierto(false)} fullWidth maxWidth="xs">
         <DialogTitle>Cambiar severidad de {folio}</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
-          <FormControl size="small" fullWidth required>
-            <InputLabel>Severidad</InputLabel>
-            <Select label="Severidad" value={idSeveridad} onChange={(e) => setIdSeveridad(e.target.value as number | "")}>
-              {severidades.map((s) => (<MenuItem key={s.id} value={s.id}>{s.nombre}</MenuItem>))}
-            </Select>
-          </FormControl>
+          <ComboBuscable
+            label="Severidad"
+            required
+            value={idSeveridad}
+            onChange={(v) => setIdSeveridad(v as number | "")}
+            opciones={severidades.map((s) => ({ valor: s.id, etiqueta: s.nombre }))}
+          />
           <TextField size="small" fullWidth multiline minRows={2} label="Motivo (obligatorio)"
             value={motivo} onChange={(e) => setMotivo(e.target.value)} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAbierto(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setAbierto(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || idSeveridad === "" || motivo.trim().length === 0}
             onClick={() => void cambiar()}>
             Confirmar
@@ -357,24 +359,27 @@ function BotonCorrectivo({ idIncidente, folio, prioridades, usuarios, alExito, a
       <Dialog open={abierto} onClose={() => setAbierto(false)} fullWidth maxWidth="xs">
         <DialogTitle>Vincular correctivo a {folio}</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
-          <FormControl size="small" fullWidth required>
-            <InputLabel>Prioridad</InputLabel>
-            <Select label="Prioridad" value={idPrioridad} onChange={(e) => setIdPrioridad(e.target.value as number | "")}>
-              {prioridades.map((p) => (<MenuItem key={p.id} value={p.id}>{p.nombre}</MenuItem>))}
-            </Select>
-          </FormControl>
-          <FormControl size="small" fullWidth>
-            <InputLabel>Asignado (opcional)</InputLabel>
-            <Select label="Asignado (opcional)" value={idAsignado} onChange={(e) => setIdAsignado(e.target.value as number | "")}>
-              <MenuItem value="">Sin asignar</MenuItem>
-              {usuarios.map((u) => (<MenuItem key={u.id} value={u.id}>{u.nombre}</MenuItem>))}
-            </Select>
-          </FormControl>
+          <ComboBuscable
+            label="Prioridad"
+            required
+            value={idPrioridad}
+            onChange={(v) => setIdPrioridad(v as number | "")}
+            opciones={prioridades.map((p) => ({ valor: p.id, etiqueta: p.nombre }))}
+          />
+          <ComboBuscable
+            label="Asignado (opcional)"
+            value={idAsignado}
+            onChange={(v) => setIdAsignado(v as number | "")}
+            opciones={[
+              { valor: "", etiqueta: "Sin asignar" },
+              ...usuarios.map((u) => ({ valor: u.id, etiqueta: u.nombre })),
+            ]}
+          />
           <TextField size="small" type="date" label="Compromiso (opcional)" value={fechaCompromiso}
             onChange={(e) => setFechaCompromiso(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAbierto(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setAbierto(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || idPrioridad === ""} onClick={() => void vincular()}>
             Vincular
           </Button>
@@ -413,17 +418,18 @@ function BotonReleaseCausante({ idIncidente, folio, releases, alExito, alError }
       <Dialog open={abierto} onClose={() => setAbierto(false)} fullWidth maxWidth="xs">
         <DialogTitle>Vincular release causante a {folio}</DialogTitle>
         <DialogContent sx={{ pt: "12px !important" }}>
-          <FormControl size="small" fullWidth required>
-            <InputLabel>Release</InputLabel>
-            <Select label="Release" value={idRelease} onChange={(e) => setIdRelease(e.target.value as number | "")}>
-              {releases.map((r) => (
-                <MenuItem key={r.idRelease} value={r.idRelease}>{r.version}{r.folio ? ` (${r.folio})` : ""}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <ComboBuscable
+            label="Release"
+            required
+            value={idRelease}
+            onChange={(v) => setIdRelease(v as number | "")}
+            opciones={releases.map((r) => ({
+              valor: r.idRelease, etiqueta: `${r.version}${r.folio ? ` (${r.folio})` : ""}`,
+            }))}
+          />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAbierto(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setAbierto(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || idRelease === ""} onClick={() => void vincular()}>
             Vincular
           </Button>

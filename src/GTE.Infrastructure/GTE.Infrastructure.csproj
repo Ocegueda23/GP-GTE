@@ -9,6 +9,11 @@
 
   <ItemGroup>
     <PackageReference Include="HtmlSanitizer" Version="9.1.974" />
+    <!-- Cifrado de columnas del motor de catalogos genericos: IDataProtector/IXmlRepository.
+         Paquete propio de Microsoft (parte del framework compartido de ASP.NET Core), no
+         un tercero nuevo; se referencia explicito porque este proyecto es class library
+         (Microsoft.NET.Sdk), no Web SDK, y no lo trae implicito. -->
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="8.0.*" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.*">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
@@ -17,6 +22,10 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="8.0.*" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.*" />
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+    <!-- ClosedXML (MIT, gratis): exportacion a Excel de los reportes (R01-R14). Se eligio
+         sobre EPPlus porque EPPlus exige licencia comercial de paga desde su v5 para uso
+         empresarial (decision confirmada con el usuario antes de codear este bloque). -->
+    <PackageReference Include="ClosedXML" Version="0.104.1" />
   </ItemGroup>
 
   <ItemGroup>

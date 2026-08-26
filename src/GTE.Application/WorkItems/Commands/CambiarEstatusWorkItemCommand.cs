@@ -23,7 +23,7 @@ public class CambiarEstatusWorkItemValidator : AbstractValidator<CambiarEstatusW
 
 /// <summary>
 /// Unica puerta de cambio de estatus de WorkItems: valida las reglas de negocio
-/// que el motor no conoce (RN-REQ-01/02/03) y delega la transicion al motor.
+/// que el motor no conoce (RN-GTE-008/02/03) y delega la transicion al motor.
 /// </summary>
 public class CambiarEstatusWorkItemHandler(
     IWorkItemRepository repositorio,
@@ -42,14 +42,14 @@ public class CambiarEstatusWorkItemHandler(
 
         var usuarioActual = await proveedorUsuario.ObtenerAsync(cancellationToken);
 
-        // RN-QA-04/05: aprobar (TERMINAR) o rechazar (RECHAZAR_QA) la fase de pruebas
+        // RN-GTE-028/05: aprobar (TERMINAR) o rechazar (RECHAZAR_QA) la fase de pruebas
         // desde En Pruebas es un rol de REVISION, no de dueño -- lo normal es que quien
         // aprueba/rechaza sea distinto del asignado, asi que el gate de "item ajeno" de
         // abajo NO aplica aqui (se reemplaza por la validacion especifica de autoaprobacion).
         var esRevisionPruebas = estado.IdEstatus == EstatusWorkItem.EnPruebas
             && (command.Accion == AccionesWorkItem.Terminar || command.Accion == AccionesWorkItem.RechazarQa);
 
-        // RN-REQ-05: item ajeno (asignado a otra persona O SIN asignar) solo con permiso --
+        // RN-GTE-012: item ajeno (asignado a otra persona O SIN asignar) solo con permiso --
         // mismo gate que ActualizarWorkItemCommand, aplicado tambien a cambios de estatus
         // (INICIAR/TERMINAR/etc.), no solo a la edicion de campos. Sin asignar cuenta como
         // ajeno (decision del equipo 2026-08-02): nadie "toma" trabajo del backlog solo con
@@ -74,6 +74,22 @@ public class CambiarEstatusWorkItemHandler(
         if (accion.RequiereMotivo && string.IsNullOrWhiteSpace(command.Motivo))
         {
             throw new BusinessException($"La accion {command.Accion} requiere capturar un motivo.");
+        }
+
+        // Proyecto administrado: cancelar (= "eliminar", ver WI.Eliminar arriba en
+        // accion.ClavePermisoRequerida) exige ademas este permiso especifico.
+        if (command.Accion == AccionesWorkItem.Cancelar && estado.Administrado)
+        {
+            await permisos.ExigirPermisoAsync(PermisosWorkItem.EliminarEnAdministrado, estado.IdProyecto, cancellationToken);
+        }
+
+        // RN-GTE-030: proyectos categoria Desarrollo deben pasar por En Pruebas antes de
+        // Terminado; terminar directo desde En Proceso (saltando la fase) exige permiso.
+        // TI y Mantenimiento quedan libres, igual que hoy.
+        if (command.Accion == AccionesWorkItem.Terminar && estado.IdEstatus == EstatusWorkItem.EnProceso
+            && estado.IdCategoriaProyecto == CategoriasProyecto.Desarrollo)
+        {
+            await permisos.ExigirPermisoAsync(PermisosWorkItem.SaltarPruebas, estado.IdProyecto, cancellationToken);
         }
 
         var horarioAsignado = await ObtenerHorarioAsignadoAsync(estado, cancellationToken);
@@ -123,16 +139,16 @@ public class CambiarEstatusWorkItemHandler(
         return asignado?.IdHorario;
     }
 
-    /// <summary>RN-REQ-01 y RN-REQ-02.</summary>
+    /// <summary>RN-GTE-008 y RN-GTE-009.</summary>
     private async Task ValidarInicioAsync(EstadoWorkItem estado, int? horarioAsignado, CancellationToken cancellationToken)
     {
-        // RN-REQ-02: iniciar exige fecha compromiso capturada
+        // RN-GTE-009: iniciar exige fecha compromiso capturada
         if (!estado.FechaCompromiso.HasValue)
         {
             throw new BusinessException("No se puede iniciar sin fecha compromiso capturada.");
         }
 
-        // RN-REQ-01: una sola tarea En Proceso por persona; la anterior se suspende
+        // RN-GTE-008: una sola tarea En Proceso por persona; la anterior se suspende
         // automaticamente registrando el historial EN EL ITEM SUSPENDIDO
         // (corrige el defecto historico del GT)
         if (estado.IdAsignado.HasValue)
@@ -152,7 +168,7 @@ public class CambiarEstatusWorkItemHandler(
     }
 
     /// <summary>
-    /// RN-QA-04: aprobar (TERMINAR) o rechazar (RECHAZAR_QA) la fase de pruebas desde En
+    /// RN-GTE-028: aprobar (TERMINAR) o rechazar (RECHAZAR_QA) la fase de pruebas desde En
     /// Pruebas exige (a) no ser el propio asignado (no autoaprobacion/autorechazo) y (b),
     /// solo para rechazar, que ya exista un hallazgo pendiente registrado -- rechazar con
     /// un simple motivo de texto sin hallazgo vinculado ya no procede. El permiso
@@ -185,10 +201,10 @@ public class CambiarEstatusWorkItemHandler(
     }
 
     /// <summary>
-    /// RN-REQ-03: cierre con avance, sin revisiones pendientes; mantenimiento con permiso.
+    /// RN-GTE-010: cierre con avance, sin revisiones pendientes; mantenimiento con permiso.
     /// Bypass acotado (decision del equipo 2026-08-02, WI.OmitirValidacionCierre, solo
     /// Administrador por seed): permite terminar sin estas validaciones. El resto de
-    /// reglas de negocio del proceso (RN-REQ-01/02, ownership) no se saltan aqui.
+    /// reglas de negocio del proceso (RN-GTE-008/02, ownership) no se saltan aqui.
     /// </summary>
     private async Task ValidarCierreAsync(EstadoWorkItem estado, CancellationToken cancellationToken)
     {

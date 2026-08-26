@@ -1,13 +1,14 @@
 import { useState } from "react";
 import {
   Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
-  FormControl, InputLabel, MenuItem, Paper, Rating, Select, Snackbar, Stack, Table,
+  Paper, Rating, Snackbar, Stack, Table,
   TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Tooltip, Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link as RouterLink } from "react-router-dom";
 import { ErrorApi } from "../../shared/api/http";
+import { ComboBuscable, ComboBuscableMultiple } from "../../shared/components/ComboBuscable";
 import { obtenerCatalogosBandeja } from "../../shared/api/workitems";
 import { useSesion } from "../../shared/api/sesion";
 import {
@@ -16,6 +17,16 @@ import {
 
 const ESTATUS_RESUELTO = 5;
 const ESTATUS_CERRADO = 6;
+
+/** Contrato de IDs de dbo.tblEstatusTicket (GTE.Domain.Soporte.EstatusTicket). */
+const ESTATUS_TICKET = [
+  { id: 1, nombre: "Nuevo" },
+  { id: 2, nombre: "Asignado" },
+  { id: 3, nombre: "En Atencion" },
+  { id: 4, nombre: "Esperando Usuario" },
+  { id: 5, nombre: "Resuelto" },
+  { id: 6, nombre: "Cerrado" },
+];
 
 function formatearFecha(iso: string | null): string {
   if (!iso) return "-";
@@ -33,6 +44,9 @@ export function PortalTicketsPage() {
   const [idUsuarioSolicitante, setIdUsuarioSolicitante] = useState<number | "">("");
   const [idLocacion, setIdLocacion] = useState<number | "">("");
   const [enviando, setEnviando] = useState(false);
+  const [busqueda, setBusqueda] = useState("");
+  // Sin filtro = abiertos (todos menos Cerrado); "Todos" (-1) sigue disponible como opcion.
+  const [filtroEstatus, setFiltroEstatus] = useState<number[]>([]);
   const clienteQuery = useQueryClient();
   const puede = useSesion((estado) => estado.puede);
   const esIngeniero = puede("TKT.Atender");
@@ -42,7 +56,15 @@ export function PortalTicketsPage() {
     queryFn: obtenerCatalogosBandeja,
     staleTime: 5 * 60_000,
   });
-  const mios = useQuery({ queryKey: ["mis-tickets"], queryFn: obtenerMisTickets });
+  const mios = useQuery({
+    queryKey: ["mis-tickets", filtroEstatus],
+    queryFn: () => obtenerMisTickets(filtroEstatus),
+  });
+  const miosFiltrados = (mios.data ?? []).filter((t) => {
+    const texto = busqueda.trim().toLowerCase();
+    if (!texto) return true;
+    return t.folio?.toLowerCase().includes(texto) || t.titulo.toLowerCase().includes(texto);
+  });
 
   const valido = titulo.trim().length > 0 && idPrioridad !== "";
 
@@ -90,6 +112,25 @@ export function PortalTicketsPage() {
         <Alert severity="error" sx={{ mb: 2 }}>{(mios.error as Error).message}</Alert>
       )}
 
+      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5, mb: 1.5 }}>
+        <TextField size="small" placeholder="Buscar folio o titulo..." value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)} sx={{ minWidth: 260 }} />
+        <ComboBuscableMultiple
+          label="Estatus"
+          value={filtroEstatus}
+          onChange={(valores) => {
+            const valor = valores as number[];
+            const eligioTodos = valor.includes(-1) && !filtroEstatus.includes(-1);
+            setFiltroEstatus(eligioTodos ? [-1] : valor.filter((v) => v !== -1));
+          }}
+          opciones={[
+            { valor: -1, etiqueta: "Todos" },
+            ...ESTATUS_TICKET.map((e) => ({ valor: e.id, etiqueta: e.nombre })),
+          ]}
+          sx={{ minWidth: 220 }}
+        />
+      </Box>
+
       <Paper variant="outlined">
         <TableContainer sx={{ overflowX: "auto" }}>
           <Table size="small">
@@ -106,16 +147,18 @@ export function PortalTicketsPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {mios.data?.length === 0 && (
+              {miosFiltrados.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={8}>
                     <Typography color="text.secondary" sx={{ py: 4, textAlign: "center" }}>
-                      Aun no tienes tickets. Crea el primero con el boton Nuevo ticket.
+                      {(mios.data?.length ?? 0) === 0 && filtroEstatus.length === 0 && !busqueda.trim()
+                        ? "Aun no tienes tickets. Crea el primero con el boton Nuevo ticket."
+                        : "No hay tickets con estos filtros."}
                     </Typography>
                   </TableCell>
                 </TableRow>
               )}
-              {mios.data?.map((t) => (
+              {miosFiltrados.map((t) => (
                 <FilaTicket key={t.idTicket} ticket={t}
                   alExito={(mensaje) => {
                     setAviso({ tipo: "success", mensaje });
@@ -134,54 +177,49 @@ export function PortalTicketsPage() {
           <TextField size="small" required label="Titulo" value={titulo}
             onChange={(e) => setTitulo(e.target.value)}
             slotProps={{ htmlInput: { maxLength: 200 } }} />
-          <FormControl size="small">
-            <InputLabel>Categoria</InputLabel>
-            <Select label="Categoria" value={idCategoria}
-              onChange={(e) => setIdCategoria(e.target.value as number | "")}>
-              <MenuItem value="">Sin categoria</MenuItem>
-              {catalogos.data?.categoriasTicket.map((c) => (
-                <MenuItem key={c.id} value={c.id}>{c.nombre}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl size="small" required>
-            <InputLabel>Prioridad</InputLabel>
-            <Select label="Prioridad" value={idPrioridad}
-              onChange={(e) => setIdPrioridad(e.target.value as number | "")}>
-              {catalogos.data?.prioridades.map((p) => (
-                <MenuItem key={p.id} value={p.id}>{p.nombre}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <ComboBuscable
+            label="Categoria"
+            value={idCategoria}
+            onChange={(v) => setIdCategoria(v as number | "")}
+            opciones={[
+              { valor: "", etiqueta: "Sin categoria" },
+              ...(catalogos.data?.categoriasTicket ?? []).map((c) => ({ valor: c.id, etiqueta: c.nombre })),
+            ]}
+          />
+          <ComboBuscable
+            label="Prioridad"
+            required
+            value={idPrioridad}
+            onChange={(v) => setIdPrioridad(v as number | "")}
+            opciones={(catalogos.data?.prioridades ?? []).map((p) => ({ valor: p.id, etiqueta: p.nombre }))}
+          />
           <TextField size="small" label="Descripcion" multiline minRows={3}
             value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
           {esIngeniero && (
             <>
-              <FormControl size="small">
-                <InputLabel>Usuario solicitante</InputLabel>
-                <Select label="Usuario solicitante" value={idUsuarioSolicitante}
-                  onChange={(e) => setIdUsuarioSolicitante(e.target.value as number | "")}>
-                  <MenuItem value="">Sin especificar</MenuItem>
-                  {catalogos.data?.usuariosSolicitantes.map((u) => (
-                    <MenuItem key={u.id} value={u.id}>{u.nombre}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <FormControl size="small">
-                <InputLabel>Locacion</InputLabel>
-                <Select label="Locacion" value={idLocacion}
-                  onChange={(e) => setIdLocacion(e.target.value as number | "")}>
-                  <MenuItem value="">Sin especificar</MenuItem>
-                  {catalogos.data?.locaciones.map((l) => (
-                    <MenuItem key={l.id} value={l.id}>{l.nombre}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <ComboBuscable
+                label="Usuario solicitante"
+                value={idUsuarioSolicitante}
+                onChange={(v) => setIdUsuarioSolicitante(v as number | "")}
+                opciones={[
+                  { valor: "", etiqueta: "Sin especificar" },
+                  ...(catalogos.data?.usuariosSolicitantes ?? []).map((u) => ({ valor: u.id, etiqueta: u.nombre })),
+                ]}
+              />
+              <ComboBuscable
+                label="Locacion"
+                value={idLocacion}
+                onChange={(v) => setIdLocacion(v as number | "")}
+                opciones={[
+                  { valor: "", etiqueta: "Sin especificar" },
+                  ...(catalogos.data?.locaciones ?? []).map((l) => ({ valor: l.id, etiqueta: l.nombre })),
+                ]}
+              />
             </>
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setModal(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setModal(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || !valido} onClick={() => void guardar()}>
             Enviar
           </Button>
@@ -227,7 +265,7 @@ function FilaTicket({ ticket, alExito, alError }: {
     <TableRow hover>
       <TableCell sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>
         <Typography component={RouterLink} to={`/tickets/${ticket.folio}`} variant="body2"
-          sx={{ fontWeight: 600, color: "inherit" }}>
+          sx={{ fontWeight: 600, color: "info.main" }}>
           {ticket.folio}
         </Typography>
       </TableCell>
@@ -261,7 +299,7 @@ function FilaTicket({ ticket, alExito, alError }: {
             value={comentario} onChange={(e) => setComentario(e.target.value)} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setCalificando(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setCalificando(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || !calificacion} onClick={() => void calificar()}>
             Enviar
           </Button>

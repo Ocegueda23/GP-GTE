@@ -22,7 +22,7 @@ public class CambiarEstatusIncidenteValidator : AbstractValidator<CambiarEstatus
 }
 
 /// <summary>
-/// Toda transicion del proceso Incidente exige INC.Gestionar. RN-OPS-02: CERRAR con
+/// Toda transicion del proceso Incidente exige INC.Gestionar. RN-GTE-036: CERRAR con
 /// severidad S1/S2 exige CausaRaiz ya capturada (via ActualizarIncidenteCommand antes de
 /// cerrar). FechaResolucion la fija el repositorio en RESOLVER
 /// (AplicarEfectosTransicionAsync).

@@ -18,6 +18,7 @@ import {
 import { AvatarUsuario } from "../../shared/components/AvatarUsuario";
 import { ComboBuscable } from "../../shared/components/ComboBuscable";
 import { useSesion } from "../../shared/api/sesion";
+import { useColorSerie } from "../../shared/graficas/coloresGrafica";
 import {
   obtenerDashboard, obtenerFiltrosDashboard, obtenerTendenciasDashboard,
   type CargaTrabajoDetalle, type CargaTrabajoEmpleado, type DashboardData, type KpiEstado,
@@ -129,6 +130,7 @@ function ordenarCarga(carga: CargaTrabajoEmpleado[], orden: OrdenCarga): CargaTr
 }
 
 export function DashboardEjecutivoPage() {
+  const colorSerie = useColorSerie();
   const hoy = new Date();
   const [anio, setAnio] = useState(hoy.getFullYear());
   const [mes, setMes] = useState(hoy.getMonth() + 1);
@@ -335,8 +337,8 @@ export function DashboardEjecutivoPage() {
                 <YAxis type="category" dataKey="nombre" width={150} tick={{ fontSize: 11 }} />
                 <RechartsTooltip formatter={(v) => `${Number(v).toFixed(1)}h`} />
                 <Legend />
-                <Bar dataKey="horasAsignadas" name="Asignadas" fill="#334155" />
-                <Bar dataKey="horasConsumidas" name="Consumidas" fill="#0f766e" />
+                <Bar dataKey="horasAsignadas" name="Asignadas" fill={colorSerie("#334155")} />
+                <Bar dataKey="horasConsumidas" name="Consumidas" fill={colorSerie("#0f766e")} />
                 <Bar dataKey="horasDisponibles" name="Disponibles" fill="#94a3b8" />
               </BarChart>
             </ResponsiveContainer>
@@ -531,7 +533,7 @@ export function DashboardEjecutivoPage() {
                       <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
                       <YAxis />
                       <RechartsTooltip />
-                      <Line type="monotone" dataKey="valor" stroke="#0f766e" strokeWidth={2} dot={{ r: 3 }} />
+                      <Line type="monotone" dataKey="valor" stroke={colorSerie("#0f766e")} strokeWidth={2} dot={{ r: 3 }} />
                     </LineChart>
                   </ResponsiveContainer>
                 </>
@@ -575,6 +577,7 @@ function TablaRanking({ items, onVer }: { items: { idUsuario: number; nombre: st
 }
 
 function GraficaRanking({ items, onVer, color }: { items: RankingItem[]; onVer: (id: number) => void; color: string }) {
+  const colorSerie = useColorSerie();
   if (items.length === 0) {
     return null;
   }
@@ -587,7 +590,7 @@ function GraficaRanking({ items, onVer, color }: { items: RankingItem[]; onVer: 
         <RechartsTooltip />
         <Bar
           dataKey="valor"
-          fill={color}
+          fill={colorSerie(color)}
           radius={[0, 4, 4, 0]}
           cursor="pointer"
           onClick={(_, index) => onVer(items[index].idUsuario)}
@@ -600,6 +603,7 @@ function GraficaRanking({ items, onVer, color }: { items: RankingItem[]; onVer: 
 const COLORES_PIE = ["#334155", "#0f766e", "#b45309", "#7c3aed", "#0891b2", "#be123c", "#4d7c0f", "#a16207", "#0369a1", "#9333ea"];
 
 function GraficaCargaTotal({ datos, onVer }: { datos: CargaTrabajoDetalle[]; onVer: (id: number) => void }) {
+  const colorSerie = useColorSerie();
   const conCarga = datos.filter((d) => d.total > 0);
   if (conCarga.length === 0) {
     return <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center" }}>Sin elementos asignados en el alcance/filtro actual.</Typography>;
@@ -618,7 +622,7 @@ function GraficaCargaTotal({ datos, onVer }: { datos: CargaTrabajoDetalle[]; onV
           onClick={(entrada: { payload?: CargaTrabajoDetalle }) => entrada.payload && onVer(entrada.payload.idUsuario)}
           cursor="pointer"
         >
-          {conCarga.map((d, i) => <Cell key={d.idUsuario} fill={COLORES_PIE[i % COLORES_PIE.length]} />)}
+          {conCarga.map((d, i) => <Cell key={d.idUsuario} fill={colorSerie(COLORES_PIE[i % COLORES_PIE.length])} />)}
         </Pie>
         <RechartsTooltip formatter={(v, _n, item) => [`${v} elementos`, (item?.payload as CargaTrabajoDetalle | undefined)?.nombre ?? ""]} />
         <Legend layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{ fontSize: 11 }} />
@@ -628,6 +632,7 @@ function GraficaCargaTotal({ datos, onVer }: { datos: CargaTrabajoDetalle[]; onV
 }
 
 function GraficaBarraSimple({ datos, color }: { datos: { etiqueta: string; valor: number }[]; color: string }) {
+  const colorSerie = useColorSerie();
   if (datos.length === 0) {
     return <Typography variant="body2" color="text.secondary">Sin datos suficientes para este comparativo.</Typography>;
   }
@@ -638,7 +643,7 @@ function GraficaBarraSimple({ datos, color }: { datos: { etiqueta: string; valor
         <XAxis type="number" />
         <YAxis type="category" dataKey="etiqueta" width={140} tick={{ fontSize: 11 }} />
         <RechartsTooltip />
-        <Bar dataKey="valor" fill={color} radius={[0, 4, 4, 0]} />
+        <Bar dataKey="valor" fill={colorSerie(color)} radius={[0, 4, 4, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );

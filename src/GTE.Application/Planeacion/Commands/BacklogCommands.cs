@@ -39,7 +39,7 @@ public record AsignarSprintCommand(int IdWorkItem, int? IdSprint) : IRequest<Uni
 
 /// <summary>
 /// Mueve un elemento al sprint o lo regresa al backlog.
-/// RN-PLA-03: un elemento pertenece a un solo sprint (la columna es unica);
+/// RN-GTE-019: un elemento pertenece a un solo sprint (la columna es unica);
 /// solo se admiten sprints abiertos (Planeado o Activo).
 /// </summary>
 public class AsignarSprintHandler(

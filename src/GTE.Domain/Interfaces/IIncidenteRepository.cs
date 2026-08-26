@@ -19,7 +19,7 @@ public interface IIncidenteRepository
     /// <summary>Titulo/Descripcion/CausaRaiz/MinutosIndisponibilidad/FechaDeteccion. No toca el estatus.</summary>
     Task ActualizarAsync(int idIncidente, IncidenteActualizacion datos, CancellationToken cancellationToken = default);
 
-    /// <summary>RN-OPS-03: cambio de severidad con motivo obligatorio (auditado en bitacora).</summary>
+    /// <summary>RN-GTE-037: cambio de severidad con motivo obligatorio (auditado en bitacora).</summary>
     Task CambiarSeveridadAsync(int idIncidente, int idSeveridad, string motivo, CancellationToken cancellationToken = default);
 
     /// <summary>Vincula el WorkItem correctivo creado. No cambia el estatus del incidente.</summary>

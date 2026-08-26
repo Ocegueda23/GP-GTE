@@ -17,10 +17,31 @@ public class GlobalExceptionMiddleware(RequestDelegate next, ILogger<GlobalExcep
         {
             await next(contexto);
         }
+        catch (ArchivoNoEncontradoException ex)
+        {
+            // La ruta esperada va al log y NO al cliente: es informacion de la instalacion.
+            logger.LogWarning(
+                "Archivo {Guid} registrado en BD pero ausente del almacen. Ruta esperada: {Ruta}",
+                ex.GuidArchivo, ex.RutaEsperada);
+            await EscribirRespuestaAsync(contexto, StatusCodes.Status404NotFound,
+                ApiResponse<object>.Falla(ApiResponseCodes.NotFound, ex.Message));
+        }
         catch (NotFoundException ex)
         {
             await EscribirRespuestaAsync(contexto, StatusCodes.Status404NotFound,
                 ApiResponse<object>.Falla(ApiResponseCodes.NotFound, ex.Message));
+        }
+        catch (AlmacenArchivosNoDisponibleException ex)
+        {
+            // Falla de instalacion, no del dato: 500, pero con mensaje propio. El detalle
+            // tecnico (que incluye la ruta) viaja en "message", que es el campo tecnico del
+            // envelope; el usuario ve solo userMessage.
+            logger.LogError(ex, "Almacen de archivos no disponible en {Raiz}", ex.Raiz);
+            await EscribirRespuestaAsync(contexto, StatusCodes.Status500InternalServerError,
+                ApiResponse<object>.Falla(ApiResponseCodes.InternalError,
+                    "No se pudo guardar el archivo: el almacen de archivos del servidor no esta "
+                    + "disponible. Avisa a sistemas, es un problema de configuracion.",
+                    ex.Message));
         }
         catch (ValidationException ex)
         {

@@ -1,8 +1,12 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using GTE.Infrastructure.Modelos.bdsGTE;
+using GTE.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 namespace GTE.Api.Tests;
 
@@ -44,6 +48,7 @@ public static class FabricaApiAutenticada
             builder.UseSetting("Jwt:Audience", "gte-api");
             builder.UseSetting("Jwt:ClaveFirma", ClaveFirmaPruebas);
             builder.UseSetting("Jwt:Desarrollo:Habilitado", "true");
+            builder.UseSetting("Hangfire:Deshabilitado", "true");
         });
     }
 
@@ -69,5 +74,40 @@ public static class FabricaApiAutenticada
     public static HttpClient CrearClienteAnonimo(WebApplicationFactory<Program> fabrica)
     {
         return Configurar(fabrica).CreateClient();
+    }
+
+    /// <summary>
+    /// Complejidad es obligatoria al crear un WorkItem (RN-GTE-015 extendida, 2026-08-07); las
+    /// pruebas de integracion de varios modulos solo necesitan un Id valido para pasar la
+    /// alta, no verifican el calculo de minutos/puntos -- se reutiliza cualquier fila activa
+    /// ya sembrada y, si el ambiente no tiene ninguna, se crea una propia.
+    /// </summary>
+    public static async Task<int> ObtenerOCrearComplejidadAsync()
+    {
+        var configuracion = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["ConnectionStrings:bdsGTE"] = CadenaLocal })
+            .Build();
+        var fabricaDatos = new FabricaContexto(configuracion);
+        await using var contexto = fabricaDatos.ConectarContexto<DbContextGTE>();
+
+        var existente = await contexto.TblComplejidad.AsNoTracking()
+            .Where(c => c.Activo)
+            .Select(c => c.IdComplejidad)
+            .FirstOrDefaultAsync();
+        if (existente != 0)
+        {
+            return existente;
+        }
+
+        var complejidad = new TblComplejidad
+        {
+            Nombre = $"E2E-{Guid.NewGuid().ToString("N")[..6].ToUpperInvariant()}",
+            Orden = 1,
+            UsuarioRegistro = "e2e",
+            Activo = true
+        };
+        contexto.TblComplejidad.Add(complejidad);
+        await contexto.SaveChangesAsync();
+        return complejidad.IdComplejidad;
     }
 }

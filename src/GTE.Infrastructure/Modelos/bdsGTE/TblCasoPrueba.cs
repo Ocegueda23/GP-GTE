@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace GTE.Infrastructure.Modelos.bdsGTE;
@@ -9,7 +9,7 @@ public partial class TblCasoPrueba
 
     public string? Folio { get; set; }
 
-    public int IdPlanPrueba { get; set; }
+    public int? IdProyecto { get; set; }
 
     public string Titulo { get; set; } = null!;
 
@@ -19,7 +19,7 @@ public partial class TblCasoPrueba
 
     public int IdTipoPrueba { get; set; }
 
-    public int? IdWorkItem { get; set; }
+    public bool Reutilizable { get; set; }
 
     public DateTime FechaRegistro { get; set; }
 
@@ -31,13 +31,13 @@ public partial class TblCasoPrueba
 
     public bool Activo { get; set; }
 
-    public virtual TblPlanPrueba IdPlanPruebaNavigation { get; set; } = null!;
+    public virtual TblProyecto? IdProyectoNavigation { get; set; }
 
     public virtual TblTipoPrueba IdTipoPruebaNavigation { get; set; } = null!;
-
-    public virtual TblWorkItem? IdWorkItemNavigation { get; set; }
 
     public virtual ICollection<TblCasoPruebaPaso> TblCasoPruebaPaso { get; set; } = new List<TblCasoPruebaPaso>();
 
     public virtual ICollection<TblEjecucionPrueba> TblEjecucionPrueba { get; set; } = new List<TblEjecucionPrueba>();
+
+    public virtual ICollection<TblWorkItemCasoPrueba> TblWorkItemCasoPrueba { get; set; } = new List<TblWorkItemCasoPrueba>();
 }

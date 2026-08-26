@@ -12,4 +12,9 @@ public class RevisionResponse
     public bool Corregido { get; set; }
     public DateTime? FechaCorreccion { get; set; }
     public DateTime FechaRegistro { get; set; }
+    public int? IdSeveridad { get; set; }
+    public string? Severidad { get; set; }
+    public bool Bloqueante { get; set; }
+    public int? IdEjecucionPrueba { get; set; }
+    public string? CasoPrueba { get; set; }
 }

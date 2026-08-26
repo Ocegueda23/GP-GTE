@@ -22,7 +22,8 @@ public class ObtenerBandejaTicketsHandler(ITicketQueryService consultas, IVerifi
     }
 }
 
-public record ObtenerMisTicketsQuery : IRequest<IReadOnlyList<TicketResponse>>;
+/// <summary>Sin estatus = abiertos (todos menos Cerrado); [-1] = todos.</summary>
+public record ObtenerMisTicketsQuery(IReadOnlyList<int>? Estatus = null) : IRequest<IReadOnlyList<TicketResponse>>;
 
 public class ObtenerMisTicketsHandler(
     ITicketQueryService consultas,
@@ -33,7 +34,7 @@ public class ObtenerMisTicketsHandler(
     {
         var usuario = await proveedorUsuario.ObtenerAsync(cancellationToken)
             ?? throw new ForbiddenException("La identidad actual no esta registrada como usuario de GTE.");
-        return await consultas.ObtenerMiosAsync(usuario.IdUsuario, cancellationToken);
+        return await consultas.ObtenerMiosAsync(usuario.IdUsuario, query.Estatus, cancellationToken);
     }
 }
 

@@ -148,6 +148,7 @@ public class NotificacionesApiTests(WebApplicationFactory<Program> fabricaApp)
                 idTipoWorkItem = 3,
                 titulo = "Item para mencion",
                 idPrioridad = 3,
+                idComplejidad = await FabricaApiAutenticada.ObtenerOCrearComplejidadAsync(),
                 fechaCompromiso = DateTime.Today.AddDays(5)
             });
             respuestaItem.EnsureSuccessStatusCode();

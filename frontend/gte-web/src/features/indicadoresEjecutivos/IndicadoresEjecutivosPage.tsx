@@ -23,6 +23,7 @@ import {
 } from "recharts";
 import { ComboBuscable } from "../../shared/components/ComboBuscable";
 import { obtenerCatalogosBandeja } from "../../shared/api/workitems";
+import { useColorSerie } from "../../shared/graficas/coloresGrafica";
 import {
   guardarLayoutDashboardEjecutivo, obtenerIndicadoresEjecutivos, obtenerLayoutDashboardEjecutivo,
   type IndicadoresEjecutivos,
@@ -87,6 +88,7 @@ function Tile({ titulo, valor, explicacion, sufijo }: {
 }
 
 function ContenidoWidget({ clave, datos }: { clave: ClaveWidget; datos: IndicadoresEjecutivos }) {
+  const colorSerie = useColorSerie();
   switch (clave) {
     case "kpis":
       return (
@@ -199,7 +201,7 @@ function ContenidoWidget({ clave, datos }: { clave: ClaveWidget; datos: Indicado
                       <XAxis dataKey="fecha" tick={{ fontSize: 10 }} />
                       <YAxis tick={{ fontSize: 10 }} />
                       <RechartsTooltip />
-                      <Line type="monotone" dataKey="valor" stroke="#334155" dot={false} />
+                      <Line type="monotone" dataKey="valor" stroke={colorSerie("#334155")} dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 </Box>
@@ -255,7 +257,7 @@ function ContenidoWidget({ clave, datos }: { clave: ClaveWidget; datos: Indicado
                 <RechartsTooltip />
                 <Legend />
                 <Line type="monotone" dataKey="restanteIdeal" name="Ideal" stroke="#94a3b8" strokeDasharray="4 4" dot={false} />
-                <Line type="monotone" dataKey="restanteReal" name="Real" stroke="#0f766e" dot={false} />
+                <Line type="monotone" dataKey="restanteReal" name="Real" stroke={colorSerie("#0f766e")} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           </Box>

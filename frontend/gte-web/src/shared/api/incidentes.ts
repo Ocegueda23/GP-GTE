@@ -49,6 +49,8 @@ export interface FiltroBandejaIncidentes {
   idSeveridad: number | null;
   idProyecto: number | null;
   texto: string;
+  ordenarPor: string | null;
+  ordenDescendente: boolean;
 }
 
 export const filtroBandejaIncidentesInicial: FiltroBandejaIncidentes = {
@@ -58,6 +60,8 @@ export const filtroBandejaIncidentesInicial: FiltroBandejaIncidentes = {
   idSeveridad: null,
   idProyecto: null,
   texto: "",
+  ordenarPor: null,
+  ordenDescendente: false,
 };
 
 export async function crearIncidente(datos: NuevoIncidente) {
@@ -72,6 +76,10 @@ export async function obtenerBandejaIncidentes(filtro: FiltroBandejaIncidentes) 
   if (filtro.idSeveridad) params.set("idSeveridad", String(filtro.idSeveridad));
   if (filtro.idProyecto) params.set("idProyecto", String(filtro.idProyecto));
   if (filtro.texto.trim()) params.set("texto", filtro.texto.trim());
+  if (filtro.ordenarPor) {
+    params.set("ordenarPor", filtro.ordenarPor);
+    params.set("ordenDescendente", String(filtro.ordenDescendente));
+  }
   return obtener<ResultadoPaginado<Incidente>>("/api/v1/incidentes", params);
 }
 

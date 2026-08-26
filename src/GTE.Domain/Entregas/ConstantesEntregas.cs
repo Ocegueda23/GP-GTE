@@ -19,6 +19,7 @@ public static class AccionesRelease
     public const string DesplegarProd = "DESPLEGAR_PROD";
     public const string Rollback = "ROLLBACK";
     public const string Cancelar = "CANCELAR";
+    public const string Reabrir = "REABRIR";
 }
 
 /// <summary>IDs de dbo.tblEstatusAprobacion.</summary>
@@ -37,7 +38,7 @@ public static class EstatusDespliegue
     public const int Fallido = 3;
 }
 
-/// <summary>IDs de dbo.tblTipoArtefacto. Los scripts SQL exigen rollback pareado (RN-REL-02).</summary>
+/// <summary>IDs de dbo.tblTipoArtefacto. Los scripts SQL exigen rollback pareado (RN-GTE-032).</summary>
 public static class TipoArtefacto
 {
     public const int Paquete = 1;

@@ -32,11 +32,35 @@ public interface IEntregaRepository
 
     Task<int> AgregarArtefactoAsync(ArtefactoNuevo datos, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Baja logica del artefacto y de su vinculo con el release. Devuelve el nombre del
+    /// artefacto que lo usa como reversa si existe, y en ese caso NO borra nada: quitarlo
+    /// dejaria a ese otro artefacto sin rollback y bloqueado por RN-GTE-032 sin explicacion.
+    /// </summary>
+    Task<string?> QuitarArtefactoAsync(
+        int idRelease, int idArtefacto, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<ArtefactoRelease>> ObtenerArtefactosAsync(int idRelease, CancellationToken cancellationToken = default);
 
     /* Aprobaciones */
 
+    /// <summary>
+    /// Cadena de aprobacion configurada por proyecto (Admin > Workflows). Lista vacia si el
+    /// proyecto no tiene configuracion propia: en ese caso el llamador usa el default fijo
+    /// (GTE.Domain.Entregas.RolesAprobacion.Cadena).
+    /// </summary>
+    Task<IReadOnlyList<string>> ObtenerCadenaAprobacionConfiguradaAsync(
+        int idProyecto, CancellationToken cancellationToken = default);
+
+    /// <summary>Reemplaza completa la cadena configurada del proyecto (lista vacia = volver al default fijo).</summary>
+    Task GuardarCadenaAprobacionConfiguradaAsync(
+        int idProyecto, IReadOnlyList<string> roles, CancellationToken cancellationToken = default);
+
     Task CrearCadenaAprobacionAsync(int idRelease, IReadOnlyList<string> roles, CancellationToken cancellationToken = default);
+
+    /// <summary>Da de baja la cadena de aprobacion vigente (REABRIR): la siguiente
+    /// SOLICITAR_APROBACION crea firmas nuevas en vez de reusar las ya resueltas.</summary>
+    Task InvalidarCadenaAprobacionAsync(int idRelease, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<AprobacionRelease>> ObtenerAprobacionesAsync(int idRelease, CancellationToken cancellationToken = default);
 
@@ -54,11 +78,12 @@ public interface IEntregaRepository
 
     Task<int?> ObtenerAmbienteProduccionAsync(int idProyecto, CancellationToken cancellationToken = default);
 
-    /* Calidad del release (RN-QA-01) */
+    /* Calidad del release (RN-GTE-025) */
 
-    /// <summary>Casos con resultado Falla en el ultimo ciclo que no tienen bug asociado.</summary>
-    Task<IReadOnlyList<string>> ObtenerFallasSinBugAsync(int idRelease, CancellationToken cancellationToken = default);
-
-    /// <summary>Bugs de severidad S1 o S2 abiertos ligados al contenido del release.</summary>
-    Task<IReadOnlyList<string>> ObtenerBugsCriticosAbiertosAsync(int idRelease, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// WorkItems del contenido del release con un hallazgo (QA o code review) de severidad
+    /// S1/S2 todavia sin corregir. Un item nunca probado no aparece aqui -- esa cobertura la
+    /// decide QA al aprobar la fase En Pruebas del propio item, no este gate.
+    /// </summary>
+    Task<IReadOnlyList<string>> ObtenerHallazgosCriticosAbiertosAsync(int idRelease, CancellationToken cancellationToken = default);
 }

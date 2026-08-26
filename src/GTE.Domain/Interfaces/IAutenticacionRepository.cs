@@ -13,4 +13,8 @@ public interface IAutenticacionRepository
     Task<RefreshTokenValido?> ObtenerRefreshTokenAsync(string tokenHash, CancellationToken cancellationToken = default);
     Task RevocarRefreshTokenAsync(int idRefreshToken, CancellationToken cancellationToken = default);
     Task RevocarTodosLosRefreshTokensAsync(int idUsuario, CancellationToken cancellationToken = default);
+
+    /// <summary>Bitacora de INICIAR_SUPLANTACION/TERMINAR_SUPLANTACION (doble identidad via AuditContext).</summary>
+    Task RegistrarBitacoraSuplantacionAsync(
+        int idUsuarioSuplantado, string accion, string? detalle, CancellationToken cancellationToken = default);
 }

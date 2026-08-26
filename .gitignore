@@ -25,3 +25,6 @@ frontend/gte-web/coverage/
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# Salida de publicar.bat (artefactos de despliegue, ~100 MB)
+publicado/

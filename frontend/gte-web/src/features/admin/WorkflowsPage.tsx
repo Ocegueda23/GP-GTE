@@ -1,16 +1,24 @@
 import { useEffect, useState } from "react";
 import {
-  Alert, Box, Button, Checkbox, LinearProgress, Paper, Snackbar, Stack,
+  Alert, Box, Button, Checkbox, Divider, IconButton, LinearProgress, Paper, Snackbar, Stack,
   Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography,
 } from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
+import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
+import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import SaveIcon from "@mui/icons-material/Save";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { obtenerProyectos, obtenerRoles } from "../../shared/api/administracion";
 import { ErrorApi } from "../../shared/api/http";
 import { ComboBuscable } from "../../shared/components/ComboBuscable";
 import {
-  guardarTransicionesWorkflow, obtenerDefinicionWorkflow, obtenerPermisosWorkflow,
-  obtenerProcesosWorkflow, type TransicionConfigGuardar, type TransicionWorkflow,
+  guardarCadenaAprobacion, guardarTransicionesWorkflow, obtenerCadenaAprobacion,
+  obtenerDefinicionWorkflow, obtenerPermisosWorkflow, obtenerProcesosWorkflow,
+  type TransicionConfigGuardar, type TransicionWorkflow,
 } from "../../shared/api/workflow";
+
+const CADENA_DEFAULT = ["QA", "Lider", "Negocio"];
 
 /**
  * P21 - Editor de Workflows (permiso ADM.Workflows): lista de procesos -> ver el grafo
@@ -22,6 +30,9 @@ export function WorkflowsPage() {
   const [proceso, setProceso] = useState<string>("");
   const [filas, setFilas] = useState<TransicionWorkflow[]>([]);
   const [guardando, setGuardando] = useState(false);
+  const [idProyectoCadena, setIdProyectoCadena] = useState<number | "">("");
+  const [rolesCadena, setRolesCadena] = useState<string[]>([]);
+  const [guardandoCadena, setGuardandoCadena] = useState(false);
   const [aviso, setAviso] = useState<{ tipo: "success" | "error"; mensaje: string } | null>(null);
   const clienteQuery = useQueryClient();
 
@@ -33,6 +44,15 @@ export function WorkflowsPage() {
     queryKey: ["workflow-definicion", proceso],
     queryFn: () => obtenerDefinicionWorkflow(proceso),
     enabled: proceso !== "",
+  });
+  const proyectos = useQuery({
+    queryKey: ["proyectos-cadena-aprobacion"], queryFn: () => obtenerProyectos(true), staleTime: 5 * 60_000,
+  });
+  const catalogosRoles = useQuery({ queryKey: ["roles-cadena-aprobacion"], queryFn: obtenerRoles, staleTime: 5 * 60_000 });
+  const cadena = useQuery({
+    queryKey: ["cadena-aprobacion", idProyectoCadena],
+    queryFn: () => obtenerCadenaAprobacion(idProyectoCadena as number),
+    enabled: idProyectoCadena !== "",
   });
 
   useEffect(() => {
@@ -47,7 +67,37 @@ export function WorkflowsPage() {
     }
   }, [definicion.data]);
 
+  useEffect(() => {
+    if (cadena.data) {
+      setRolesCadena(cadena.data.length > 0 ? cadena.data : CADENA_DEFAULT);
+    }
+  }, [cadena.data]);
+
   const avisar = (mensaje: string, error = false) => setAviso({ tipo: error ? "error" : "success", mensaje });
+
+  const moverRol = (indice: number, delta: number) => {
+    setRolesCadena((prev) => {
+      const destino = indice + delta;
+      if (destino < 0 || destino >= prev.length) return prev;
+      const copia = [...prev];
+      [copia[indice], copia[destino]] = [copia[destino], copia[indice]];
+      return copia;
+    });
+  };
+
+  const guardarCadena = async (roles: string[]) => {
+    if (idProyectoCadena === "") return;
+    setGuardandoCadena(true);
+    try {
+      const { mensaje } = await guardarCadenaAprobacion(idProyectoCadena, roles);
+      avisar(mensaje);
+      await clienteQuery.invalidateQueries({ queryKey: ["cadena-aprobacion", idProyectoCadena] });
+    } catch (error) {
+      avisar(error instanceof ErrorApi ? error.message : "No se pudo guardar la cadena de aprobacion.", true);
+    } finally {
+      setGuardandoCadena(false);
+    }
+  };
 
   const actualizarFila = (idEstatusOrigen: number, accion: string, cambios: Partial<TransicionWorkflow>) => {
     setFilas((previas) => previas.map((f) =>
@@ -160,6 +210,69 @@ export function WorkflowsPage() {
           </TableBody>
         </Table>
       </Paper>
+
+      <Divider sx={{ my: 3 }} />
+
+      <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>Cadena de aprobacion de releases</Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        Orden de firmas que exige SOLICITAR_APROBACION en un release. Sin configuracion propia,
+        el proyecto usa el default fijo: {CADENA_DEFAULT.join(" -> ")}.
+      </Typography>
+
+      <ComboBuscable
+        label="Proyecto"
+        value={idProyectoCadena}
+        onChange={(v) => setIdProyectoCadena(v as number | "")}
+        opciones={(proyectos.data ?? []).map((p) => ({ valor: p.idProyecto, etiqueta: `${p.clave} - ${p.nombre}` }))}
+        sx={{ minWidth: 320, mb: 2 }}
+      />
+
+      {idProyectoCadena === "" ? (
+        <Alert severity="info">Elige un proyecto para ver o editar su cadena de aprobacion.</Alert>
+      ) : (
+        <Paper variant="outlined" sx={{ p: 2, maxWidth: 480 }}>
+          {cadena.isLoading && <LinearProgress sx={{ mb: 1 }} />}
+          <Stack spacing={1}>
+            {rolesCadena.map((rol, indice) => (
+              <Stack key={indice} direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                <Typography variant="body2" sx={{ minWidth: 24 }}>{indice + 1}.</Typography>
+                <ComboBuscable
+                  label=""
+                  value={rol}
+                  onChange={(v) => setRolesCadena((prev) => prev.map((r, i) => (i === indice ? String(v) : r)))}
+                  opciones={(catalogosRoles.data ?? []).map((r) => ({ valor: r.nombre, etiqueta: r.nombre }))}
+                  sx={{ flex: 1 }}
+                />
+                <IconButton size="small" disabled={indice === 0} onClick={() => moverRol(indice, -1)}>
+                  <ArrowUpwardIcon fontSize="small" />
+                </IconButton>
+                <IconButton size="small" disabled={indice === rolesCadena.length - 1}
+                  onClick={() => moverRol(indice, 1)}>
+                  <ArrowDownwardIcon fontSize="small" />
+                </IconButton>
+                <IconButton size="small" onClick={() => setRolesCadena((prev) => prev.filter((_, i) => i !== indice))}>
+                  <DeleteOutlineIcon fontSize="small" />
+                </IconButton>
+              </Stack>
+            ))}
+            <Button size="small" startIcon={<AddIcon />} onClick={() => setRolesCadena((prev) => [...prev, ""])}>
+              Agregar rol
+            </Button>
+          </Stack>
+          <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
+            <Button
+              variant="contained" startIcon={<SaveIcon />}
+              disabled={guardandoCadena || rolesCadena.some((r) => r.trim().length === 0)}
+              onClick={() => void guardarCadena(rolesCadena)}
+            >
+              Guardar cadena
+            </Button>
+            <Button disabled={guardandoCadena} onClick={() => void guardarCadena([])}>
+              Restaurar default
+            </Button>
+          </Stack>
+        </Paper>
+      )}
 
       <Snackbar open={aviso !== null} autoHideDuration={6000} onClose={() => setAviso(null)}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>

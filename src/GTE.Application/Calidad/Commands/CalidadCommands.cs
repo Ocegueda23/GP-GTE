@@ -1,10 +1,9 @@
 using FluentValidation;
 using GTE.Application.DTOs.Request.Calidad;
-using GTE.Application.DTOs.Request.WorkItems;
+using GTE.Application.DTOs.Request.Revisiones;
 using GTE.Application.DTOs.Responses.Calidad;
-using GTE.Application.DTOs.Responses.WorkItems;
 using GTE.Application.Interfaces;
-using GTE.Application.WorkItems.Commands;
+using GTE.Application.Revisiones.Commands;
 using GTE.Domain.Calidad;
 using GTE.Domain.Exceptions;
 using GTE.Domain.Interfaces;
@@ -12,49 +11,15 @@ using MediatR;
 
 namespace GTE.Application.Calidad.Commands;
 
-/* ---------- Planes ---------- */
+/* ---------- Crear caso y asignarlo a un WorkItem ---------- */
 
-public record CrearPlanPruebaCommand(PlanPruebaCrearRequest Datos) : IRequest<PlanPruebaResponse>;
+public record CrearCasoYAsignarCommand(int IdWorkItem, CasoPruebaCrearRequest Datos) : IRequest<int>;
 
-public class CrearPlanPruebaValidator : AbstractValidator<CrearPlanPruebaCommand>
+public class CrearCasoYAsignarValidator : AbstractValidator<CrearCasoYAsignarCommand>
 {
-    public CrearPlanPruebaValidator()
+    public CrearCasoYAsignarValidator()
     {
-        RuleFor(c => c.Datos.IdProyecto).GreaterThan(0).WithMessage("El proyecto es obligatorio.");
-        RuleFor(c => c.Datos.Nombre).NotEmpty().WithMessage("El nombre del plan es obligatorio.")
-            .MaximumLength(200);
-        RuleFor(c => c.Datos.Descripcion).MaximumLength(500);
-    }
-}
-
-public class CrearPlanPruebaHandler(
-    ICalidadRepository repositorio,
-    ICalidadQueryService consultas,
-    IVerificadorPermisos permisos) : IRequestHandler<CrearPlanPruebaCommand, PlanPruebaResponse>
-{
-    public async Task<PlanPruebaResponse> Handle(CrearPlanPruebaCommand command, CancellationToken cancellationToken)
-    {
-        await permisos.ExigirPermisoAsync(
-            PermisosCalidad.GestionarPlanes, command.Datos.IdProyecto, cancellationToken);
-
-        var id = await repositorio.CrearPlanAsync(new PlanPruebaNuevo(
-            command.Datos.IdProyecto, command.Datos.IdRelease,
-            command.Datos.Nombre.Trim(), command.Datos.Descripcion), cancellationToken);
-
-        return await consultas.ObtenerPlanAsync(id, cancellationToken)
-            ?? throw new NotFoundException("PlanPrueba", id);
-    }
-}
-
-/* ---------- Casos ---------- */
-
-public record CrearCasoPruebaCommand(int IdPlanPrueba, CasoPruebaCrearRequest Datos) : IRequest<int>;
-
-public class CrearCasoPruebaValidator : AbstractValidator<CrearCasoPruebaCommand>
-{
-    public CrearCasoPruebaValidator()
-    {
-        RuleFor(c => c.IdPlanPrueba).GreaterThan(0);
+        RuleFor(c => c.IdWorkItem).GreaterThan(0);
         RuleFor(c => c.Datos.Titulo).NotEmpty().WithMessage("El titulo del caso es obligatorio.")
             .MaximumLength(200);
         RuleFor(c => c.Datos.IdTipoPrueba).GreaterThan(0);
@@ -66,17 +31,22 @@ public class CrearCasoPruebaValidator : AbstractValidator<CrearCasoPruebaCommand
     }
 }
 
-public class CrearCasoPruebaHandler(
+/// <summary>
+/// Crea un caso de prueba y lo asigna al WorkItem en el mismo paso. Si Datos.Reutilizable es
+/// false, el caso solo existe para esta asignacion (no aparece en el catalogo del proyecto).
+/// </summary>
+public class CrearCasoYAsignarHandler(
     ICalidadRepository repositorio,
+    IWorkItemRepository workItems,
     IGeneradorFolios folios,
-    IVerificadorPermisos permisos) : IRequestHandler<CrearCasoPruebaCommand, int>
+    IVerificadorPermisos permisos) : IRequestHandler<CrearCasoYAsignarCommand, int>
 {
-    public async Task<int> Handle(CrearCasoPruebaCommand command, CancellationToken cancellationToken)
+    public async Task<int> Handle(CrearCasoYAsignarCommand command, CancellationToken cancellationToken)
     {
-        var plan = await repositorio.ObtenerEstadoPlanAsync(command.IdPlanPrueba, cancellationToken)
-            ?? throw new NotFoundException("PlanPrueba", command.IdPlanPrueba);
+        var estadoItem = await workItems.ObtenerEstadoAsync(command.IdWorkItem, cancellationToken)
+            ?? throw new NotFoundException("WorkItem", command.IdWorkItem);
 
-        await permisos.ExigirPermisoAsync(PermisosCalidad.GestionarPlanes, plan.IdProyecto, cancellationToken);
+        await permisos.ExigirPermisoAsync(PermisosCalidad.Ejecutar, estadoItem.IdProyecto, cancellationToken);
 
         var folio = await folios.GenerarAsync("CP", cancellationToken: cancellationToken);
 
@@ -85,53 +55,171 @@ public class CrearCasoPruebaHandler(
             .Select(p => new PasoCaso(p.NumeroPaso, p.Accion.Trim(), p.ResultadoEsperado))
             .ToList();
 
-        return await repositorio.CrearCasoAsync(new CasoPruebaNuevo(
-            folio, command.IdPlanPrueba, command.Datos.Titulo.Trim(), command.Datos.Precondiciones,
-            command.Datos.ResultadoEsperado, command.Datos.IdTipoPrueba,
-            command.Datos.IdWorkItem, pasos), cancellationToken);
+        var idCaso = await repositorio.CrearCasoAsync(new CasoPruebaNuevo(
+            estadoItem.IdProyecto, folio, command.Datos.Titulo.Trim(), command.Datos.Precondiciones,
+            command.Datos.ResultadoEsperado, command.Datos.IdTipoPrueba, command.Datos.Reutilizable, pasos),
+            cancellationToken);
+
+        await repositorio.AsignarCasoAsync(command.IdWorkItem, idCaso, cancellationToken);
+        return idCaso;
     }
 }
 
-/* ---------- Ciclos ---------- */
+/* ---------- Asignar un caso ya existente del catalogo ---------- */
 
-public record CrearCicloPruebaCommand(int IdPlanPrueba, CicloPruebaCrearRequest Datos) : IRequest<int>;
+public record AsignarCasoExistenteCommand(int IdWorkItem, AsignarCasoRequest Datos) : IRequest<Unit>;
 
-public class CrearCicloPruebaValidator : AbstractValidator<CrearCicloPruebaCommand>
+public class AsignarCasoExistenteValidator : AbstractValidator<AsignarCasoExistenteCommand>
 {
-    public CrearCicloPruebaValidator()
+    public AsignarCasoExistenteValidator()
     {
-        RuleFor(c => c.IdPlanPrueba).GreaterThan(0);
-        RuleFor(c => c.Datos.Nombre).NotEmpty().WithMessage("El nombre del ciclo es obligatorio.")
-            .MaximumLength(200);
+        RuleFor(c => c.IdWorkItem).GreaterThan(0);
+        RuleFor(c => c.Datos.IdCasoPrueba).GreaterThan(0);
     }
 }
 
-public class CrearCicloPruebaHandler(
+public class AsignarCasoExistenteHandler(
     ICalidadRepository repositorio,
-    IVerificadorPermisos permisos) : IRequestHandler<CrearCicloPruebaCommand, int>
+    IWorkItemRepository workItems,
+    IVerificadorPermisos permisos) : IRequestHandler<AsignarCasoExistenteCommand, Unit>
 {
-    public async Task<int> Handle(CrearCicloPruebaCommand command, CancellationToken cancellationToken)
+    public async Task<Unit> Handle(AsignarCasoExistenteCommand command, CancellationToken cancellationToken)
     {
-        var plan = await repositorio.ObtenerEstadoPlanAsync(command.IdPlanPrueba, cancellationToken)
-            ?? throw new NotFoundException("PlanPrueba", command.IdPlanPrueba);
+        var estadoItem = await workItems.ObtenerEstadoAsync(command.IdWorkItem, cancellationToken)
+            ?? throw new NotFoundException("WorkItem", command.IdWorkItem);
 
-        await permisos.ExigirPermisoAsync(PermisosCalidad.GestionarPlanes, plan.IdProyecto, cancellationToken);
+        await permisos.ExigirPermisoAsync(PermisosCalidad.Ejecutar, estadoItem.IdProyecto, cancellationToken);
 
-        return await repositorio.CrearCicloAsync(new CicloPruebaNuevo(
-            command.IdPlanPrueba, command.Datos.Nombre.Trim(),
-            command.Datos.FechaInicio, command.Datos.FechaFin), cancellationToken);
+        var caso = await repositorio.ObtenerEstadoCasoAsync(command.Datos.IdCasoPrueba, cancellationToken)
+            ?? throw new NotFoundException("CasoPrueba", command.Datos.IdCasoPrueba);
+
+        if (caso.IdProyecto != estadoItem.IdProyecto)
+        {
+            throw new BusinessException("Ese caso pertenece a otro proyecto.");
+        }
+
+        if (await repositorio.ExisteAsignacionActivaAsync(command.IdWorkItem, command.Datos.IdCasoPrueba, cancellationToken))
+        {
+            throw new ConflictException("Ese caso ya esta asignado a este elemento.");
+        }
+
+        await repositorio.AsignarCasoAsync(command.IdWorkItem, command.Datos.IdCasoPrueba, cancellationToken);
+        return Unit.Value;
     }
 }
 
-/* ---------- Ejecucion ---------- */
+/* ---------- Retirar una asignacion ---------- */
 
-public record RegistrarEjecucionCommand(int IdCicloPrueba, EjecucionRegistrarRequest Datos) : IRequest<int>;
+public record RetirarAsignacionCommand(int IdWorkItemCasoPrueba) : IRequest<Unit>;
+
+public class RetirarAsignacionValidator : AbstractValidator<RetirarAsignacionCommand>
+{
+    public RetirarAsignacionValidator()
+    {
+        RuleFor(c => c.IdWorkItemCasoPrueba).GreaterThan(0);
+    }
+}
+
+public class RetirarAsignacionHandler(
+    ICalidadRepository repositorio,
+    IWorkItemRepository workItems,
+    IVerificadorPermisos permisos) : IRequestHandler<RetirarAsignacionCommand, Unit>
+{
+    public async Task<Unit> Handle(RetirarAsignacionCommand command, CancellationToken cancellationToken)
+    {
+        var idWorkItem = await repositorio.ObtenerIdWorkItemDeAsignacionAsync(command.IdWorkItemCasoPrueba, cancellationToken)
+            ?? throw new NotFoundException("WorkItemCasoPrueba", command.IdWorkItemCasoPrueba);
+
+        var estadoItem = await workItems.ObtenerEstadoAsync(idWorkItem, cancellationToken)
+            ?? throw new NotFoundException("WorkItem", idWorkItem);
+
+        await permisos.ExigirPermisoAsync(PermisosCalidad.Ejecutar, estadoItem.IdProyecto, cancellationToken);
+
+        await repositorio.RetirarAsignacionAsync(command.IdWorkItemCasoPrueba, cancellationToken);
+        return Unit.Value;
+    }
+}
+
+/* ---------- Editar / retirar un caso del catalogo ---------- */
+
+public record ActualizarCasoPruebaCommand(int IdCasoPrueba, CasoPruebaEditarRequest Datos) : IRequest<Unit>;
+
+public class ActualizarCasoPruebaValidator : AbstractValidator<ActualizarCasoPruebaCommand>
+{
+    public ActualizarCasoPruebaValidator()
+    {
+        RuleFor(c => c.IdCasoPrueba).GreaterThan(0);
+        RuleFor(c => c.Datos.Titulo).NotEmpty().WithMessage("El titulo del caso es obligatorio.")
+            .MaximumLength(200);
+        RuleFor(c => c.Datos.IdTipoPrueba).GreaterThan(0);
+        RuleForEach(c => c.Datos.Pasos).ChildRules(paso =>
+        {
+            paso.RuleFor(p => p.Accion).NotEmpty().WithMessage("Cada paso requiere una accion.");
+            paso.RuleFor(p => p.NumeroPaso).GreaterThan(0);
+        });
+    }
+}
+
+public class ActualizarCasoPruebaHandler(
+    ICalidadRepository repositorio,
+    IVerificadorPermisos permisos) : IRequestHandler<ActualizarCasoPruebaCommand, Unit>
+{
+    public async Task<Unit> Handle(ActualizarCasoPruebaCommand command, CancellationToken cancellationToken)
+    {
+        var caso = await repositorio.ObtenerEstadoCasoAsync(command.IdCasoPrueba, cancellationToken)
+            ?? throw new NotFoundException("CasoPrueba", command.IdCasoPrueba);
+
+        await permisos.ExigirPermisoAsync(PermisosCalidad.GestionarPlanes, caso.IdProyecto, cancellationToken);
+
+        var pasos = command.Datos.Pasos
+            .OrderBy(p => p.NumeroPaso)
+            .Select(p => new PasoCaso(p.NumeroPaso, p.Accion.Trim(), p.ResultadoEsperado))
+            .ToList();
+
+        await repositorio.ActualizarCasoAsync(new CasoPruebaEdicion(
+            command.IdCasoPrueba, command.Datos.Titulo.Trim(), command.Datos.Precondiciones,
+            command.Datos.ResultadoEsperado, command.Datos.IdTipoPrueba, pasos), cancellationToken);
+
+        return Unit.Value;
+    }
+}
+
+public record RetirarCasoPruebaCommand(int IdCasoPrueba) : IRequest<Unit>;
+
+public class RetirarCasoPruebaValidator : AbstractValidator<RetirarCasoPruebaCommand>
+{
+    public RetirarCasoPruebaValidator()
+    {
+        RuleFor(c => c.IdCasoPrueba).GreaterThan(0);
+    }
+}
+
+public class RetirarCasoPruebaHandler(
+    ICalidadRepository repositorio,
+    IVerificadorPermisos permisos) : IRequestHandler<RetirarCasoPruebaCommand, Unit>
+{
+    public async Task<Unit> Handle(RetirarCasoPruebaCommand command, CancellationToken cancellationToken)
+    {
+        var caso = await repositorio.ObtenerEstadoCasoAsync(command.IdCasoPrueba, cancellationToken)
+            ?? throw new NotFoundException("CasoPrueba", command.IdCasoPrueba);
+
+        await permisos.ExigirPermisoAsync(PermisosCalidad.GestionarPlanes, caso.IdProyecto, cancellationToken);
+
+        await repositorio.RetirarCasoAsync(command.IdCasoPrueba, cancellationToken);
+        return Unit.Value;
+    }
+}
+
+/* ---------- Registrar ejecucion ---------- */
+
+public record RegistrarEjecucionCommand(int IdWorkItem, EjecucionRegistrarRequest Datos)
+    : IRequest<EjecucionRegistradaResponse>;
 
 public class RegistrarEjecucionValidator : AbstractValidator<RegistrarEjecucionCommand>
 {
     public RegistrarEjecucionValidator()
     {
-        RuleFor(c => c.IdCicloPrueba).GreaterThan(0);
+        RuleFor(c => c.IdWorkItem).GreaterThan(0);
         RuleFor(c => c.Datos.IdCasoPrueba).GreaterThan(0);
         RuleFor(c => c.Datos.IdResultadoPrueba).InclusiveBetween(1, 4)
             .WithMessage("El resultado debe ser Pasa, Falla, Bloqueado o No aplica.");
@@ -139,101 +227,68 @@ public class RegistrarEjecucionValidator : AbstractValidator<RegistrarEjecucionC
             .NotEmpty()
             .When(c => c.Datos.IdResultadoPrueba is ResultadoPrueba.Falla or ResultadoPrueba.Bloqueado)
             .WithMessage("Describe que fallo o que bloqueo la prueba.");
-    }
-}
-
-public class RegistrarEjecucionHandler(
-    ICalidadRepository repositorio,
-    IProveedorUsuarioActual proveedorUsuario,
-    IVerificadorPermisos permisos) : IRequestHandler<RegistrarEjecucionCommand, int>
-{
-    public async Task<int> Handle(RegistrarEjecucionCommand command, CancellationToken cancellationToken)
-    {
-        var usuario = await proveedorUsuario.ObtenerAsync(cancellationToken)
-            ?? throw new ForbiddenException("La identidad actual no esta registrada como usuario de GTE.");
-
-        var caso = await repositorio.ObtenerEstadoCasoAsync(command.Datos.IdCasoPrueba, cancellationToken)
-            ?? throw new NotFoundException("CasoPrueba", command.Datos.IdCasoPrueba);
-
-        await permisos.ExigirPermisoAsync(PermisosCalidad.Ejecutar, caso.IdProyecto, cancellationToken);
-
-        // El ciclo y el caso deben pertenecer al mismo plan
-        if (!await repositorio.ExisteCicloEnPlanAsync(command.IdCicloPrueba, caso.IdPlanPrueba, cancellationToken))
-        {
-            throw new BusinessException("El ciclo no pertenece al plan de pruebas de ese caso.");
-        }
-
-        return await repositorio.RegistrarEjecucionAsync(new EjecucionNueva(
-            command.Datos.IdCasoPrueba, command.IdCicloPrueba, usuario.IdUsuario,
-            command.Datos.IdResultadoPrueba, command.Datos.Observaciones), cancellationToken);
-    }
-}
-
-/* ---------- Bug desde una falla ---------- */
-
-public record CrearBugDesdeEjecucionCommand(int IdEjecucion, BugDesdeEjecucionRequest Datos)
-    : IRequest<WorkItemResponse>;
-
-public class CrearBugDesdeEjecucionValidator : AbstractValidator<CrearBugDesdeEjecucionCommand>
-{
-    public CrearBugDesdeEjecucionValidator()
-    {
-        RuleFor(c => c.IdEjecucion).GreaterThan(0);
-        RuleFor(c => c.Datos.IdPrioridad).GreaterThan(0);
-        RuleFor(c => c.Datos.Titulo).MaximumLength(200);
+        RuleFor(c => c.Datos.IdSeveridad)
+            .NotNull().InclusiveBetween(1, 4)
+            .When(c => c.Datos.IdResultadoPrueba == ResultadoPrueba.Falla)
+            .WithMessage("Selecciona la severidad del hallazgo.");
     }
 }
 
 /// <summary>
-/// Crea el bug de una ejecucion fallida reutilizando el comando de alta de WorkItem
-/// (folio, historial y reglas incluidas) y lo deja vinculado a la ejecucion, para que
-/// la trazabilidad prueba-defecto quede completa y no se reporte dos veces lo mismo.
+/// Registra el resultado de correr un caso contra el WorkItem. Si el resultado es Falla,
+/// crea en automatico el hallazgo (mismo mecanismo que un hallazgo de code review, via
+/// CrearRevisionCommand) con la evidencia de la ejecucion ya precargada -- no se crea un
+/// WorkItem nuevo: el defecto es parte de este mismo item, no pierde su trazabilidad.
 /// </summary>
-public class CrearBugDesdeEjecucionHandler(
+public class RegistrarEjecucionHandler(
     ICalidadRepository repositorio,
-    ISender mediator) : IRequestHandler<CrearBugDesdeEjecucionCommand, WorkItemResponse>
+    IWorkItemRepository workItems,
+    IProveedorUsuarioActual proveedorUsuario,
+    IVerificadorPermisos permisos,
+    ISender mediator) : IRequestHandler<RegistrarEjecucionCommand, EjecucionRegistradaResponse>
 {
-    private const int TipoBug = 5;   // dbo.tblTipoWorkItem
-
-    public async Task<WorkItemResponse> Handle(
-        CrearBugDesdeEjecucionCommand command, CancellationToken cancellationToken)
+    public async Task<EjecucionRegistradaResponse> Handle(
+        RegistrarEjecucionCommand command, CancellationToken cancellationToken)
     {
-        var ejecucion = await repositorio.ObtenerEstadoEjecucionAsync(command.IdEjecucion, cancellationToken)
-            ?? throw new NotFoundException("EjecucionPrueba", command.IdEjecucion);
+        var usuario = await proveedorUsuario.ObtenerAsync(cancellationToken)
+            ?? throw new ForbiddenException("La identidad actual no esta registrada como usuario de GTE.");
 
-        if (ejecucion.IdResultado != ResultadoPrueba.Falla)
+        var estadoItem = await workItems.ObtenerEstadoAsync(command.IdWorkItem, cancellationToken)
+            ?? throw new NotFoundException("WorkItem", command.IdWorkItem);
+
+        await permisos.ExigirPermisoAsync(PermisosCalidad.Ejecutar, estadoItem.IdProyecto, cancellationToken);
+
+        if (!await repositorio.ExisteAsignacionActivaAsync(command.IdWorkItem, command.Datos.IdCasoPrueba, cancellationToken))
         {
-            throw new BusinessException("Solo se crean bugs desde ejecuciones con resultado Falla.");
+            throw new BusinessException("Ese caso no esta asignado a este elemento.");
         }
 
-        var existente = await repositorio.ObtenerBugDeEjecucionAsync(command.IdEjecucion, cancellationToken);
-        if (existente.HasValue)
+        var idEjecucion = await repositorio.RegistrarEjecucionAsync(new EjecucionNueva(
+            command.Datos.IdCasoPrueba, command.IdWorkItem, usuario.IdUsuario,
+            command.Datos.IdResultadoPrueba, command.Datos.Observaciones), cancellationToken);
+
+        var respuesta = new EjecucionRegistradaResponse { IdEjecucionPrueba = idEjecucion };
+
+        if (command.Datos.IdResultadoPrueba == ResultadoPrueba.Falla)
         {
-            throw new ConflictException(
-                "Esta ejecucion ya tiene un bug reportado.", new { idWorkItem = existente.Value });
+            var ejecucion = await repositorio.ObtenerEstadoEjecucionAsync(idEjecucion, cancellationToken)
+                ?? throw new NotFoundException("EjecucionPrueba", idEjecucion);
+
+            var comentario = $"Prueba fallida: {ejecucion.TituloCaso}."
+                + (string.IsNullOrWhiteSpace(command.Datos.Observaciones)
+                    ? string.Empty
+                    : $"\n\nObservaciones: {command.Datos.Observaciones}");
+
+            var hallazgo = await mediator.Send(new CrearRevisionCommand(command.IdWorkItem, new RevisionCrearRequest
+            {
+                Comentarios = comentario,
+                IdSeveridad = command.Datos.IdSeveridad!.Value,
+                IdEjecucionPrueba = idEjecucion
+            }), cancellationToken);
+
+            respuesta.IdRevision = hallazgo.IdRevision;
         }
 
-        var descripcion = string.IsNullOrWhiteSpace(command.Datos.Descripcion)
-            ? $"Detectado al ejecutar el caso: {ejecucion.TituloCaso}."
-              + (string.IsNullOrWhiteSpace(ejecucion.Observaciones)
-                  ? string.Empty
-                  : $"\n\nObservaciones de la ejecucion: {ejecucion.Observaciones}")
-            : command.Datos.Descripcion;
-
-        var bug = await mediator.Send(new CrearWorkItemCommand(new WorkItemCrearRequest
-        {
-            IdProyecto = ejecucion.IdProyecto,
-            IdTipoWorkItem = TipoBug,
-            Titulo = string.IsNullOrWhiteSpace(command.Datos.Titulo)
-                ? $"Falla en prueba: {ejecucion.TituloCaso}"
-                : command.Datos.Titulo.Trim(),
-            Descripcion = descripcion,
-            IdPrioridad = command.Datos.IdPrioridad,
-            IdAsignado = command.Datos.IdAsignado,
-            FechaCompromiso = command.Datos.FechaCompromiso
-        }), cancellationToken);
-
-        await repositorio.VincularBugAsync(command.IdEjecucion, bug.IdWorkItem, cancellationToken);
-        return bug;
+        return respuesta;
     }
 }

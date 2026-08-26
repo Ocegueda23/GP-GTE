@@ -11,16 +11,6 @@ namespace GTE.Infrastructure.Repositories;
 public class PlaneacionRepository(FabricaContexto fabrica, AuditContext auditoria)
     : RepositoryBase(fabrica, auditoria), IPlaneacionRepository
 {
-    /// <summary>Mapeo estandar de columnas de tablero (estatus abiertos + Terminado).</summary>
-    private static readonly (string Nombre, int IdEstatus, int Orden, int? Wip)[] ColumnasEstandar =
-    [
-        ("Pendiente",  EstatusWorkItem.Pendiente,  1, null),
-        ("En proceso", EstatusWorkItem.EnProceso,  2, 5),
-        ("En pruebas", EstatusWorkItem.EnPruebas,  3, 5),
-        ("Correccion", EstatusWorkItem.Correccion, 4, null),
-        ("Terminado",  EstatusWorkItem.Terminado,  5, null)
-    ];
-
     public async Task<int> CrearSprintAsync(SprintNuevo datos, CancellationToken cancellationToken = default)
     {
         await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
@@ -51,6 +41,25 @@ public class PlaneacionRepository(FabricaContexto fabrica, AuditContext auditori
 
         await RegistrarBitacoraAsync("Sprint", entidad.IdSprint, "CREAR", datos.Nombre, cancellationToken);
         return entidad.IdSprint;
+    }
+
+    public async Task EditarSprintAsync(
+        int idSprint, SprintEdicion datos, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
+        var entidad = await contexto.TblSprint
+            .FirstOrDefaultAsync(s => s.IdSprint == idSprint, cancellationToken)
+            ?? throw new InvalidOperationException($"Sprint {idSprint} no existe.");
+
+        entidad.Nombre = datos.Nombre;
+        entidad.Objetivo = datos.Objetivo;
+        entidad.FechaInicio = datos.FechaInicio;
+        entidad.FechaFin = datos.FechaFin;
+        entidad.UsuarioMovto = Auditoria.Usuario.Length > 50 ? Auditoria.Usuario[..50] : Auditoria.Usuario;
+        entidad.FechaMovto = DateTime.Now;
+        await contexto.SaveChangesAsync(cancellationToken);
+
+        await RegistrarBitacoraAsync("Sprint", idSprint, "MODIFICAR", datos.Nombre, cancellationToken);
     }
 
     public async Task<EstadoSprint?> ObtenerEstadoSprintAsync(
@@ -226,7 +235,7 @@ public class PlaneacionRepository(FabricaContexto fabrica, AuditContext auditori
 
         if (columnas.Count == 0)
         {
-            foreach (var (nombre, idEstatus, orden, wip) in ColumnasEstandar)
+            foreach (var (nombre, idEstatus, orden, wip) in ColumnasTableroEstandar.Columnas)
             {
                 contexto.TblTableroColumna.Add(new TblTableroColumna
                 {

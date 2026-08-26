@@ -15,5 +15,4 @@ public class WorkItemCrearRequest
     public int? IdPadre { get; set; }
     public int? IdSolicitud { get; set; }
     public DateTime? FechaCompromiso { get; set; }
-    public decimal? PuntosHistoria { get; set; }
 }

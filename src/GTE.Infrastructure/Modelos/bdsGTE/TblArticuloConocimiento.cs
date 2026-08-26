@@ -15,6 +15,8 @@ public partial class TblArticuloConocimiento
 
     public bool EsGlosario { get; set; }
 
+    public bool EsPublico { get; set; }
+
     public DateTime FechaRegistro { get; set; }
 
     public string UsuarioRegistro { get; set; } = null!;

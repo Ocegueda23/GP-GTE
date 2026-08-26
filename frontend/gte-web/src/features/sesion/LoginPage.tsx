@@ -2,12 +2,24 @@ import { useState } from "react";
 import {
   Alert, Box, Button, Container, Divider, Paper, TextField, Typography,
 } from "@mui/material";
+import KeyboardCapslockIcon from "@mui/icons-material/KeyboardCapslock";
 import { useQuery } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
 import {
   cambiarPassword, iniciarSesion, iniciarSesionDesarrollo, obtenerConfiguracionAuth, useSesion,
   type Sesion,
 } from "../../shared/api/sesion";
+import { useBloqMayusculas } from "../../shared/hooks/useBloqMayusculas";
+
+/** Aviso junto a los campos de contraseña: enmascarados, la tecla trabada no se nota. */
+function AvisoBloqMayusculas({ activo }: { activo: boolean }) {
+  if (!activo) return null;
+  return (
+    <Alert severity="warning" icon={<KeyboardCapslockIcon fontSize="inherit" />} sx={{ py: 0 }}>
+      Bloq Mayus esta activado.
+    </Alert>
+  );
+}
 
 /** P01 - Inicio de sesion propio de GTE (usuario + contraseña, sin proveedor externo). */
 export function LoginPage() {
@@ -16,6 +28,7 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const establecer = useSesion((e) => e.establecer);
+  const bloqMayusculas = useBloqMayusculas();
 
   const [dominioDesarrollo, setDominioDesarrollo] = useState("");
   const [errorDesarrollo, setErrorDesarrollo] = useState<string | null>(null);
@@ -94,6 +107,7 @@ export function LoginPage() {
             <TextField size="small" type="password" label="Confirmar contraseña"
               value={passwordConfirmacion} onChange={(e) => setPasswordConfirmacion(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && valido) void confirmarCambioPassword(); }} />
+            <AvisoBloqMayusculas activo={bloqMayusculas} />
             {errorCambio !== null && <Alert severity="error">{errorCambio}</Alert>}
             <Button variant="contained" disabled={enviandoCambio || !valido}
               onClick={() => void confirmarCambioPassword()}>
@@ -119,6 +133,7 @@ export function LoginPage() {
           <TextField size="small" type="password" label="Contraseña" value={password}
             onChange={(e) => setPassword(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && dominio.trim() && password) void entrar(); }} />
+          <AvisoBloqMayusculas activo={bloqMayusculas} />
           {error !== null && <Alert severity="error">{error}</Alert>}
           <Button variant="contained" disabled={enviando || !dominio.trim() || !password}
             onClick={() => void entrar()}>

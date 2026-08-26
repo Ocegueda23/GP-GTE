@@ -35,9 +35,12 @@ public class IncidentesController(IMediator mediator) : ControllerBase
         [FromQuery] int? idSeveridad = null,
         [FromQuery] int? idProyecto = null,
         [FromQuery] string? texto = null,
+        [FromQuery] string? ordenarPor = null,
+        [FromQuery] bool ordenDescendente = false,
         CancellationToken cancellationToken = default)
     {
-        var filtro = new FiltroBandejaIncidente(page, pageSize, estatus, idSeveridad, idProyecto, texto);
+        var filtro = new FiltroBandejaIncidente(
+            page, pageSize, estatus, idSeveridad, idProyecto, texto, ordenarPor, ordenDescendente);
         var resultado = await mediator.Send(new ObtenerBandejaIncidentesQuery(filtro), cancellationToken);
         return Ok(ApiResponse<PagedResult<IncidenteResponse>>.Exito(resultado));
     }
@@ -79,7 +82,7 @@ public class IncidentesController(IMediator mediator) : ControllerBase
             $"El incidente paso a {resultado.Estatus}."));
     }
 
-    /// <summary>RN-OPS-03: cambio de severidad con motivo obligatorio.</summary>
+    /// <summary>RN-GTE-037: cambio de severidad con motivo obligatorio.</summary>
     [HttpPut("{id:int}/severidad")]
     public async Task<ActionResult<ApiResponse<IncidenteResponse>>> CambiarSeveridad(
         int id, [FromBody] CambiarSeveridadIncidenteRequest request, CancellationToken cancellationToken)

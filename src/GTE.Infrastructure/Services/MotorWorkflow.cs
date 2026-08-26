@@ -153,9 +153,9 @@ public class MotorWorkflow(FabricaContexto fabrica, AuditContext auditoria) : IM
         int idRegistro,
         CancellationToken cancellationToken)
     {
-        var sql = $"SELECT {Citar(configuracion.ColumnaEstatus)} AS [Value] " +
-                  $"FROM {CitarTabla(configuracion.TablaTransaccional)} " +
-                  $"WHERE {Citar(configuracion.ColumnaPk)} = @p0";
+        var sql = $"SELECT {SqlIdentificadores.Citar(configuracion.ColumnaEstatus)} AS [Value] " +
+                  $"FROM {SqlIdentificadores.CitarTabla(configuracion.TablaTransaccional)} " +
+                  $"WHERE {SqlIdentificadores.Citar(configuracion.ColumnaPk)} = @p0";
 
         var estatus = await contexto.Database
             .SqlQueryRaw<int?>(sql, new SqlParameter("@p0", idRegistro))
@@ -170,27 +170,11 @@ public class MotorWorkflow(FabricaContexto fabrica, AuditContext auditoria) : IM
         int idEstatus,
         CancellationToken cancellationToken)
     {
-        var sql = $"SELECT Descripcion AS [Value] FROM {CitarTabla(tablaEstatus)} WHERE Id = @p0";
+        var sql = $"SELECT Descripcion AS [Value] FROM {SqlIdentificadores.CitarTabla(tablaEstatus)} WHERE Id = @p0";
         var descripcion = await contexto.Database
             .SqlQueryRaw<string>(sql, new SqlParameter("@p0", idEstatus))
             .FirstOrDefaultAsync(cancellationToken);
 
         return descripcion ?? idEstatus.ToString();
-    }
-
-    private static string Citar(string identificador)
-    {
-        return "[" + identificador.Replace("]", "]]") + "]";
-    }
-
-    private static string CitarTabla(string tabla)
-    {
-        var partes = tabla.Split('.');
-        return partes.Length switch
-        {
-            1 => "[dbo]." + Citar(partes[0]),
-            2 => Citar(partes[0]) + "." + Citar(partes[1]),
-            _ => throw new InvalidOperationException($"Nombre de tabla invalido en tblProceso: {tabla}")
-        };
     }
 }

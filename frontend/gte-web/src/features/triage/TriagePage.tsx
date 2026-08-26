@@ -1,15 +1,21 @@
 import { useState } from "react";
 import {
   Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent,
-  DialogTitle, FormControl, IconButton, InputLabel, Menu, MenuItem, Paper, Select,
+  DialogTitle, IconButton, Menu, MenuItem, Paper,
   Snackbar, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   TextField, Tooltip, Typography,
 } from "@mui/material";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
+import { alpha } from "@mui/material/styles";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
+import { ComboBuscable } from "../../shared/components/ComboBuscable";
+import { EncabezadoOrdenable } from "../../shared/components/EncabezadoOrdenable";
+import { ContenidoEnriquecido } from "../../shared/editor/ContenidoEnriquecido";
+import { htmlATextoPlano } from "../../shared/editor/textoPlano";
 import { obtenerCatalogosBandeja, type AccionDisponible, type CatalogosBandeja } from "../../shared/api/workitems";
 import {
   cambiarEstatusSolicitud, colorEstatusSolicitud, convertirSolicitud,
@@ -25,12 +31,12 @@ function generarUiId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }
 
-function nuevaFila(titulo = ""): FilaConversion {
+function nuevaFila(titulo = "", descripcion: string | null = null): FilaConversion {
   return {
     uiId: generarUiId(),
     idTipoWorkItem: 3,   // Historia
     titulo,
-    descripcion: null,
+    descripcion,
     idPrioridad: 3,      // Media
     idAsignado: null,
     fechaCompromiso: null,
@@ -41,7 +47,15 @@ function nuevaFila(titulo = ""): FilaConversion {
 export function TriagePage() {
   const [texto, setTexto] = useState("");
   const [aviso, setAviso] = useState<{ tipo: "success" | "error"; mensaje: string } | null>(null);
+  const [verDetalle, setVerDetalle] = useState<Solicitud | null>(null);
+  const [ordenarPor, setOrdenarPor] = useState<string | null>(null);
+  const [ordenDescendente, setOrdenDescendente] = useState(false);
   const clienteQuery = useQueryClient();
+
+  const manejarOrden = (clave: string) => {
+    if (ordenarPor === clave) setOrdenDescendente((d) => !d);
+    else { setOrdenarPor(clave); setOrdenDescendente(false); }
+  };
 
   const catalogos = useQuery({
     queryKey: ["catalogos-bandeja"],
@@ -49,8 +63,8 @@ export function TriagePage() {
     staleTime: 5 * 60_000,
   });
   const triage = useQuery({
-    queryKey: ["triage", texto],
-    queryFn: () => obtenerTriage(1, 50, texto),
+    queryKey: ["triage", texto, ordenarPor, ordenDescendente],
+    queryFn: () => obtenerTriage(1, 50, texto, ordenarPor, ordenDescendente),
     placeholderData: (anterior) => anterior,
   });
 
@@ -72,14 +86,14 @@ export function TriagePage() {
           <Table size="small">
             <TableHead>
               <TableRow sx={{ "& th": { fontWeight: 700, whiteSpace: "nowrap" } }}>
-                <TableCell>Folio</TableCell>
-                <TableCell>Titulo</TableCell>
-                <TableCell>Solicitante</TableCell>
-                <TableCell>Tipo</TableCell>
-                <TableCell>Prioridad</TableCell>
-                <TableCell align="center">Dias esperando</TableCell>
-                <TableCell>Estatus</TableCell>
-                <TableCell>Proyecto</TableCell>
+                <EncabezadoOrdenable clave="folio" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Folio</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="titulo" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Titulo</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="solicitante" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Solicitante</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="tipo" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Tipo</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="prioridad" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Prioridad</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="diasEspera" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden} align="center">Dias esperando</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="estatus" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Estatus</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="proyecto" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Proyecto</EncabezadoOrdenable>
                 <TableCell align="center">Acciones</TableCell>
               </TableRow>
             </TableHead>
@@ -95,10 +109,14 @@ export function TriagePage() {
               )}
               {triage.data?.items.map((s) => (
                 <TableRow key={s.idSolicitud} hover
-                  sx={{ backgroundColor: s.diasEspera >= 3 && s.idEstatus === 2 ? "#fdecea" : undefined }}>
+                  sx={(theme) => ({
+                    backgroundColor: s.diasEspera >= 3 && s.idEstatus === 2
+                      ? alpha(theme.palette.error.main, theme.palette.mode === "dark" ? 0.18 : 0.08)
+                      : undefined,
+                  })}>
                   <TableCell sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>{s.folio}</TableCell>
                   <TableCell sx={{ maxWidth: 300 }}>
-                    <Tooltip title={`${s.descripcion ?? ""}\n${s.justificacionNegocio ?? ""}`.trim()}>
+                    <Tooltip title={`${htmlATextoPlano(s.descripcion ?? "")}\n${s.justificacionNegocio ?? ""}`.trim()}>
                       <Typography noWrap variant="body2">{s.titulo}</Typography>
                     </Tooltip>
                   </TableCell>
@@ -117,6 +135,11 @@ export function TriagePage() {
                   </TableCell>
                   <TableCell>{s.proyecto ?? "-"}</TableCell>
                   <TableCell align="center">
+                    <Tooltip title="Ver detalle">
+                      <IconButton size="small" onClick={() => setVerDetalle(s)} aria-label={`Ver detalle de ${s.folio}`}>
+                        <VisibilityIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
                     <MenuAccionesSolicitud
                       solicitud={s}
                       catalogos={catalogos.data}
@@ -130,6 +153,51 @@ export function TriagePage() {
           </Table>
         </TableContainer>
       </Paper>
+
+      <Dialog open={verDetalle !== null} onClose={() => setVerDetalle(null)} fullWidth maxWidth="sm">
+        <DialogTitle>{verDetalle?.folio} - {verDetalle?.titulo}</DialogTitle>
+        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <Stack direction="row" spacing={3}>
+            <Box>
+              <Typography variant="caption" color="text.secondary">Solicitante</Typography>
+              <Typography variant="body2">
+                {verDetalle?.usuarioSolicitante ?? verDetalle?.solicitante}
+              </Typography>
+            </Box>
+            <Box>
+              <Typography variant="caption" color="text.secondary">Tipo</Typography>
+              <Typography variant="body2">{verDetalle?.tipo}</Typography>
+            </Box>
+            <Box>
+              <Typography variant="caption" color="text.secondary">Prioridad</Typography>
+              <Typography variant="body2">{verDetalle?.prioridad}</Typography>
+            </Box>
+            <Box>
+              <Typography variant="caption" color="text.secondary">Fecha deseada</Typography>
+              <Typography variant="body2">{verDetalle?.fechaDeseada ?? "-"}</Typography>
+            </Box>
+          </Stack>
+          <Box>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
+              Descripcion
+            </Typography>
+            {verDetalle?.descripcion
+              ? <ContenidoEnriquecido html={verDetalle.descripcion} />
+              : <Typography variant="body2" color="text.secondary">Sin descripcion capturada.</Typography>}
+          </Box>
+          {verDetalle?.justificacionNegocio && (
+            <Box>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
+                Justificacion de negocio
+              </Typography>
+              <Typography variant="body2">{verDetalle.justificacionNegocio}</Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setVerDetalle(null)}>Cerrar</Button>
+        </DialogActions>
+      </Dialog>
 
       <Snackbar open={aviso !== null} autoHideDuration={6000} onClose={() => setAviso(null)}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>
@@ -215,7 +283,10 @@ function MenuAccionesSolicitud({ solicitud, catalogos, alExito, alError }: Props
     if (accion.accion === "APROBAR") {
       setDialogoAprobar(true);
     } else if (accion.accion === "CONVERTIR") {
-      setFilas([nuevaFila(solicitud.titulo)]);
+      // La descripcion de la solicitud (con sus imagenes ya adjuntas) se copia al unico
+      // elemento inicial para no perderla en la conversion; si el usuario agrega mas
+      // filas para partir el trabajo, esas nacen vacias (el se decide que va en cada una).
+      setFilas([nuevaFila(solicitud.titulo, solicitud.descripcion)]);
       setDialogoConvertir(true);
     } else if (accion.requiereMotivo) {
       setAccionConMotivo(accion);
@@ -253,7 +324,7 @@ function MenuAccionesSolicitud({ solicitud, catalogos, alExito, alError }: Props
             onChange={(e) => setMotivo(e.target.value)} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAccionConMotivo(null)}>Cancelar</Button>
+          <Button color="error" onClick={() => setAccionConMotivo(null)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || motivo.trim().length === 0}
             onClick={() => accionConMotivo && void ejecutar(accionConMotivo.accion, motivo.trim())}>
             Confirmar
@@ -264,18 +335,17 @@ function MenuAccionesSolicitud({ solicitud, catalogos, alExito, alError }: Props
       <Dialog open={dialogoAprobar} onClose={() => setDialogoAprobar(false)} fullWidth maxWidth="xs">
         <DialogTitle>Aprobar {solicitud.folio}</DialogTitle>
         <DialogContent sx={{ pt: "12px !important" }}>
-          <FormControl size="small" fullWidth required>
-            <InputLabel>Proyecto destino</InputLabel>
-            <Select label="Proyecto destino" value={idProyecto}
-              onChange={(e) => setIdProyecto(e.target.value as number | "")}>
-              {catalogos?.proyectos.map((p) => (
-                <MenuItem key={p.id} value={p.id}>{p.clave} - {p.nombre}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <ComboBuscable
+            label="Proyecto destino"
+            required
+            value={idProyecto}
+            onChange={(v) => setIdProyecto(v as number | "")}
+            opciones={(catalogos?.proyectos ?? []).map((p) => ({ valor: p.id, etiqueta: `${p.clave} - ${p.nombre}` }))}
+            sx={{ width: "100%" }}
+          />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDialogoAprobar(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setDialogoAprobar(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || idProyecto === ""}
             onClick={() => void ejecutar("APROBAR", undefined, idProyecto as number)}>
             Aprobar
@@ -283,54 +353,56 @@ function MenuAccionesSolicitud({ solicitud, catalogos, alExito, alError }: Props
         </DialogActions>
       </Dialog>
 
-      <Dialog open={dialogoConvertir} onClose={() => setDialogoConvertir(false)} fullWidth maxWidth="md">
+      <Dialog open={dialogoConvertir} onClose={() => setDialogoConvertir(false)} fullWidth maxWidth="lg">
         <DialogTitle>Convertir {solicitud.folio} en elementos de trabajo</DialogTitle>
         <DialogContent sx={{ pt: "12px !important" }}>
-          <Stack spacing={1.5}>
+          <Stack spacing={2}>
             {filas.map((fila) => (
-              <Stack key={fila.uiId} direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                <FormControl size="small" sx={{ minWidth: 130 }}>
-                  <InputLabel>Tipo</InputLabel>
-                  <Select label="Tipo" value={fila.idTipoWorkItem}
-                    onChange={(e) => actualizarFila(fila.uiId, { idTipoWorkItem: Number(e.target.value) })}>
-                    {catalogos?.tipos.map((t) => (
-                      <MenuItem key={t.id} value={t.id}>{t.nombre}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <TextField size="small" label="Titulo" value={fila.titulo} sx={{ flex: 1 }}
-                  onChange={(e) => actualizarFila(fila.uiId, { titulo: e.target.value })} />
-                <FormControl size="small" sx={{ minWidth: 120 }}>
-                  <InputLabel>Prioridad</InputLabel>
-                  <Select label="Prioridad" value={fila.idPrioridad}
-                    onChange={(e) => actualizarFila(fila.uiId, { idPrioridad: Number(e.target.value) })}>
-                    {catalogos?.prioridades.map((p) => (
-                      <MenuItem key={p.id} value={p.id}>{p.nombre}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <FormControl size="small" sx={{ minWidth: 150 }}>
-                  <InputLabel>Asignado</InputLabel>
-                  <Select label="Asignado" value={fila.idAsignado ?? ""}
-                    onChange={(e) => actualizarFila(fila.uiId, {
-                      idAsignado: (e.target.value as number | "") === "" ? null : Number(e.target.value),
-                    })}>
-                    <MenuItem value="">Sin asignar</MenuItem>
-                    {catalogos?.usuarios.map((u) => (
-                      <MenuItem key={u.id} value={u.id}>{u.nombre}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <TextField size="small" type="date" label="Compromiso"
-                  value={fila.fechaCompromiso ?? ""}
-                  onChange={(e) => actualizarFila(fila.uiId, { fechaCompromiso: e.target.value || null })}
-                  slotProps={{ inputLabel: { shrink: true } }} sx={{ minWidth: 150 }} />
-                <IconButton size="small" disabled={filas.length === 1}
-                  onClick={() => setFilas((previas) => previas.filter((f) => f.uiId !== fila.uiId))}
-                  aria-label="Quitar fila">
-                  <DeleteIcon fontSize="small" />
-                </IconButton>
-              </Stack>
+              <Paper key={fila.uiId} variant="outlined" sx={{ p: 2 }}>
+                <Stack spacing={1.5}>
+                  <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                    <TextField size="small" label="Titulo" value={fila.titulo} fullWidth
+                      onChange={(e) => actualizarFila(fila.uiId, { titulo: e.target.value })} />
+                    <IconButton size="small" disabled={filas.length === 1}
+                      onClick={() => setFilas((previas) => previas.filter((f) => f.uiId !== fila.uiId))}
+                      aria-label="Quitar fila">
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </Stack>
+                  {fila.descripcion && (
+                    <Typography variant="caption" color="text.secondary">
+                      Incluye la descripcion original de la solicitud (con sus imagenes, si tiene).
+                    </Typography>
+                  )}
+                  <Stack direction="row" spacing={1.5} sx={{ flexWrap: "wrap", "& > *": { flex: "1 1 200px" } }}>
+                    <ComboBuscable
+                      label="Tipo"
+                      value={fila.idTipoWorkItem}
+                      onChange={(v) => actualizarFila(fila.uiId, { idTipoWorkItem: Number(v) })}
+                      opciones={(catalogos?.tipos ?? []).map((t) => ({ valor: t.id, etiqueta: t.nombre }))}
+                    />
+                    <ComboBuscable
+                      label="Prioridad"
+                      value={fila.idPrioridad}
+                      onChange={(v) => actualizarFila(fila.uiId, { idPrioridad: Number(v) })}
+                      opciones={(catalogos?.prioridades ?? []).map((p) => ({ valor: p.id, etiqueta: p.nombre }))}
+                    />
+                    <ComboBuscable
+                      label="Asignado"
+                      value={fila.idAsignado ?? ""}
+                      onChange={(v) => actualizarFila(fila.uiId, { idAsignado: v === "" ? null : Number(v) })}
+                      opciones={[
+                        { valor: "", etiqueta: "Sin asignar" },
+                        ...(catalogos?.usuarios ?? []).map((u) => ({ valor: u.id, etiqueta: u.nombre })),
+                      ]}
+                    />
+                    <TextField size="small" type="date" label="Compromiso"
+                      value={fila.fechaCompromiso ?? ""}
+                      onChange={(e) => actualizarFila(fila.uiId, { fechaCompromiso: e.target.value || null })}
+                      slotProps={{ inputLabel: { shrink: true } }} />
+                  </Stack>
+                </Stack>
+              </Paper>
             ))}
             <Button size="small" startIcon={<AddIcon />} sx={{ alignSelf: "flex-start" }}
               onClick={() => setFilas((previas) => [...previas, nuevaFila()])}>
@@ -339,7 +411,7 @@ function MenuAccionesSolicitud({ solicitud, catalogos, alExito, alError }: Props
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDialogoConvertir(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setDialogoConvertir(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || !conversionValida}
             onClick={() => void convertir()}>
             Convertir

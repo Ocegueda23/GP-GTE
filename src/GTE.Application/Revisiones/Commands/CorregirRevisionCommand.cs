@@ -23,9 +23,9 @@ public class CorregirRevisionValidator : AbstractValidator<CorregirRevisionComma
 
 /// <summary>
 /// Marca un hallazgo como corregido o lo reabre.
-/// RN-QA-02: reabrir un hallazgo ya corregido exige el permiso REV.Reabrir
+/// RN-GTE-026: reabrir un hallazgo ya corregido exige el permiso REV.Reabrir
 /// (regla heredada del GT: solo un lider puede reabrir) y motivo capturado.
-/// RN-REQ-05 (2026-08-02): marcar CORREGIDO un hallazgo de un WorkItem ajeno exige
+/// RN-GTE-012 (2026-08-02): marcar CORREGIDO un hallazgo de un WorkItem ajeno exige
 /// WI.ModificarAjeno -- quien corrige deberia ser quien hizo el arreglo (el asignado
 /// del WorkItem), no un tercero cualquiera. Se detecto la misma clase de hueco que
 /// RegistrarTiempoCommand: este comando no tenia NINGUN gate en el camino de
@@ -66,7 +66,7 @@ public class CorregirRevisionHandler(
         }
         else
         {
-            // RN-QA-02: reabrir es facultad del lider y siempre con motivo
+            // RN-GTE-026: reabrir es facultad del lider y siempre con motivo
             await permisos.ExigirPermisoAsync(PermisosRevision.Reabrir, estadoItem.IdProyecto, cancellationToken);
             if (string.IsNullOrWhiteSpace(command.Datos.Motivo))
             {

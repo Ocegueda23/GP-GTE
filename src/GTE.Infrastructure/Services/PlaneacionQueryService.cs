@@ -68,6 +68,44 @@ public class PlaneacionQueryService(FabricaContexto fabrica) : IPlaneacionQueryS
         };
     }
 
+    /// <summary>
+    /// Backlog de todos los proyectos para consulta cruzada (P06 pedido explicito del
+    /// usuario): mismo filtro base que ObtenerBacklogAsync pero sin acotar a un proyecto,
+    /// mas texto libre sobre folio/titulo/proyecto. Es de solo lectura -- reordenar o
+    /// mover a sprint sigue siendo por proyecto (el orden manual y el sprint son conceptos
+    /// de un equipo/proyecto, no tiene sentido mezclarlos aqui).
+    /// </summary>
+    public async Task<BacklogResponse> ObtenerBacklogGlobalAsync(
+        string? texto, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
+
+        var consulta = ConsultaBase(contexto)
+            .Where(x => x.Item.IdSprint == null && EstatusAbiertos.Contains(x.Vista.IdEstatusWorkItem));
+
+        if (!string.IsNullOrWhiteSpace(texto))
+        {
+            var valor = texto.Trim();
+            consulta = consulta.Where(x =>
+                x.Vista.Folio.Contains(valor) || x.Vista.Titulo.Contains(valor) || x.Vista.Proyecto.Contains(valor));
+        }
+
+        var items = await consulta
+            .OrderBy(x => x.Vista.ClaveProyecto)
+            .ThenBy(x => x.Item.OrdenBacklog == null)
+            .ThenBy(x => x.Item.OrdenBacklog)
+            .ThenByDescending(x => x.Vista.IdWorkItem)
+            .Select(x => x.Vista)
+            .Select(ProyeccionTarjeta)
+            .ToListAsync(cancellationToken);
+
+        return new BacklogResponse
+        {
+            Items = items,
+            PuntosTotales = items.Sum(i => i.PuntosHistoria ?? 0)
+        };
+    }
+
     public async Task<BacklogResponse> ObtenerItemsDeSprintAsync(
         int idSprint, CancellationToken cancellationToken = default)
     {
@@ -88,39 +126,70 @@ public class PlaneacionQueryService(FabricaContexto fabrica) : IPlaneacionQueryS
         };
     }
 
+    /// <summary>idEquipo null = vista consolidada: todos los equipos y usuarios a la vez.</summary>
     public async Task<TableroResponse> ObtenerTableroAsync(
-        int idEquipo, CancellationToken cancellationToken = default)
+        int? idEquipo, CancellationToken cancellationToken = default)
     {
         await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
 
-        var equipo = await contexto.TblEquipo.AsNoTracking()
-            .Where(e => e.IdEquipo == idEquipo)
-            .Select(e => e.Nombre)
-            .FirstOrDefaultAsync(cancellationToken) ?? "Equipo";
+        string equipo;
+        (int IdSprint, string Nombre)? sprintActivo = null;
+        List<(int IdTableroColumna, string Nombre, int IdEstatusWorkItem, int Orden, int? LimiteWip)> columnas;
 
-        var sprintActivo = await contexto.TblSprint.AsNoTracking()
-            .Where(s => s.IdEquipo == idEquipo && s.IdEstatusSprint == EstatusSprint.Activo && s.Activo)
-            .Select(s => new { s.IdSprint, s.Nombre })
-            .FirstOrDefaultAsync(cancellationToken);
+        if (idEquipo.HasValue)
+        {
+            equipo = await contexto.TblEquipo.AsNoTracking()
+                .Where(e => e.IdEquipo == idEquipo.Value)
+                .Select(e => e.Nombre)
+                .FirstOrDefaultAsync(cancellationToken) ?? "Equipo";
 
-        var columnas = await (
-            from c in contexto.TblTableroColumna.AsNoTracking()
-            join t in contexto.TblTablero.AsNoTracking() on c.IdTablero equals t.IdTablero
-            where t.IdEquipo == idEquipo && t.Activo && c.Activo
-            orderby c.Orden
-            select new { c.IdTableroColumna, c.Nombre, c.IdEstatusWorkItem, c.Orden, c.LimiteWip }
-            ).ToListAsync(cancellationToken);
+            var sprint = await contexto.TblSprint.AsNoTracking()
+                .Where(s => s.IdEquipo == idEquipo.Value && s.IdEstatusSprint == EstatusSprint.Activo && s.Activo)
+                .Select(s => new { s.IdSprint, s.Nombre })
+                .FirstOrDefaultAsync(cancellationToken);
+            if (sprint is not null)
+            {
+                sprintActivo = (sprint.IdSprint, sprint.Nombre);
+            }
 
-        // Las tarjetas del tablero son los elementos de los proyectos del equipo;
-        // si hay sprint activo se acota a ese sprint (el tablero es del sprint en curso).
+            columnas = await (
+                from c in contexto.TblTableroColumna.AsNoTracking()
+                join t in contexto.TblTablero.AsNoTracking() on c.IdTablero equals t.IdTablero
+                where t.IdEquipo == idEquipo.Value && t.Activo && c.Activo
+                orderby c.Orden
+                select new { c.IdTableroColumna, c.Nombre, c.IdEstatusWorkItem, c.Orden, c.LimiteWip }
+                ).Select(c => new ValueTuple<int, string, int, int, int?>(
+                    c.IdTableroColumna, c.Nombre, c.IdEstatusWorkItem, c.Orden, c.LimiteWip))
+                .ToListAsync(cancellationToken);
+        }
+        else
+        {
+            // Vista "todos los equipos": sin TblTablero propio del que leer columnas ni
+            // sprint activo unico (cada equipo tiene el suyo) -- se usa el mapeo estandar
+            // y no se acota por sprint, para no ocultar trabajo de equipos sin sprint activo.
+            equipo = "Todos los equipos";
+            columnas = ColumnasTableroEstandar.Columnas
+                .Select((c, indice) => (IdTableroColumna: -(indice + 1), c.Nombre, IdEstatusWorkItem: c.IdEstatus, c.Orden, LimiteWip: (int?)null))
+                .ToList();
+        }
+
+        // Las tarjetas del tablero son los elementos de los proyectos del equipo (o de
+        // todos, en la vista consolidada); si hay sprint activo se acota a ese sprint (el
+        // tablero es del sprint en curso). RN-GTE-021 (nueva): en la columna Terminado solo
+        // entran los items cerrados en el mes en curso -- evita que el tablero acumule
+        // meses de historial en esa columna.
         var idSprintActivo = sprintActivo?.IdSprint;
-        var filas = await (
+        var inicioMesActual = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+        var consulta =
             from x in ConsultaBase(contexto)
             join p in contexto.TblProyecto.AsNoTracking() on x.Item.IdProyecto equals p.IdProyecto
-            where p.IdEquipo == idEquipo
+            where (idEquipo == null || p.IdEquipo == idEquipo.Value)
                   && (idSprintActivo == null || x.Item.IdSprint == idSprintActivo)
-            select new { x.Vista, Orden = x.Item.OrdenBacklog }
-            ).ToListAsync(cancellationToken);
+                  && (x.Vista.IdEstatusWorkItem != EstatusWorkItem.Terminado
+                      || (x.Item.FechaFin != null && x.Item.FechaFin >= inicioMesActual))
+            select new { x.Vista, Orden = x.Item.OrdenBacklog };
+
+        var filas = await consulta.ToListAsync(cancellationToken);
 
         var proyectar = ProyeccionTarjeta.Compile();
         var tarjetas = filas
@@ -274,6 +343,7 @@ public class PlaneacionQueryService(FabricaContexto fabrica) : IPlaneacionQueryS
             IdEstatus = v.IdEstatusWorkItem,
             Estatus = v.Estatus,
             Prioridad = v.Prioridad,
+            Complejidad = v.Complejidad,
             Asignado = v.Asignado,
             FechaCompromiso = v.FechaCompromiso,
             EsVencida = v.EsVencida == true,

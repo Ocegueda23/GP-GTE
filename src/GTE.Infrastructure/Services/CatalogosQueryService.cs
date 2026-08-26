@@ -1,5 +1,7 @@
 using GTE.Application.Catalogos.Queries;
 using GTE.Application.DTOs.Responses.Catalogos;
+using GTE.Domain.Administracion;
+using GTE.Domain.Entregas;
 using GTE.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,9 +10,14 @@ namespace GTE.Infrastructure.Services;
 public class CatalogosQueryService(FabricaContexto fabrica) : ICatalogosQueryService
 {
     public async Task<CatalogosBandejaResponse> ObtenerCatalogosBandejaAsync(
-        CancellationToken cancellationToken = default)
+        int idUsuario, CancellationToken cancellationToken = default)
     {
         await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
+
+        var idsEquiposUsuario = await contexto.TblEquipoMiembro.AsNoTracking()
+            .Where(m => m.IdUsuario == idUsuario && m.Activo)
+            .Select(m => m.IdEquipo)
+            .ToListAsync(cancellationToken);
 
         return new CatalogosBandejaResponse
         {
@@ -29,10 +36,21 @@ public class CatalogosQueryService(FabricaContexto fabrica) : ICatalogosQuerySer
                 .OrderBy(p => p.Id)
                 .Select(p => new CatalogoItemResponse { Id = p.Id, Nombre = p.Nombre })
                 .ToListAsync(cancellationToken),
+            // Solo proyectos donde el usuario es responsable o pertenece al equipo asignado.
+            // Cerrados fuera: no tiene sentido crear/planear trabajo nuevo en un proyecto cerrado.
             Proyectos = await contexto.TblProyecto.AsNoTracking()
                 .Where(p => p.Activo)
+                .Where(p => p.IdEstatusProyecto != EstatusProyecto.Cerrado)
+                .Where(p => p.IdResponsable == idUsuario
+                    || (p.IdEquipo != null && idsEquiposUsuario.Contains(p.IdEquipo.Value)))
                 .OrderBy(p => p.Nombre)
-                .Select(p => new ProyectoItemResponse { Id = p.IdProyecto, Clave = p.Clave, Nombre = p.Nombre })
+                .Select(p => new ProyectoItemResponse
+                {
+                    Id = p.IdProyecto,
+                    Clave = p.Clave,
+                    Nombre = p.Nombre,
+                    CategoriaProyecto = p.IdCategoriaProyectoNavigation.Nombre,
+                })
                 .ToListAsync(cancellationToken),
             Usuarios = await contexto.TblUsuario.AsNoTracking()
                 .Where(u => u.Activo)
@@ -134,6 +152,22 @@ public class CatalogosQueryService(FabricaContexto fabrica) : ICatalogosQuerySer
                 .OrderBy(h => h.Nombre)
                 .Select(h => new CatalogoItemResponse { Id = h.IdHorario, Nombre = h.Nombre })
                 .ToListAsync(cancellationToken)
+        };
+    }
+
+    public async Task<CatalogosEntregasResponse> ObtenerCatalogosEntregasAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
+
+        return new CatalogosEntregasResponse
+        {
+            TiposArtefacto = await contexto.TblTipoArtefacto.AsNoTracking()
+                .Where(t => t.Activo)
+                .OrderBy(t => t.Nombre)
+                .Select(t => new CatalogoItemResponse { Id = t.Id, Nombre = t.Nombre })
+                .ToListAsync(cancellationToken),
+            IdTipoArtefactoScriptSql = TipoArtefacto.ScriptSql
         };
     }
 }

@@ -46,6 +46,27 @@ public class SolicitudRepository(FabricaContexto fabrica, AuditContext auditoria
         return entidad.IdSolicitud;
     }
 
+    public async Task ActualizarAsync(SolicitudEdicion datos, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
+        var entidad = await contexto.TblSolicitud
+            .FirstOrDefaultAsync(s => s.IdSolicitud == datos.IdSolicitud, cancellationToken)
+            ?? throw new InvalidOperationException($"Solicitud {datos.IdSolicitud} no existe.");
+
+        entidad.Titulo = datos.Titulo;
+        entidad.Descripcion = datos.Descripcion;
+        entidad.IdTipoSolicitud = datos.IdTipoSolicitud;
+        entidad.IdPrioridad = datos.IdPrioridad;
+        entidad.FechaDeseada = datos.FechaDeseada.HasValue ? DateOnly.FromDateTime(datos.FechaDeseada.Value) : null;
+        entidad.JustificacionNegocio = datos.JustificacionNegocio;
+        entidad.IdUsuarioSolicitante = datos.IdUsuarioSolicitante;
+        entidad.UsuarioMovto = Auditoria.Usuario.Length > 50 ? Auditoria.Usuario[..50] : Auditoria.Usuario;
+        entidad.FechaMovto = DateTime.Now;
+        await contexto.SaveChangesAsync(cancellationToken);
+
+        await RegistrarBitacoraAsync("Solicitud", datos.IdSolicitud, "EDITAR", datos.Titulo, cancellationToken);
+    }
+
     public async Task<EstadoSolicitud?> ObtenerEstadoAsync(int idSolicitud, CancellationToken cancellationToken = default)
     {
         await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();

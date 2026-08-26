@@ -29,6 +29,7 @@ public class AdministracionRepository(FabricaContexto fabrica, AuditContext audi
             FechaInicioPlan = datos.FechaInicioPlan,
             FechaFinPlan = datos.FechaFinPlan,
             EsMantenimiento = datos.EsMantenimiento,
+            Administrado = datos.Administrado,
             UsuarioRegistro = Auditoria.Usuario,
             Activo = true
         };
@@ -63,6 +64,7 @@ public class AdministracionRepository(FabricaContexto fabrica, AuditContext audi
         entidad.FechaInicioPlan = datos.FechaInicioPlan;
         entidad.FechaFinPlan = datos.FechaFinPlan;
         entidad.EsMantenimiento = datos.EsMantenimiento;
+        entidad.Administrado = datos.Administrado;
         entidad.UsuarioMovto = Recortar(Auditoria.Usuario);
         entidad.FechaMovto = DateTime.Now;
         await contexto.SaveChangesAsync(cancellationToken);
@@ -285,7 +287,7 @@ public class AdministracionRepository(FabricaContexto fabrica, AuditContext audi
     }
 
     /// <summary>
-    /// RN-ADM-01: sube la cadena de jefes desde idJefePropuesto (CTE recursivo parametrizado,
+    /// RN-GTE-001: sube la cadena de jefes desde idJefePropuesto (CTE recursivo parametrizado,
     /// sin SQL interpolado) y verifica si idUsuario aparece en ella; de ser asi, asignarlo
     /// formaria un ciclo. DbCommand crudo porque EF no expresa CTEs recursivos.
     /// </summary>
@@ -518,6 +520,104 @@ public class AdministracionRepository(FabricaContexto fabrica, AuditContext audi
         await contexto.SaveChangesAsync(cancellationToken);
 
         await RegistrarBitacoraAsync("Ambiente", idAmbiente, "RETIRAR", null, cancellationToken);
+    }
+
+    /* ---------- Areas ---------- */
+
+    public async Task<int> CrearAreaAsync(AreaNueva datos, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
+        var entidad = new TblArea
+        {
+            Nombre = datos.Nombre,
+            UsuarioRegistro = Auditoria.Usuario,
+            Activo = true
+        };
+        contexto.TblArea.Add(entidad);
+        await contexto.SaveChangesAsync(cancellationToken);
+
+        await RegistrarBitacoraAsync("Area", entidad.IdArea, "CREAR", datos.Nombre, cancellationToken);
+        return entidad.IdArea;
+    }
+
+    public async Task ActualizarAreaAsync(AreaEdicion datos, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
+        var entidad = await contexto.TblArea
+            .FirstOrDefaultAsync(a => a.IdArea == datos.IdArea, cancellationToken)
+            ?? throw new InvalidOperationException($"Area {datos.IdArea} no existe.");
+
+        entidad.Nombre = datos.Nombre;
+        entidad.UsuarioMovto = Recortar(Auditoria.Usuario);
+        entidad.FechaMovto = DateTime.Now;
+        await contexto.SaveChangesAsync(cancellationToken);
+
+        await RegistrarBitacoraAsync("Area", datos.IdArea, "EDITAR", datos.Nombre, cancellationToken);
+    }
+
+    public async Task RetirarAreaAsync(int idArea, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
+        var entidad = await contexto.TblArea
+            .FirstOrDefaultAsync(a => a.IdArea == idArea, cancellationToken)
+            ?? throw new InvalidOperationException($"Area {idArea} no existe.");
+
+        entidad.Activo = false;
+        entidad.UsuarioMovto = Recortar(Auditoria.Usuario);
+        entidad.FechaMovto = DateTime.Now;
+        await contexto.SaveChangesAsync(cancellationToken);
+
+        await RegistrarBitacoraAsync("Area", idArea, "RETIRAR", null, cancellationToken);
+    }
+
+    /* ---------- Puestos ---------- */
+
+    public async Task<int> CrearPuestoAsync(PuestoNuevo datos, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
+        var entidad = new TblPuesto
+        {
+            Nombre = datos.Nombre,
+            IdArea = datos.IdArea,
+            UsuarioRegistro = Auditoria.Usuario,
+            Activo = true
+        };
+        contexto.TblPuesto.Add(entidad);
+        await contexto.SaveChangesAsync(cancellationToken);
+
+        await RegistrarBitacoraAsync("Puesto", entidad.IdPuesto, "CREAR", datos.Nombre, cancellationToken);
+        return entidad.IdPuesto;
+    }
+
+    public async Task ActualizarPuestoAsync(PuestoEdicion datos, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
+        var entidad = await contexto.TblPuesto
+            .FirstOrDefaultAsync(p => p.IdPuesto == datos.IdPuesto, cancellationToken)
+            ?? throw new InvalidOperationException($"Puesto {datos.IdPuesto} no existe.");
+
+        entidad.Nombre = datos.Nombre;
+        entidad.IdArea = datos.IdArea;
+        entidad.UsuarioMovto = Recortar(Auditoria.Usuario);
+        entidad.FechaMovto = DateTime.Now;
+        await contexto.SaveChangesAsync(cancellationToken);
+
+        await RegistrarBitacoraAsync("Puesto", datos.IdPuesto, "EDITAR", datos.Nombre, cancellationToken);
+    }
+
+    public async Task RetirarPuestoAsync(int idPuesto, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
+        var entidad = await contexto.TblPuesto
+            .FirstOrDefaultAsync(p => p.IdPuesto == idPuesto, cancellationToken)
+            ?? throw new InvalidOperationException($"Puesto {idPuesto} no existe.");
+
+        entidad.Activo = false;
+        entidad.UsuarioMovto = Recortar(Auditoria.Usuario);
+        entidad.FechaMovto = DateTime.Now;
+        await contexto.SaveChangesAsync(cancellationToken);
+
+        await RegistrarBitacoraAsync("Puesto", idPuesto, "RETIRAR", null, cancellationToken);
     }
 
     private static string Recortar(string usuario) => usuario.Length > 50 ? usuario[..50] : usuario;

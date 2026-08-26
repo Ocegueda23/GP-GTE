@@ -8,8 +8,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
 import { useSesion } from "../../shared/api/sesion";
 import {
-  cambiarEstatus, obtenerAcciones, type AccionDisponible, type BandejaItem, type CatalogosBandeja,
+  cambiarEstatus, obtenerAcciones, obtenerWorkItem,
+  type AccionDisponible, type BandejaItem, type CatalogosBandeja,
 } from "../../shared/api/workitems";
+import { ModalTiempo } from "./ModalTiempo";
 import { NuevoItemModal } from "./NuevoItemModal";
 
 interface Props {
@@ -17,6 +19,15 @@ interface Props {
   catalogos: CatalogosBandeja | undefined;
   alExito: (mensaje: string) => void;
   alError: (mensaje: string) => void;
+}
+
+interface CopiaDeWorkItem {
+  idProyecto: number;
+  idTipo: number | "";
+  idPrioridad: number | "";
+  titulo: string;
+  descripcion: string | null;
+  idAsignado: number | null;
 }
 
 /**
@@ -31,11 +42,14 @@ export function MenuAcciones({ item, catalogos, alExito, alError }: Props) {
   const [accionConMotivo, setAccionConMotivo] = useState<AccionDisponible | null>(null);
   const [motivo, setMotivo] = useState("");
   const [modalSubtarea, setModalSubtarea] = useState(false);
+  const [modalTiempo, setModalTiempo] = useState(false);
+  const [copiaDe, setCopiaDe] = useState<CopiaDeWorkItem | null>(null);
+  const [cargandoCopia, setCargandoCopia] = useState(false);
   const clienteQuery = useQueryClient();
   const sesion = useSesion((estado) => estado.sesion);
   const puede = useSesion((estado) => estado.puede);
 
-  // RN-REQ-05: solo el propio asignado modifica un elemento; sin asignar tambien
+  // RN-GTE-012: solo el propio asignado modifica un elemento; sin asignar tambien
   // cuenta como ajeno (decision del equipo 2026-08-02). El backend revalida igual.
   const esAjeno = item.idAsignado !== sesion?.idUsuario && !puede("WI.ModificarAjeno");
 
@@ -55,6 +69,26 @@ export function MenuAcciones({ item, catalogos, alExito, alError }: Props) {
   const cerrarMenu = () => {
     setAncla(null);
     setAcciones(null);
+  };
+
+  const abrirCopia = async () => {
+    cerrarMenu();
+    setCargandoCopia(true);
+    try {
+      const detalle = await obtenerWorkItem(item.folio);
+      setCopiaDe({
+        idProyecto: detalle.idProyecto,
+        idTipo: catalogos?.tipos.find((t) => t.nombre === detalle.tipo)?.id ?? "",
+        idPrioridad: detalle.idPrioridad,
+        titulo: detalle.titulo,
+        descripcion: detalle.descripcion,
+        idAsignado: detalle.idAsignado,
+      });
+    } catch (error) {
+      alError(error instanceof ErrorApi ? error.message : "No se pudo obtener el elemento a copiar.");
+    } finally {
+      setCargandoCopia(false);
+    }
   };
 
   const ejecutar = async (accion: AccionDisponible, motivoCapturado?: string) => {
@@ -92,7 +126,7 @@ export function MenuAcciones({ item, catalogos, alExito, alError }: Props) {
   return (
     <>
       <IconButton size="small" onClick={abrirMenu} aria-label={`Acciones de ${item.folio}`}>
-        {cargando ? <CircularProgress size={18} /> : <MoreVertIcon fontSize="small" />}
+        {cargando || cargandoCopia ? <CircularProgress size={18} /> : <MoreVertIcon fontSize="small" />}
       </IconButton>
 
       <Menu anchorEl={ancla} open={ancla !== null && acciones !== null} onClose={cerrarMenu}>
@@ -101,6 +135,17 @@ export function MenuAcciones({ item, catalogos, alExito, alError }: Props) {
             {accion.etiqueta}
           </MenuItem>
         ))}
+        <MenuItem
+          onClick={() => {
+            cerrarMenu();
+            setModalTiempo(true);
+          }}
+        >
+          Registrar tiempo
+        </MenuItem>
+        <MenuItem onClick={() => void abrirCopia()}>
+          Copiar
+        </MenuItem>
         {!esAjeno && (
           <MenuItem
             onClick={() => {
@@ -128,7 +173,7 @@ export function MenuAcciones({ item, catalogos, alExito, alError }: Props) {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAccionConMotivo(null)}>Cancelar</Button>
+          <Button color="error" onClick={() => setAccionConMotivo(null)}>Cancelar</Button>
           <Button
             variant="contained"
             disabled={enviando || motivo.trim().length === 0}
@@ -147,6 +192,25 @@ export function MenuAcciones({ item, catalogos, alExito, alError }: Props) {
         alExito={alExito}
         alError={alError}
       />
+
+      <ModalTiempo
+        abierto={modalTiempo}
+        item={{ idWorkItem: item.idWorkItem, folio: item.folio }}
+        alCerrar={() => setModalTiempo(false)}
+        alExito={alExito}
+        alError={alError}
+      />
+
+      {copiaDe && (
+        <NuevoItemModal
+          abierto
+          catalogos={catalogos}
+          copiaDe={copiaDe}
+          alCerrar={() => setCopiaDe(null)}
+          alExito={alExito}
+          alError={alError}
+        />
+      )}
     </>
   );
 }

@@ -28,6 +28,7 @@ public abstract class RepositoryBase(FabricaContexto fabrica, AuditContext audit
         contexto.TblBitacora.Add(new TblBitacora
         {
             Usuario = Auditoria.Usuario,
+            UsuarioReal = Auditoria.UsuarioReal,
             Ip = Auditoria.Ip,
             Endpoint = Auditoria.Endpoint,
             Entidad = entidad,

@@ -24,7 +24,7 @@ public class CrearIncidenteValidator : AbstractValidator<CrearIncidenteCommand>
 
 /// <summary>
 /// Alta de incidente: estatus inicial Detectado (lo fija el backend), folio de la
-/// serie INC-anio. RN-OPS-01 (parcial): un incidente S1 notifica de inmediato al
+/// serie INC-anio. RN-GTE-035 (parcial): un incidente S1 notifica de inmediato al
 /// responsable del proyecto (tblProyecto.IdResponsable), si esta configurado. El
 /// escalamiento a los 30 minutos y el resto de canales quedan fuera de esta pasada
 /// (necesitan Hangfire, ver PENDIENTES.md).

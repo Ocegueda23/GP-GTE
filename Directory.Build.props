@@ -1,0 +1,20 @@
+<Project>
+
+  <!--
+    Version UNICA de la aplicacion GTE, en el esquema de versionado de Interflo
+    (ver CLAUDE.md, seccion "Versionado"): Proyecto.Mejora.Defecto.Reenvio.
+
+    Se sube A MANO al liberar, segun lo que se reporte en el informe de liberacion, y
+    solo el digito mas alto de lo liberado (los de su derecha se resetean a 0). Nunca
+    se genera sola ni se estampa con la fecha: el numero tiene que poder cotejarse
+    contra el informe.
+
+    De aqui la toman los tres consumidores: el ensamblado de la API (y con el
+    GET /api/v1/version), el bundle del frontend (publicar.bat la pasa como
+    VITE_VERSION) y el instalador.
+  -->
+  <PropertyGroup>
+    <Version>1.17.0.0</Version>
+  </PropertyGroup>
+
+</Project>

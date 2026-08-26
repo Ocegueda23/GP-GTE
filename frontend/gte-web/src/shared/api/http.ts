@@ -49,7 +49,12 @@ const RUTAS_SIN_REINTENTO = [
   "/api/v1/auth/logout",
 ];
 
-export const URL_BASE_API = import.meta.env.VITE_API_URL ?? "http://localhost:5088";
+/**
+ * 5090 es el puerto del API real: lo sirve el servicio de Windows `GTE`
+ * (`C:\Servicios\GTE`, ambiente Production). Se puede apuntar a otro con VITE_API_URL
+ * si alguien levanta una instancia aparte para depurar.
+ */
+export const URL_BASE_API = import.meta.env.VITE_API_URL ?? "http://localhost:5090";
 
 export const http = axios.create({
   baseURL: URL_BASE_API,

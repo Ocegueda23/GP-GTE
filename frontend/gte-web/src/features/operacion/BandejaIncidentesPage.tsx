@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent,
-  DialogTitle, FormControl, IconButton, InputLabel, Menu, MenuItem, Paper, Select,
+  DialogTitle, IconButton, Menu, MenuItem, Paper,
   Snackbar, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   TextField, Tooltip, Typography,
 } from "@mui/material";
@@ -11,6 +11,8 @@ import BuildIcon from "@mui/icons-material/Build";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link as RouterLink } from "react-router-dom";
 import { ErrorApi } from "../../shared/api/http";
+import { ComboBuscable, ComboBuscableMultiple } from "../../shared/components/ComboBuscable";
+import { EncabezadoOrdenable } from "../../shared/components/EncabezadoOrdenable";
 import { obtenerCatalogosBandeja, type AccionDisponible, type CatalogosBandeja } from "../../shared/api/workitems";
 import {
   cambiarEstatusIncidente, cambiarSeveridadIncidente, colorEstatusIncidente, colorSeveridad,
@@ -29,6 +31,15 @@ function fechaLocalAhora(): string {
   return ahora.toISOString().slice(0, 16);
 }
 
+/** Contrato de IDs de dbo.tblEstatusIncidente (GTE.Domain.Operacion.EstatusIncidente). */
+const ESTATUS_INCIDENTE = [
+  { id: 1, nombre: "Detectado" },
+  { id: 2, nombre: "En Atencion" },
+  { id: 3, nombre: "Mitigado" },
+  { id: 4, nombre: "Resuelto" },
+  { id: 5, nombre: "Cerrado" },
+];
+
 /** P17 - Incidentes: bandeja de operacion (permiso INC.Gestionar). */
 export function BandejaIncidentesPage() {
   const [texto, setTexto] = useState("");
@@ -36,12 +47,24 @@ export function BandejaIncidentesPage() {
   const [aviso, setAviso] = useState<{ tipo: "success" | "error"; mensaje: string } | null>(null);
   const [idProyecto, setIdProyecto] = useState<number | "">("");
   const [idSeveridad, setIdSeveridad] = useState<number | "">("");
+  // Sin filtro = abiertos (todos menos Cerrado); "Todos" (-1) sigue disponible como opcion
+  // explicita en el combo de abajo.
+  const [filtroEstatus, setFiltroEstatus] = useState<number[]>([]);
+  const [filtroSeveridad, setFiltroSeveridad] = useState<number | "">("");
+  const [filtroProyecto, setFiltroProyecto] = useState<number | "">("");
   const [titulo, setTitulo] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [fechaOcurrencia, setFechaOcurrencia] = useState(fechaLocalAhora());
   const [fechaDeteccion, setFechaDeteccion] = useState("");
   const [enviando, setEnviando] = useState(false);
+  const [ordenarPor, setOrdenarPor] = useState<string | null>(null);
+  const [ordenDescendente, setOrdenDescendente] = useState(false);
   const clienteQuery = useQueryClient();
+
+  const manejarOrden = (clave: string) => {
+    if (ordenarPor === clave) setOrdenDescendente((d) => !d);
+    else { setOrdenarPor(clave); setOrdenDescendente(false); }
+  };
 
   const catalogos = useQuery({
     queryKey: ["catalogos-bandeja"],
@@ -49,8 +72,16 @@ export function BandejaIncidentesPage() {
     staleTime: 5 * 60_000,
   });
   const bandeja = useQuery({
-    queryKey: ["bandeja-incidentes", texto],
-    queryFn: () => obtenerBandejaIncidentes({ ...filtroBandejaIncidentesInicial, texto }),
+    queryKey: ["bandeja-incidentes", texto, filtroEstatus, filtroSeveridad, filtroProyecto, ordenarPor, ordenDescendente],
+    queryFn: () => obtenerBandejaIncidentes({
+      ...filtroBandejaIncidentesInicial,
+      texto,
+      estatus: filtroEstatus,
+      idSeveridad: filtroSeveridad === "" ? null : filtroSeveridad,
+      idProyecto: filtroProyecto === "" ? null : filtroProyecto,
+      ordenarPor,
+      ordenDescendente,
+    }),
     placeholderData: (anterior) => anterior,
   });
 
@@ -95,8 +126,44 @@ export function BandejaIncidentesPage() {
         </Button>
       </Box>
 
-      <TextField size="small" label="Buscar folio o titulo" value={texto}
-        onChange={(e) => setTexto(e.target.value)} sx={{ mb: 2, minWidth: 300 }} />
+      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5, mb: 2 }}>
+        <TextField size="small" label="Buscar folio o titulo" value={texto}
+          onChange={(e) => setTexto(e.target.value)} sx={{ minWidth: 260 }} />
+        <ComboBuscableMultiple
+          label="Estatus"
+          value={filtroEstatus}
+          onChange={(valores) => {
+            const valor = valores as number[];
+            const eligioTodos = valor.includes(-1) && !filtroEstatus.includes(-1);
+            setFiltroEstatus(eligioTodos ? [-1] : valor.filter((v) => v !== -1));
+          }}
+          opciones={[
+            { valor: -1, etiqueta: "Todos" },
+            ...ESTATUS_INCIDENTE.map((e) => ({ valor: e.id, etiqueta: e.nombre })),
+          ]}
+          sx={{ minWidth: 220 }}
+        />
+        <ComboBuscable
+          label="Severidad"
+          value={filtroSeveridad}
+          onChange={(v) => setFiltroSeveridad(v as number | "")}
+          opciones={[
+            { valor: "", etiqueta: "Todas" },
+            ...(catalogos.data?.severidades ?? []).map((s) => ({ valor: s.id, etiqueta: s.nombre })),
+          ]}
+          sx={{ minWidth: 160 }}
+        />
+        <ComboBuscable
+          label="Proyecto"
+          value={filtroProyecto}
+          onChange={(v) => setFiltroProyecto(v as number | "")}
+          opciones={[
+            { valor: "", etiqueta: "Todos" },
+            ...(catalogos.data?.proyectos ?? []).map((p) => ({ valor: p.id, etiqueta: `${p.clave} - ${p.nombre}` })),
+          ]}
+          sx={{ minWidth: 220 }}
+        />
+      </Box>
 
       {bandeja.isError && (
         <Alert severity="error" sx={{ mb: 2 }}>{(bandeja.error as Error).message}</Alert>
@@ -107,13 +174,13 @@ export function BandejaIncidentesPage() {
           <Table size="small">
             <TableHead>
               <TableRow sx={{ "& th": { fontWeight: 700, whiteSpace: "nowrap" } }}>
-                <TableCell>Folio</TableCell>
-                <TableCell>Titulo</TableCell>
-                <TableCell>Proyecto</TableCell>
-                <TableCell>Severidad</TableCell>
-                <TableCell>Estatus</TableCell>
-                <TableCell>Ocurrencia</TableCell>
-                <TableCell>Resolucion</TableCell>
+                <EncabezadoOrdenable clave="folio" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Folio</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="titulo" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Titulo</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="proyecto" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Proyecto</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="severidad" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Severidad</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="estatus" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Estatus</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="fechaOcurrencia" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Ocurrencia</EncabezadoOrdenable>
+                <EncabezadoOrdenable clave="fechaResolucion" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Resolucion</EncabezadoOrdenable>
                 <TableCell align="center">Acciones</TableCell>
               </TableRow>
             </TableHead>
@@ -122,7 +189,7 @@ export function BandejaIncidentesPage() {
                 <TableRow>
                   <TableCell colSpan={8}>
                     <Typography color="text.secondary" sx={{ py: 4, textAlign: "center" }}>
-                      No hay incidentes abiertos.
+                      No hay incidentes con estos filtros.
                     </Typography>
                   </TableCell>
                 </TableRow>
@@ -131,7 +198,7 @@ export function BandejaIncidentesPage() {
                 <TableRow key={i.idIncidente} hover>
                   <TableCell sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>
                     <Typography component={RouterLink} to={`/operacion/incidentes/${i.folio}`} variant="body2"
-                      sx={{ fontWeight: 600, color: "inherit" }}>
+                      sx={{ fontWeight: 600, color: "info.main" }}>
                       {i.folio}
                     </Typography>
                   </TableCell>
@@ -167,22 +234,20 @@ export function BandejaIncidentesPage() {
       <Dialog open={modal} onClose={() => setModal(false)} fullWidth maxWidth="sm">
         <DialogTitle>Nuevo incidente</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
-          <FormControl size="small" required>
-            <InputLabel>Proyecto</InputLabel>
-            <Select label="Proyecto" value={idProyecto} onChange={(e) => setIdProyecto(e.target.value as number | "")}>
-              {catalogos.data?.proyectos.map((p) => (
-                <MenuItem key={p.id} value={p.id}>{p.clave} - {p.nombre}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl size="small" required>
-            <InputLabel>Severidad</InputLabel>
-            <Select label="Severidad" value={idSeveridad} onChange={(e) => setIdSeveridad(e.target.value as number | "")}>
-              {catalogos.data?.severidades.map((s) => (
-                <MenuItem key={s.id} value={s.id}>{s.nombre}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <ComboBuscable
+            label="Proyecto"
+            required
+            value={idProyecto}
+            onChange={(v) => setIdProyecto(v as number | "")}
+            opciones={(catalogos.data?.proyectos ?? []).map((p) => ({ valor: p.id, etiqueta: `${p.clave} - ${p.nombre}` }))}
+          />
+          <ComboBuscable
+            label="Severidad"
+            required
+            value={idSeveridad}
+            onChange={(v) => setIdSeveridad(v as number | "")}
+            opciones={(catalogos.data?.severidades ?? []).map((s) => ({ valor: s.id, etiqueta: s.nombre }))}
+          />
           <TextField size="small" required label="Titulo" value={titulo}
             onChange={(e) => setTitulo(e.target.value)} slotProps={{ htmlInput: { maxLength: 200 } }} />
           <TextField size="small" type="datetime-local" required label="Fecha de ocurrencia" value={fechaOcurrencia}
@@ -193,7 +258,7 @@ export function BandejaIncidentesPage() {
             value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setModal(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setModal(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || !valido} onClick={() => void guardar()}>
             Registrar
           </Button>
@@ -334,7 +399,7 @@ function MenuAccionesIncidente({ incidente, catalogos, alExito, alError }: Props
             label="Motivo (obligatorio)" value={motivo} onChange={(e) => setMotivo(e.target.value)} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAccionConMotivo(null)}>Cancelar</Button>
+          <Button color="error" onClick={() => setAccionConMotivo(null)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || motivo.trim().length === 0}
             onClick={() => accionConMotivo && void ejecutar(accionConMotivo.accion, motivo.trim())}>
             Confirmar
@@ -345,19 +410,18 @@ function MenuAccionesIncidente({ incidente, catalogos, alExito, alError }: Props
       <Dialog open={dialogoSeveridad} onClose={() => setDialogoSeveridad(false)} fullWidth maxWidth="xs">
         <DialogTitle>Cambiar severidad de {incidente.folio}</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
-          <FormControl size="small" fullWidth required>
-            <InputLabel>Severidad</InputLabel>
-            <Select label="Severidad" value={nuevaSeveridad} onChange={(e) => setNuevaSeveridad(e.target.value as number | "")}>
-              {catalogos?.severidades.map((s) => (
-                <MenuItem key={s.id} value={s.id}>{s.nombre}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <ComboBuscable
+            label="Severidad"
+            required
+            value={nuevaSeveridad}
+            onChange={(v) => setNuevaSeveridad(v as number | "")}
+            opciones={(catalogos?.severidades ?? []).map((s) => ({ valor: s.id, etiqueta: s.nombre }))}
+          />
           <TextField size="small" fullWidth multiline minRows={2} label="Motivo (obligatorio)"
             value={motivoSeveridad} onChange={(e) => setMotivoSeveridad(e.target.value)} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDialogoSeveridad(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setDialogoSeveridad(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || nuevaSeveridad === "" || motivoSeveridad.trim().length === 0}
             onClick={() => void cambiarSeveridad()}>
             Confirmar
@@ -368,28 +432,27 @@ function MenuAccionesIncidente({ incidente, catalogos, alExito, alError }: Props
       <Dialog open={dialogoCorrectivo} onClose={() => setDialogoCorrectivo(false)} fullWidth maxWidth="xs">
         <DialogTitle>Vincular correctivo a {incidente.folio}</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
-          <FormControl size="small" fullWidth required>
-            <InputLabel>Prioridad</InputLabel>
-            <Select label="Prioridad" value={idPrioridad} onChange={(e) => setIdPrioridad(e.target.value as number | "")}>
-              {catalogos?.prioridades.map((p) => (
-                <MenuItem key={p.id} value={p.id}>{p.nombre}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl size="small" fullWidth>
-            <InputLabel>Asignado (opcional)</InputLabel>
-            <Select label="Asignado (opcional)" value={idAsignado} onChange={(e) => setIdAsignado(e.target.value as number | "")}>
-              <MenuItem value="">Sin asignar</MenuItem>
-              {catalogos?.usuarios.map((u) => (
-                <MenuItem key={u.id} value={u.id}>{u.nombre}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <ComboBuscable
+            label="Prioridad"
+            required
+            value={idPrioridad}
+            onChange={(v) => setIdPrioridad(v as number | "")}
+            opciones={(catalogos?.prioridades ?? []).map((p) => ({ valor: p.id, etiqueta: p.nombre }))}
+          />
+          <ComboBuscable
+            label="Asignado (opcional)"
+            value={idAsignado}
+            onChange={(v) => setIdAsignado(v as number | "")}
+            opciones={[
+              { valor: "", etiqueta: "Sin asignar" },
+              ...(catalogos?.usuarios ?? []).map((u) => ({ valor: u.id, etiqueta: u.nombre })),
+            ]}
+          />
           <TextField size="small" type="date" label="Compromiso (opcional)" value={fechaCompromiso}
             onChange={(e) => setFechaCompromiso(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDialogoCorrectivo(false)}>Cancelar</Button>
+          <Button color="error" onClick={() => setDialogoCorrectivo(false)}>Cancelar</Button>
           <Button variant="contained" disabled={enviando || idPrioridad === ""} onClick={() => void vincular()}>
             Vincular
           </Button>

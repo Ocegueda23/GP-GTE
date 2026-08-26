@@ -21,4 +21,5 @@ public class ProyectoResponse
     public DateTime? FechaInicioReal { get; set; }
     public DateTime? FechaFinReal { get; set; }
     public bool EsMantenimiento { get; set; }
+    public bool Administrado { get; set; }
 }

@@ -56,7 +56,7 @@ public class ColumnaTableroResponse
 
 public class TableroResponse
 {
-    public int IdEquipo { get; set; }
+    public int? IdEquipo { get; set; }
     public string Equipo { get; set; } = string.Empty;
     public int? IdSprintActivo { get; set; }
     public string? SprintActivo { get; set; }

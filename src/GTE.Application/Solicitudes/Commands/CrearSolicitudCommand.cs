@@ -3,6 +3,7 @@ using GTE.Application.DTOs.Request.Solicitudes;
 using GTE.Application.DTOs.Responses.Solicitudes;
 using GTE.Application.Interfaces;
 using GTE.Domain.Exceptions;
+using GTE.Domain.Archivos;
 using GTE.Domain.Interfaces;
 using GTE.Domain.Solicitudes;
 using MediatR;
@@ -35,17 +36,22 @@ public class CrearSolicitudHandler(
     ISolicitudQueryService consultas,
     IGeneradorFolios folios,
     IMotorWorkflow motor,
-    IProveedorUsuarioActual proveedorUsuario) : IRequestHandler<CrearSolicitudCommand, SolicitudResponse>
+    ISanitizadorHtml sanitizador,
+    IProveedorUsuarioActual proveedorUsuario,
+    IArchivoRepository archivos) : IRequestHandler<CrearSolicitudCommand, SolicitudResponse>
 {
     public async Task<SolicitudResponse> Handle(CrearSolicitudCommand command, CancellationToken cancellationToken)
     {
         var usuario = await proveedorUsuario.ObtenerAsync(cancellationToken)
             ?? throw new ForbiddenException("La identidad actual no esta registrada como usuario de GTE.");
 
+        var descripcion = string.IsNullOrWhiteSpace(command.Datos.Descripcion)
+            ? null : sanitizador.Sanitizar(command.Datos.Descripcion);
+
         var folio = await folios.GenerarAsync($"SOL-{DateTime.Today.Year}", cancellationToken: cancellationToken);
 
         var idSolicitud = await repositorio.CrearAsync(new SolicitudNueva(
-            folio, usuario.IdUsuario, command.Datos.Titulo.Trim(), command.Datos.Descripcion,
+            folio, usuario.IdUsuario, command.Datos.Titulo.Trim(), descripcion,
             command.Datos.IdTipoSolicitud, command.Datos.IdPrioridad,
             command.Datos.FechaDeseada, command.Datos.JustificacionNegocio,
             command.Datos.IdUsuarioSolicitante), cancellationToken);
@@ -53,6 +59,11 @@ public class CrearSolicitudHandler(
         await motor.EjecutarAccionAsync(
             "Solicitud", idSolicitud, AccionesSolicitud.Enviar, null, null, cancellationToken);
         await repositorio.AplicarEfectosTransicionAsync(idSolicitud, AccionesSolicitud.Enviar, cancellationToken);
+
+        // Las imagenes pegadas durante el alta se subieron en borrador (sin vinculo, porque la
+        // entidad aun no tenia Id): ahora que existe, se adjuntan.
+        await archivos.VincularBorradoresAsync(
+            "Solicitud", idSolicitud, ReferenciasImagenes.ObtenerGuids(descripcion), cancellationToken);
 
         return await consultas.ObtenerPorIdAsync(idSolicitud, cancellationToken)
             ?? throw new NotFoundException("Solicitud", idSolicitud);

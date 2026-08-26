@@ -19,6 +19,14 @@ public record ClaveFirmaGte(byte[] Clave, string Issuer, string Audience, int Mi
 public interface IEmisorTokenSesion
 {
     (string Token, DateTime Expira) EmitirTokenAcceso(SesionResponse sesion);
+
+    /// <summary>
+    /// Token de suplantacion auditada ("iniciar sesion como"): la identidad efectiva
+    /// (preferred_username, la que evalua RBAC) es la del suplantado, con un claim extra
+    /// "actor_real" para la doble identidad en bitacora (ver AuditContext.UsuarioReal).
+    /// </summary>
+    (string Token, DateTime Expira) EmitirTokenSuplantacion(SesionResponse suplantado, string dominioReal);
+
     RefreshTokenGenerado GenerarRefreshToken();
     string HashRefreshToken(string tokenCrudo);
 }

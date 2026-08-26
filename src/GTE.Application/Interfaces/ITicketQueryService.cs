@@ -6,14 +6,17 @@ namespace GTE.Application.Interfaces;
 /// <summary>Filtro de la bandeja de mesa de ayuda. Sin estatus = abiertos (todos menos Cerrado).</summary>
 public record FiltroBandejaTicket(
     int Page = 1, int PageSize = 25, IReadOnlyList<int>? Estatus = null,
-    string? Texto = null, int? IdAsignado = null);
+    string? Texto = null, int? IdAsignado = null,
+    string? OrdenarPor = null, bool OrdenDescendente = false);
 
 public interface ITicketQueryService
 {
     Task<PagedResult<TicketResponse>> ObtenerBandejaAsync(FiltroBandejaTicket filtro, CancellationToken cancellationToken = default);
 
-    /// <summary>Tickets del usuario actual (portal del solicitante).</summary>
-    Task<IReadOnlyList<TicketResponse>> ObtenerMiosAsync(int idSolicitante, CancellationToken cancellationToken = default);
+    /// <summary>Tickets del usuario actual (portal del solicitante). Sin estatus = abiertos
+    /// (todos menos Cerrado); [-1] = todos, mismo contrato que ObtenerBandejaAsync.</summary>
+    Task<IReadOnlyList<TicketResponse>> ObtenerMiosAsync(
+        int idSolicitante, IReadOnlyList<int>? estatus, CancellationToken cancellationToken = default);
 
     Task<TicketResponse?> ObtenerPorIdAsync(int idTicket, CancellationToken cancellationToken = default);
 

@@ -27,4 +27,13 @@ public class CatalogosController(IMediator mediator) : ControllerBase
         var resultado = await mediator.Send(new ObtenerCatalogosAdministracionQuery(), cancellationToken);
         return Ok(ApiResponse<CatalogosAdministracionResponse>.Exito(resultado));
     }
+
+    /// <summary>Catalogos de la pantalla de Releases (hoy: tipos de artefacto).</summary>
+    [HttpGet("entregas")]
+    public async Task<ActionResult<ApiResponse<CatalogosEntregasResponse>>> ObtenerEntregas(
+        CancellationToken cancellationToken)
+    {
+        var resultado = await mediator.Send(new ObtenerCatalogosEntregasQuery(), cancellationToken);
+        return Ok(ApiResponse<CatalogosEntregasResponse>.Exito(resultado));
+    }
 }
