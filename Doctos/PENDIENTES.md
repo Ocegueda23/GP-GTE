@@ -3,7 +3,76 @@
 > Documento de continuidad. Sirve para retomar el proyecto en otra sesión sin
 > contexto previo. Actualizar al cerrar cada bloque de trabajo.
 >
-> **Última actualización:** 2026-08-13 (**Catalogo de Reportes R01-R14 + vistas vwBI*** --
+> **Última actualización:** 2026-08-26 (**Versionado manual estándar Interflo, diagnóstico
+> del almacén de archivos y ajustes de Releases** — fusionado a `main` en el merge commit
+> `5108700`, PR #1, y **ya desplegado y probado en producción por el usuario**. El PR
+> arrastró además 6 commits de sesiones anteriores que nunca habían llegado a `main`.)
+>
+> **Bug de producción resuelto — TODA subida de archivos fallaba con `INTERNAL_ERROR`**
+> (imágenes pegadas en descripciones y comentarios, adjuntos de WorkItem, base de
+> conocimiento, fotos de perfil, todas a la vez). No era de cada módulo: `appsettings.json`
+> clava `AlmacenArchivos:Ruta = D:\GTE\Archivos` — la ruta de la máquina de desarrollo — y
+> se publica tal cual, así que en un servidor sin unidad `D:` `Directory.CreateDirectory`
+> truena en cada subida. **La causa de fondo estaba en `asistente-instalacion.html`**: tenía
+> la ruta detrás de un checkbox opcional ("Los archivos adjuntos van a un share de red")
+> cuya pista afirmaba que sin marcarlo se usaba una carpeta local junto al ejecutable, lo
+> cual es **falso** — no escribía la variable y ganaba el `D:` de `appsettings.json`. Quien
+> instalara con carpeta local dejaba la casilla sin marcar creyendo la pista y se llevaba la
+> ruta de desarrollo al servidor. Ahora la ruta es obligatoria siempre (default local), y el
+> script generado crea la carpeta y prueba escribir en ella durante la instalación.
+>
+> **El sistema ahora se autodiagnostica** en vez de dar un `INTERNAL_ERROR` ciego: el
+> arranque comprueba la ruta y deja `ALMACEN DE ARCHIVOS NO DISPONIBLE` en el log (no aborta
+> a propósito: un share caído puede volver y el resto de la API sirve igual);
+> `GET /api/v1/version/almacen` (con identidad, la ruta del share no es dato público)
+> reporta ruta resuelta, existencia y escritura; `AlmacenArchivosNoDisponibleException` da un
+> mensaje útil con la ruta al log; y un binario ausente es 404 con explicación, no 500.
+> Herramientas: `configurar-almacen-archivos.bat`/`.ps1` (nuevo, corrige solo esa variable en
+> una instalación ya hecha) y `configurar-servicio-completo` pasa a registrar las **cuatro**
+> variables (`RutaAlmacen` obligatoria en TERCERA posición, con guard si llega algo que no
+> parece ruta, porque antes el tercero era el nombre del servicio) y ya no imprime la cadena
+> de conexión ni la clave JWT completas.
+>
+> **Versionado (nuevo estándar en `CLAUDE.md`)**: 4 dígitos
+> `Proyecto.Mejora.Defecto.Reenvío` para aplicación, sitios web e instaladores; 3 dígitos
+> `Proyecto.Mejora.Defecto` para procedimientos almacenados (renglón `Version:` en el
+> encabezado del script que crea el objeto). Al subir un dígito se resetean los de su
+> derecha; si en una liberación van varios defectos y una mejora se versiona como mejora; si
+> va un proyecto, se versiona solo como proyecto. **El número se sube A MANO al liberar,
+> contra el informe de liberación** — no se genera solo ni se estampa con la fecha (el primer
+> intento de esta sesión fue un sello `aaaa.MM.dd.HHmm`, descartado por no cumplir la regla).
+> `Directory.Build.props` es la ÚNICA fuente; `publicar.bat` lo lee y estampa el mismo número
+> en el ensamblado (`-p:Version`) y en el bundle (`VITE_VERSION`). La barra superior lo
+> muestra debajo de "GTE" y **lo pinta en ámbar si bundle y API no coinciden**, que es la
+> señal de un despliegue a medias (se copió `wwwroot` sin los DLL, o al revés). Versión en
+> producción al cerrar esta sesión: `1.16.0.0`.
+>
+> **Releases**: el combo de tipo de artefacto tenía los cuatro tipos escritos a mano en la
+> pantalla, así que editar `dbo.tblTipoArtefacto` en Catálogos no cambiaba nada — nuevo
+> `GET /api/v1/catalogos/entregas`, que además devuelve el id de "Script SQL" para que el
+> front no clave el `2` al decidir cuándo pedir la justificación de irreversibilidad
+> (RN-GTE-032). Baja de contenido (el endpoint ya existía con su guarda, solo no estaba
+> expuesto) y baja de artefactos (nueva de punta a punta, con bloqueo si el artefacto es la
+> reversa de otro). El selector de contenido usaba la bandeja general, que no sabe nada de
+> releases, y ofrecía elementos ya entregados en otra versión: nuevo
+> `GET releases/{id}/candidatos` que filtra `IdRelease IS NULL`, ordena por folio y trae el
+> conteo de hallazgos; la ventana suma filtros de folio/título, sprint, tipo y ocultar
+> bloqueados, con contador y selección masiva (se elige el sprint y entra su contenido
+> completo de un clic).
+>
+> **Decisión del equipo en esta sesión**: la bandera de "exige reversa" de los tipos de
+> artefacto **se queda como constante en código** (`TipoArtefacto.ScriptSql`), NO se movió a
+> una columna de `tblTipoArtefacto`. Se propuso hacerla configurable desde Catálogos (donde
+> `TIPO_ARTEFACTO` ya está registrado como catálogo genérico) y el usuario decidió dejarla
+> así. Consecuencia a tener presente: un tipo de artefacto nuevo creado desde Catálogos NO
+> exigirá reversa; para eso hay que editar la constante y republicar.
+>
+> `publicado/` se agregó al `.gitignore` (eran ~100 MB de artefactos de despliegue sin
+> versionar en la raíz). `DataBase/bdsGTE.sql` y `DataBase/script.sql` siguen deliberadamente
+> fuera del control de versiones: son dumps UTF-16 de SSMS "Generate Scripts", no
+> idempotentes, y no son la fuente de verdad del esquema (lo es `DataBase/Scripts`).
+>
+> **Bloque anterior — 2026-08-13** (**Catalogo de Reportes R01-R14 + vistas vwBI*** --
 > segundo bloque de la "Fase 5 completa" (Dashboard P18 -> Reportes/PowerBI -> Automatizaciones
 > -> IA). Extiende el modulo `Reportes` que ya existia con un solo reporte (Actividad de
 > usuario, permiso `RPT.Actividad`) en vez de duplicarlo: mismo `IReportesQueryService`/
@@ -756,6 +825,9 @@ transiciones automáticas configurables.
 
 ## 5. Trampas técnicas ya pagadas (no repetir)
 
+- **Rutas de máquina de desarrollo dentro de `appsettings.json` se publican al servidor y rompen funciones completas en silencio** (2026-08-26): `AlmacenArchivos:Ruta = D:\GTE\Archivos` viajó al servidor de despliegue, que no tiene unidad `D:`, y TODA subida de archivos empezó a fallar con `INTERNAL_ERROR` — en cuatro pantallas distintas a la vez, lo que hacía parecer que el bug era de cada módulo. **Lección doble**: (1) un valor de configuración específico de una máquina no debe quedar como default en el archivo que se publica — o va vacío (con fallback en código) o el instalador está obligado a fijarlo; (2) cuando el MISMO error aparece en varias pantallas sin relación entre sí, la causa es un recurso compartido (almacén, BD, permiso), no cada pantalla. Ahora hay chequeo al arranque, `GET /api/v1/version/almacen` para diagnosticar sin entrar al servidor, y el instalador lo comprueba con una sonda de escritura.
+- **Una pista de UI que MIENTE es peor que no tener pista** (2026-08-26, misma causa raíz que el punto anterior): `asistente-instalacion.html` tenía la ruta del almacén detrás de un checkbox opcional cuya ayuda decía "Si no lo marcas, se usa la carpeta local junto al ejecutable". Falso: si no se marcaba, el asistente no escribía la variable de entorno y ganaba el `D:` de `appsettings.json`. El fallback a carpeta local solo ocurre cuando la ruta está VACÍA, y nunca lo estaba. Quien instalara con carpeta local hacía exactamente lo que decía la pista y se llevaba una instalación rota. **Lección**: al documentar un default en la UI, verificar contra el código qué pasa REALMENTE en la rama "no configurado" — no asumir que "no marcar" equivale a "vacío".
+- **En PowerShell el backslash NO escapa dentro de cadenas** (2026-08-26, bug propio detectado al probar): se escribió `$ruta -like '\\*'` para detectar un share UNC, pensando en semántica tipo C. En PowerShell (donde el escape es la backtick) eso son CUATRO barras literales, así que ningún UNC entraba y se trataba como carpeta local. El correcto es `-like '\*'`. Se comprobó con una tabla explícita de rutas (`\servidor\...`, `C:\...`, texto suelto). **Trampa adicional del mismo día**: `Join-Path` valida la unidad y lanza antes que el `catch` útil, tapando el error real ("no existe la unidad Z") con un "la ruta no puede ser nula" que no le dice nada a quien instala — usar `[IO.Path]::Combine` cuando la ruta puede ser inválida a propósito. **Y**: no probar bloques de PowerShell copiándolos a un heredoc de Bash, que se come las barras y produce falsos positivos; invocar el archivo real.
 - **EF y columnas `bit`**: el `DEFAULT 1` de la base no aplica en los INSERT de EF. Toda
   alta debe fijar `Activo = true` explícitamente.
 - **EF y proyecciones intermedias**: filtrar u ordenar sobre un DTO/record ya proyectado da
