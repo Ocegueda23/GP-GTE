@@ -185,21 +185,17 @@
       </div>
 
       <div class="grupo-condicional">
-        <div class="check">
-          <input type="checkbox" id="usarAlmacen">
-          <div>
-            <label for="usarAlmacen">Los archivos adjuntos van a un share de red</label>
-            <div class="pista">Si no lo marcas, se usa la carpeta local junto al ejecutable.</div>
-          </div>
+        <label for="rutaAlmacen">Ruta del almacen de archivos <span class="req">*</span></label>
+        <input type="text" id="rutaAlmacen" value="C:\GTE\Archivos">
+        <div class="pista">
+          Donde se guardan los adjuntos y las imagenes pegadas en descripciones, comentarios
+          y articulos. Carpeta local del servidor (<code>C:\GTE\Archivos</code>) o share de
+          red (<code>\\servidor\GTE\Archivos</code>); en share, la cuenta del servicio
+          necesita lectura y escritura ahi. <strong>Se fija siempre</strong>: el valor que
+          trae <code>appsettings.json</code> apunta a la unidad <code>D:</code> de la maquina
+          de desarrollo, y si el servidor no la tiene, toda subida de archivos falla.
         </div>
-        <div id="grupoAlmacen" hidden style="margin-top:12px">
-          <label for="rutaAlmacen">Ruta del almacen de archivos <span class="req">*</span></label>
-          <input type="text" id="rutaAlmacen" value="\\servidor\GTE\Archivos" data-obligatorio-si="usarAlmacen">
-          <div class="pista">
-            La cuenta del servicio (LocalSystem por defecto) necesita permiso de lectura y escritura ahi.
-          </div>
-          <div class="msg-error" id="err-rutaAlmacen"></div>
-        </div>
+        <div class="msg-error" id="err-rutaAlmacen"></div>
       </div>
     </section>
 
@@ -446,7 +442,6 @@ function leerDatos() {
     copiarPublish: $("copiarPublish").checked,
     rutaOrigenPublish: $("rutaOrigenPublish").value.trim().replace(/[\\/]+$/, ""),
     abrirFirewall: $("abrirFirewall").checked,
-    usarAlmacen: $("usarAlmacen").checked,
     rutaAlmacen: $("rutaAlmacen").value.trim(),
     servidorSql: $("servidorSql").value.trim(),
     usuarioSql: $("usuarioSql").value.trim(),
@@ -489,7 +484,10 @@ function validar(d) {
     }
   }
 
-  if (d.usarAlmacen && !d.rutaAlmacen) errores.rutaAlmacen = "Obligatorio.";
+  // Obligatoria siempre: si no se fija la variable de entorno, gana la ruta de
+  // appsettings.json (D:GTEArchivos, la de la maquina de desarrollo) y ninguna subida
+  // de archivos funciona en el servidor.
+  if (!d.rutaAlmacen) errores.rutaAlmacen = "Obligatorio.";
 
   if (!d.servidorSql) errores.servidorSql = "Obligatorio.";
   if (!d.usuarioSql) errores.usuarioSql = "Obligatorio.";
@@ -562,7 +560,7 @@ function generarScript(d) {
   add("$CopiarPublish    = $" + (d.copiarPublish ? "true" : "false"));
   add("$RutaOrigen       = " + psLiteral(d.copiarPublish ? d.rutaOrigenPublish : ""));
   add("$AbrirFirewall    = $" + (d.abrirFirewall ? "true" : "false"));
-  add("$RutaAlmacen      = " + psLiteral(d.usarAlmacen ? d.rutaAlmacen : ""));
+  add("$RutaAlmacen      = " + psLiteral(d.rutaAlmacen));
   add("$UrlBase          = " + psLiteral(urlBase));
   add("$PasswordTemporal = " + psLiteral(PASSWORD_TEMPORAL));
   add("$HashTemporal     = " + psLiteral(HASH_TEMPORAL));
@@ -985,12 +983,29 @@ function generarScript(d) {
   add("ActualizarVariable -Clave 'Jwt__ClaveFirma' -Valor $claveJwt");
   add("Ok 'Jwt__ClaveFirma generada (aleatoria, exclusiva de esta instalacion)'");
   add();
-  if (d.usarAlmacen) {
-    add("ActualizarVariable -Clave 'AlmacenArchivos__Ruta' -Valor $RutaAlmacen");
-    add("Ok \"AlmacenArchivos__Ruta = $RutaAlmacen\"");
-    add("Aviso 'Confirma que la cuenta del servicio tenga lectura y escritura sobre ese share de red.'");
-    add();
-  }
+  // Siempre, no opcional: sin esta variable gana la ruta de appsettings.json, que apunta a
+  // la unidad D: de la maquina de desarrollo, y toda subida de archivos falla en el servidor.
+  add("ActualizarVariable -Clave 'AlmacenArchivos__Ruta' -Valor $RutaAlmacen");
+  add("Ok \"AlmacenArchivos__Ruta = $RutaAlmacen\"");
+  add();
+  add("# Se crea aqui para que el servicio no tenga que crearla en la primera subida, y para");
+  add("# que un error de ruta o de permisos salte durante la instalacion y no en produccion.");
+  add("if ($RutaAlmacen -like '\\\\*') {");
+  add("    Aviso \"El almacen es un share de red. Confirma que la cuenta del servicio tenga lectura y escritura sobre $RutaAlmacen.\"");
+  add("} else {");
+  add("    try {");
+  add("        if (-not (Test-Path $RutaAlmacen)) { New-Item -ItemType Directory -Path $RutaAlmacen -Force -ErrorAction Stop | Out-Null }");
+  add("        # Combine y no Join-Path: Join-Path valida la unidad y tapa el error real con un");
+  add("        # 'la ruta no puede ser nula' que no le dice nada a quien instala.");
+  add("        $sonda = [IO.Path]::Combine($RutaAlmacen, '.sonda-' + [Guid]::NewGuid().ToString('N'))");
+  add("        [IO.File]::WriteAllBytes($sonda, [byte[]]@(0))");
+  add("        Remove-Item $sonda -Force");
+  add("        Ok \"El almacen de archivos $RutaAlmacen existe y acepta escritura\"");
+  add("    } catch {");
+  add("        Detener \"No se pudo escribir en el almacen de archivos $($RutaAlmacen): $($_.Exception.Message). Corrige la ruta o los permisos: sin esto ninguna subida de archivos va a funcionar.\"");
+  add("    }");
+  add("}");
+  add();
   paso++;
 
   // ---------------------------------------------------------------- firewall
@@ -1130,7 +1145,6 @@ function refrescar() {
 
   // Secciones que aparecen o desaparecen segun los checkboxes
   $("grupoOrigenPublish").hidden = !d.copiarPublish;
-  $("grupoAlmacen").hidden = !d.usarAlmacen;
   $("grupoAdminSql").hidden = !d.crearLogin;
   $("grupoCredencialesAdmin").hidden = !(d.crearLogin && d.authAdminAlta === "sql");
   $("avisoSecretos").hidden = d.modoSecretos !== "incrustar";

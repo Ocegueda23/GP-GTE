@@ -102,19 +102,41 @@ Definir las variables de entorno del servicio -- **todo lo sensible va aqui, nun
 `appsettings.json`**. Copiar las herramientas del repositorio al servidor (junto con lo
 publicado, o aparte) y correr como Administrador.
 
-**Opcion recomendada -- las tres variables de una vez, con reinicio del servicio
+**Opcion recomendada -- las cuatro variables de una vez, con reinicio del servicio
 incluido** (`configurar-servicio-completo.bat`/`.ps1`):
 
 ```bash
-configurar-servicio-completo.bat NOMBRE_SERVIDOR_SQL LA-CONTRASENA-DEL-PASO-1.3
+configurar-servicio-completo.bat NOMBRE_SERVIDOR_SQL LA-CONTRASENA-DEL-PASO-1.3 C:\GTE\Archivos
 ```
 
 Registra `ASPNETCORE_ENVIRONMENT=Production`, arma y registra
 `ConnectionStrings__bdsGTE` (con usuario `svc_gte` por default), genera y registra una
-`Jwt__ClaveFirma` nueva (y la copia al portapapeles), y reinicia el servicio al final --
-avisa si no quedo en estado `Running`. Nombre de servicio y usuario de SQL son
-parametros opcionales (`configurar-servicio-completo.bat SERVIDOR PASSWORD
-[NOMBRE_SERVICIO] [USUARIO_SQL]`, default `GTE`/`svc_gte`).
+`Jwt__ClaveFirma` nueva (y la copia al portapapeles), registra `AlmacenArchivos__Ruta`
+(creando la carpeta y comprobando que se puede escribir en ella antes de tocar nada), y
+reinicia el servicio al final -- avisa si no quedo en estado `Running`. Nombre de servicio
+y usuario de SQL son parametros opcionales (`configurar-servicio-completo.bat SERVIDOR
+PASSWORD RUTA_ALMACEN [NOMBRE_SERVICIO] [USUARIO_SQL]`, default `GTE`/`svc_gte`).
+
+Las cuatro son obligatorias porque sin cualquiera de ellas el sistema no funciona: sin las
+tres primeras el servicio no arranca o no conecta, y sin la cuarta arranca pero **ninguna
+subida de archivos funciona** (ver el porque unos parrafos mas abajo).
+
+> **El orden de los parametros cambio**: `RUTA_ALMACEN` es el TERCERO. Antes el tercero era
+> `NOMBRE_SERVICIO`, que ahora es el cuarto. El script frena si el tercer argumento no
+> parece una ruta, para que una llamada con el orden viejo no pase inadvertida.
+
+**Almacen de archivos** (`configurar-almacen-archivos.bat`/`.ps1`), que es la variable mas
+facil de olvidar y la unica que rompe una funcion completa del sistema si queda mal:
+
+```bash
+configurar-almacen-archivos.bat C:\GTE\Archivos
+configurar-almacen-archivos.bat \\servidor\GTE\Archivos
+```
+
+A diferencia de las herramientas de arriba, este ademas **crea la carpeta, comprueba que se
+puede escribir en ella y reinicia el servicio**. Si la ruta no sirve (unidad que no existe
+en el servidor, permisos), aborta sin tocar el registro y dice por que. Para un share de red
+solo avisa: la sonda correria con TU cuenta, no con la del servicio.
 
 **Opcion variable por variable** (`configurar-variable-servicio.bat`/`.ps1` +
 `generar-clave-jwt.bat`/`.ps1`), util para tocar solo una sin reiniciar el servicio o sin
@@ -150,9 +172,14 @@ Notas sobre estas variables:
   `svc_gte` creado en el Paso 1.3 (autenticacion de SQL Server, no de Windows -- ver
   requisito del modo mixto en la seccion 1). Usar la misma contrasena que se puso en el
   script de ese paso, guardada en el gestor de contrasenas del equipo.
-- Si `AlmacenArchivos:Ruta` va a ser un share de red, agregar tambien
-  `AlmacenArchivos__Ruta=\\servidor\GTE\Archivos` (o la ruta real) a la misma lista del
-  primer `reg add`.
+- `AlmacenArchivos__Ruta`: **fijarla siempre**, en la misma lista del primer `reg add`
+  (ej. `AlmacenArchivos__Ruta=\\servidor\GTE\Archivos` para un share de red, o
+  `AlmacenArchivos__Ruta=C:\GTE\Archivos` para una carpeta local del servidor). El valor
+  que trae `appsettings.json` es `D:\GTE\Archivos`, que es la ruta de la maquina de
+  desarrollo: si el servidor destino no tiene unidad `D:`, TODA subida de archivos falla
+  con `INTERNAL_ERROR` (imagenes pegadas en descripciones y comentarios, adjuntos de
+  WorkItem, base de conocimiento, fotos de perfil). Se comprueba en el Paso 4 con
+  `/api/v1/version/almacen`.
 - Si por alguna razon el SPA necesitara llamar a la API desde OTRO origen (no deberia,
   quedan en el mismo proceso/puerto), se agregaria `Cors__Origenes__0=https://...`.
 
@@ -189,7 +216,15 @@ sc query GTE
 3. Entrar a `http://NOMBRE_SERVIDOR:5090/`. Debe verse la pantalla de login de GTE (el
    shell de la SPA se sirve sin sesion a proposito -- es lo unico que un usuario
    anonimo puede ver; todo lo demas exige token).
-4. Revisar el Visor de Eventos de Windows (Application) o `logs/gte-*.log` junto al
+4. **Comprobar el almacen de archivos**, con sesion iniciada, en
+   `http://NOMBRE_SERVIDOR:5090/api/v1/version/almacen`. Debe responder
+   `"sePuedeEscribir": true` y la `ruta` que corresponde a ESE servidor. Si responde
+   `false`, ninguna subida de archivo va a funcionar (imagenes pegadas en descripciones y
+   comentarios, adjuntos de WorkItem, base de conocimiento, fotos de perfil): la ruta de
+   `AlmacenArchivos:Ruta` apunta a una unidad o share que no existe ahi, o la cuenta del
+   servicio no puede escribir. El arranque tambien lo deja escrito en el log como
+   `ALMACEN DE ARCHIVOS NO DISPONIBLE`.
+5. Revisar el Visor de Eventos de Windows (Application) o `logs/gte-*.log` junto al
    ejecutable si no arranca -- los errores de conexion a `bdsGTE` (login sin permisos,
    firewall de SQL, `ConnectionStrings__bdsGTE` mal escrita) quedan ahi.
 
@@ -294,6 +329,8 @@ elimina automaticamente.
 | El servicio no arranca (`sc query` no llega a RUNNING) | Ruta del `.exe` incorrecta en `binPath=`, o falta el .NET 8 Runtime en el servidor | Visor de Eventos > Application; confirmar `dotnet --list-runtimes` incluye `Microsoft.AspNetCore.App 8.x` |
 | El Visor de Eventos dice "You must install or update .NET to run this application" / pide `Microsoft.AspNetCore.App` version 'X.0.0' | Falta exactamente esa version mayor en el servidor -- .NET no hace fallback a otra version mayor aunque este instalada | Instalar el ASP.NET Core Runtime 8.0 (x64) en el servidor, o confirmar que se publico con el `.csproj` actual (`net8.0`) y no una copia vieja |
 | El proceso truena con `FileNotFoundException: Could not load file or assembly 'System.Runtime, Version=X.0.0.0...'` (version DISTINTA a la del runtime instalado, ej. corre bajo 8.0.29 pero pide 9.0.0.0) | Quedaron archivos de un publish VIEJO (de otra version de .NET) mezclados con el nuevo en la misma carpeta -- `dotnet publish -o carpeta` no borra lo que ya no necesita, solo agrega/sobreescribe | `publicar.bat` ya limpia su carpeta de destino local antes de publicar (paso 1/4). **Falta limpiar la carpeta INSTALADA en el servidor** (ej. `C:\Program Files (x86)\Interflo\ServiceGTE\`): `sc stop GTE`, borrar el contenido completo de esa carpeta, copiar de nuevo el publish fresco completo, `sc start GTE` |
+| **Cualquier subida de archivo falla con `INTERNAL_ERROR`** (imagen pegada en una descripcion o comentario, adjunto de WorkItem, articulo de la base de conocimiento, foto de perfil -- todas a la vez) | `AlmacenArchivos:Ruta` apunta a una ruta que no existe en ESE servidor o donde la cuenta del servicio no puede escribir. El default que viene en `appsettings.json` es `D:\GTE\Archivos`, que solo sirve si el servidor tiene unidad `D:` -- **hay que fijar la ruta real del servidor**, no dejar el default | `http://SERVIDOR:5090/api/v1/version/almacen` dice `sePuedeEscribir: false` y trae el error exacto. Corregir con la variable de entorno `AlmacenArchivos__Ruta` del servicio (Paso 3) y reiniciar: `sc stop GTE && sc start GTE` |
+| Una imagen ya guardada sale rota, o su descarga da 404 "esta registrado pero su contenido no esta en el almacen" | La ruta del almacen CAMBIO entre despliegues: el registro sigue en `tblArchivo` pero el binario quedo en la carpeta anterior | Buscar los archivos en la ruta vieja (ej. `ArchivosGte` junto al ejecutable, que es el fallback cuando no hay ruta configurada) y moverlos a la nueva conservando la subcarpeta de 2 caracteres |
 | Error de login "Cannot open server ... requested by the login" o "Login failed for user 'svc_gte'" | El SQL Server destino no tiene habilitado el modo mixto (solo Windows Authentication), o no se corrio el script `01_..._UsuarioServicio.sql`, o la contrasena en `ConnectionStrings__bdsGTE` no coincide con la del script | Server Properties > Security en SSMS (modo mixto); confirmar que el login `svc_gte` existe en `sys.server_principals` y tiene usuario en `bdsGTE` (`sys.database_principals`) |
 | El servicio arranca pero se detiene solo / error de conexion a BD | `ConnectionStrings__bdsGTE` mal escrita, firewall de SQL Server (puerto 1433), o permisos insuficientes del login `svc_gte` | `logs/gte-*.log` junto al ejecutable; probar la misma cadena de conexion con `sqlcmd -S servidor -d bdsGTE -U svc_gte -P la-contrasena` |
 | Falla al arrancar con "Falta Jwt:ClaveFirma" | No se configuro `Jwt__ClaveFirma` en las variables de entorno del servicio (Paso 3) | `reg query "HKLM\SYSTEM\CurrentControlSet\Services\GTE" /v Environment` |

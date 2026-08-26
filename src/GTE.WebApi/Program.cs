@@ -261,6 +261,23 @@ if (!hangfireDeshabilitado)
     }
 }
 
+// Chequeo de almacen en el arranque: una ruta de AlmacenArchivos:Ruta que apunte a una
+// unidad o share inexistente en el servidor rompe TODA subida de archivos, y antes solo se
+// notaba al primer intento del usuario y como INTERNAL_ERROR sin pistas. No se aborta el
+// arranque a proposito: un share caido puede volver, y el resto de la API sirve igual.
+var sondaAlmacen = app.Services.GetRequiredService<GTE.Application.Interfaces.IAlmacenArchivos>().Verificar();
+if (sondaAlmacen.SePuedeEscribir)
+{
+    Log.Information("Almacen de archivos listo en {Raiz}", sondaAlmacen.Raiz);
+}
+else
+{
+    Log.Error(
+        "ALMACEN DE ARCHIVOS NO DISPONIBLE en {Raiz} (existe: {Existe}): {Error}. "
+        + "Ninguna subida de archivos va a funcionar hasta que se corrija AlmacenArchivos:Ruta.",
+        sondaAlmacen.Raiz, sondaAlmacen.Existe, sondaAlmacen.Error);
+}
+
 app.UseSerilogRequestLogging();
 app.UseMiddleware<GlobalExceptionMiddleware>();
 

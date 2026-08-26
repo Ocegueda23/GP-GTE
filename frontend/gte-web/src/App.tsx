@@ -16,6 +16,7 @@ import {
   marcarNotificacionLeida, marcarTodasNotificacionesLeidas, obtenerNotificaciones,
 } from "./shared/api/notificaciones";
 import { useConexionTiempoReal } from "./shared/tiempoReal/useConexionTiempoReal";
+import { VERSION_FRONTEND, obtenerVersionApi } from "./shared/api/version";
 import { BandejaPage } from "./features/trabajo/BandejaPage";
 import { DetallePage } from "./features/workitem/DetallePage";
 import { MiDiaPage } from "./features/midia/MiDiaPage";
@@ -374,6 +375,51 @@ function ListaNavegacion({ alNavegar }: { alNavegar?: () => void }) {
   );
 }
 
+/**
+ * Sello de version debajo del nombre del sistema. Existe para responder de un golpe de
+ * vista "este servidor tiene la ultima publicacion?": el numero grande es el del bundle
+ * (VITE_VERSION, estampado por publicar.bat) y el tooltip trae el del API. Si no
+ * coinciden, quedo a medias el despliegue (tipico: se copio wwwroot pero no los DLL, o al
+ * reves) y el sello se pinta en ambar para que salte a la vista.
+ */
+function SelloVersion() {
+  const { data: versionApi } = useQuery({
+    queryKey: ["version-api"],
+    queryFn: obtenerVersionApi,
+    staleTime: Infinity,
+    retry: false,
+  });
+
+  const sello = VERSION_FRONTEND ?? versionApi?.version ?? null;
+  if (!sello) return null;
+
+  const descuadre = VERSION_FRONTEND !== null
+    && versionApi !== undefined
+    && versionApi.version !== VERSION_FRONTEND;
+
+  const detalle = versionApi
+    ? `API ${versionApi.version} · ${versionApi.ambiente}`
+    : "No se pudo consultar la version del API";
+
+  return (
+    <Tooltip title={descuadre ? `${detalle}. El frontend y el API no coinciden: el despliegue quedo a medias.` : detalle}>
+      <Typography
+        variant="caption"
+        sx={{
+          display: "block",
+          lineHeight: 1,
+          letterSpacing: 0,
+          opacity: descuadre ? 1 : 0.7,
+          color: descuadre ? "warning.main" : "inherit",
+          cursor: "default",
+        }}
+      >
+        v{sello}{descuadre ? " !" : ""}
+      </Typography>
+    </Tooltip>
+  );
+}
+
 function BarraSuperior({ alAbrirMenu, modo, alternarModo }: {
   alAbrirMenu: () => void; modo: PaletteMode; alternarModo: () => void;
 }) {
@@ -400,7 +446,10 @@ function BarraSuperior({ alAbrirMenu, modo, alternarModo }: {
           sx={{ display: { sm: "none" }, mr: 1 }}>
           <MenuIcon />
         </IconButton>
-        <Typography variant="h6" sx={{ fontWeight: 700, letterSpacing: 1, flex: 1 }}>GTE</Typography>
+        <Box sx={{ flex: 1 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, letterSpacing: 1, lineHeight: 1.15 }}>GTE</Typography>
+          <SelloVersion />
+        </Box>
         {estaSuplantando() && (
           <Stack direction="row" spacing={1} sx={{ alignItems: "center", mr: 1 }}>
             <Chip

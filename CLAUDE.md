@@ -60,6 +60,64 @@ SOLO a este proyecto. No migrar sin decision del equipo.
   ordenar por columnas reales, y proyectar al final con Expression<Func<T,TResult>>
   (ver ConsultaBase/ProyeccionTarjeta en PlaneacionQueryService).
 
+## Versionado (estandar Interflo)
+
+Aplica a la aplicacion, a los procedimientos almacenados y a los instaladores. El numero
+NO se genera solo ni se estampa con la fecha: se sube A MANO al liberar y tiene que poder
+cotejarse contra el informe de liberacion.
+
+### Aplicaciones, sitios web e instaladores: 4 digitos
+
+```
+Proyecto . Mejora . Defecto . Reenvio
+   x         y        z         w
+```
+
+- `x` -- sube al liberar un PROYECTO.
+- `y` -- sube al liberar una MEJORA.
+- `z` -- sube al liberar solo DEFECTOS o errores.
+- `w` -- sube en cada REENVIO a preproduccion.
+
+Reglas de resolucion:
+
+1. Al subir un digito se RESETEAN a 0 todos los de su derecha.
+2. Si en una misma liberacion van varios defectos y una mejora, se versiona como mejora.
+3. Si van defectos, mejoras y un proyecto, se versiona solo como proyecto.
+
+En resumen: manda lo mas alto que se libere, y solo ese digito se mueve.
+
+Ejemplos: `2.4.7.1` + tres defectos -> `2.4.8.0`; `2.4.7.1` + dos defectos y una mejora ->
+`2.5.0.0`; `2.4.7.1` + un proyecto (con lo que sea que lo acompane) -> `3.0.0.0`;
+`2.4.7.1` reenviado a preproduccion sin cambios de alcance -> `2.4.7.2`.
+
+### Procedimientos almacenados: 3 digitos
+
+```
+Proyecto . Mejora . Defecto
+   x         y        z
+```
+
+- `x` -- proyectos.
+- `y` -- mejoras (resetea `z`).
+- `z` -- defectos, errores o reenvios.
+
+La version del programable va en el encabezado del script que lo crea, en el bloque de
+comentario que ya usan los scripts de `DataBase/Scripts` (renglon `Version:`, junto a
+`Script:`/`Autor:`/`Descripcion:`), y se sube en el mismo script que cambia el objeto.
+
+### Donde vive la version de la aplicacion
+
+`Directory.Build.props` (raiz) es la UNICA fuente: su `<Version>` la consumen los tres
+destinos y por eso nunca se escribe a mano en otro lado.
+
+- API: la estampa `dotnet publish` y la devuelve `GET /api/v1/version`.
+- Frontend: `publicar.bat` la pasa como `VITE_VERSION` y la barra superior la muestra
+  debajo de "GTE".
+- Instalador: mismo numero que la aplicacion que empaqueta.
+
+Si la barra superior marca la version en ambar, el bundle y el API no coinciden: el
+despliegue quedo a medias (se copio `wwwroot` sin los DLL, o al reves).
+
 ## Frontend
 
 - Estado servidor con TanStack Query; UI con Zustand por feature; actualizaciones inmutables.
