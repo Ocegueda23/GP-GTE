@@ -140,6 +140,13 @@ export async function agregarContenido(idRelease: number, idsWorkItem: number[])
   return enviar<ReleaseDetalle>("post", `/api/v1/releases/${idRelease}/items`, { idsWorkItem });
 }
 
+export async function quitarContenido(idRelease: number, idWorkItem: number) {
+  const { mensaje } = await enviar<object>(
+    "delete", `/api/v1/releases/${idRelease}/items/${idWorkItem}`,
+  );
+  return { mensaje };
+}
+
 export async function agregarArtefacto(idRelease: number, datos: {
   nombre: string;
   idTipoArtefacto: number;
@@ -148,6 +155,13 @@ export async function agregarArtefacto(idRelease: number, datos: {
   justificacionIrreversible: string | null;
 }) {
   return enviar<number>("post", `/api/v1/releases/${idRelease}/artefactos`, datos);
+}
+
+export async function quitarArtefacto(idRelease: number, idArtefacto: number) {
+  const { mensaje } = await enviar<object>(
+    "delete", `/api/v1/releases/${idRelease}/artefactos/${idArtefacto}`,
+  );
+  return { mensaje };
 }
 
 export async function resolverAprobacion(idAprobacion: number, aprobada: boolean, comentario?: string) {
@@ -186,4 +200,40 @@ export async function enviarSprintARelease(idSprint: number, datos: {
   versionNueva: string | null;
 }) {
   return enviar<ReleaseDetalle>("post", `/api/v1/sprints/${idSprint}/enviar-a-release`, datos);
+}
+
+export interface CatalogosEntregas {
+  tiposArtefacto: { id: number; nombre: string }[];
+  /** Id de "Script SQL": el unico tipo que pide justificacion si no hay reversa (RN-GTE-032). */
+  idTipoArtefactoScriptSql: number;
+}
+
+/**
+ * Tipos de artefacto vivos del catalogo dbo.tblTipoArtefacto. Antes el combo los tenia
+ * escritos a mano y la pantalla seguia mostrando los cuatro originales aunque el catalogo
+ * se editara en Administracion.
+ */
+export async function obtenerCatalogosEntregas() {
+  return obtener<CatalogosEntregas>("/api/v1/catalogos/entregas");
+}
+
+export interface CandidatoContenido {
+  idWorkItem: number;
+  folio: string;
+  titulo: string;
+  tipo: string;
+  /** Hallazgos de revision sin corregir: mayor que cero lo bloquea (RN-GTE-031). */
+  hallazgosPendientes: number;
+  /** Nulo si el elemento se termino fuera de un sprint. */
+  idSprint: number | null;
+  sprint: string | null;
+}
+
+/**
+ * Lo que puede entrar al release, ya ordenado por folio y sin lo que pertenece a otro
+ * release. Reemplaza el uso de la bandeja general, que no sabia nada de releases y por eso
+ * ofrecia elementos ya entregados en otra version.
+ */
+export async function obtenerCandidatosContenido(idRelease: number) {
+  return obtener<CandidatoContenido[]>(`/api/v1/releases/${idRelease}/candidatos`);
 }

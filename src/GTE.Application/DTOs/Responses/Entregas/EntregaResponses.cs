@@ -27,6 +27,24 @@ public class ItemReleaseResponse
     public string Estatus { get; set; } = string.Empty;
 }
 
+/// <summary>Elemento que puede entrar al release (ver ObtenerCandidatosContenidoAsync).</summary>
+public class CandidatoContenidoResponse
+{
+    public int IdWorkItem { get; set; }
+    public string Folio { get; set; } = string.Empty;
+    public string Titulo { get; set; } = string.Empty;
+    public string Tipo { get; set; } = string.Empty;
+
+    /// <summary>Hallazgos de revision sin corregir: mayor que cero lo bloquea (RN-GTE-031).</summary>
+    public int HallazgosPendientes { get; set; }
+
+    /// <summary>Sprint donde se trabajo, para poder filtrar el selector por sprint. Nulo si
+    /// el elemento se termino fuera de un sprint.</summary>
+    public int? IdSprint { get; set; }
+
+    public string? Sprint { get; set; }
+}
+
 public class ArtefactoResponse
 {
     public int IdArtefacto { get; set; }

@@ -1,6 +1,7 @@
 using GTE.Application.Catalogos.Queries;
 using GTE.Application.DTOs.Responses.Catalogos;
 using GTE.Domain.Administracion;
+using GTE.Domain.Entregas;
 using GTE.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -151,6 +152,22 @@ public class CatalogosQueryService(FabricaContexto fabrica) : ICatalogosQuerySer
                 .OrderBy(h => h.Nombre)
                 .Select(h => new CatalogoItemResponse { Id = h.IdHorario, Nombre = h.Nombre })
                 .ToListAsync(cancellationToken)
+        };
+    }
+
+    public async Task<CatalogosEntregasResponse> ObtenerCatalogosEntregasAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
+
+        return new CatalogosEntregasResponse
+        {
+            TiposArtefacto = await contexto.TblTipoArtefacto.AsNoTracking()
+                .Where(t => t.Activo)
+                .OrderBy(t => t.Nombre)
+                .Select(t => new CatalogoItemResponse { Id = t.Id, Nombre = t.Nombre })
+                .ToListAsync(cancellationToken),
+            IdTipoArtefactoScriptSql = TipoArtefacto.ScriptSql
         };
     }
 }

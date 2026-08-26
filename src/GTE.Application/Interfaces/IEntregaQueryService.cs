@@ -13,6 +13,15 @@ public interface IEntregaQueryService
     Task<IReadOnlyList<ReleaseResponse>> ObtenerRelevantesAsync(
         int idUsuario, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Elementos que pueden entrar al release: Terminados del proyecto del release y sin
+    /// release asignado todavia, ordenados por folio. Deja fuera lo que ya esta en otro
+    /// release (o en este) porque un WorkItem pertenece a un solo release a la vez, y trae
+    /// el conteo de hallazgos para avisar en la interfaz de lo que RN-GTE-031 va a rechazar.
+    /// </summary>
+    Task<IReadOnlyList<CandidatoContenidoResponse>> ObtenerCandidatosContenidoAsync(
+        int idRelease, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<MatrizAmbienteResponse>> ObtenerMatrizAmbientesAsync(
         CancellationToken cancellationToken = default);
 

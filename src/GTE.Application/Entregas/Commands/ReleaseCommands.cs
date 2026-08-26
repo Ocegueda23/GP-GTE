@@ -283,6 +283,43 @@ public class AgregarArtefactoHandler(
     }
 }
 
+public record QuitarArtefactoCommand(int IdRelease, int IdArtefacto) : IRequest<Unit>;
+
+/// <summary>
+/// Baja de un artefacto del release. Mismo criterio que QuitarContenido: solo mientras el
+/// release esta En Preparacion, porque a partir de En Aprobacion las firmas se dieron sobre
+/// una lista concreta de artefactos y quitar uno la invalidaria en silencio.
+/// </summary>
+public class QuitarArtefactoHandler(
+    IEntregaRepository repositorio,
+    IVerificadorPermisos permisos) : IRequestHandler<QuitarArtefactoCommand, Unit>
+{
+    public async Task<Unit> Handle(QuitarArtefactoCommand command, CancellationToken cancellationToken)
+    {
+        var release = await repositorio.ObtenerEstadoAsync(command.IdRelease, cancellationToken)
+            ?? throw new NotFoundException("Release", command.IdRelease);
+
+        await permisos.ExigirPermisoAsync(PermisosEntregas.Crear, release.IdProyecto, cancellationToken);
+
+        if (release.IdEstatus != EstatusRelease.EnPreparacion)
+        {
+            throw new BusinessException(
+                "Los artefactos solo se quitan mientras el release esta En Preparacion.");
+        }
+
+        var dependiente = await repositorio.QuitarArtefactoAsync(
+            command.IdRelease, command.IdArtefacto, cancellationToken);
+        if (dependiente is not null)
+        {
+            throw new BusinessException(
+                $"No se puede quitar: es el script de reversa de \"{dependiente}\". "
+                + "Quita primero ese artefacto o cambiale la reversa.");
+        }
+
+        return Unit.Value;
+    }
+}
+
 /* ---------- Aprobaciones ---------- */
 
 public record ResolverAprobacionCommand(int IdAprobacion, ResolverAprobacionRequest Datos)

@@ -11,6 +11,7 @@ public interface ICatalogosQueryService
 {
     Task<CatalogosBandejaResponse> ObtenerCatalogosBandejaAsync(int idUsuario, CancellationToken cancellationToken = default);
     Task<CatalogosAdministracionResponse> ObtenerCatalogosAdministracionAsync(CancellationToken cancellationToken = default);
+    Task<CatalogosEntregasResponse> ObtenerCatalogosEntregasAsync(CancellationToken cancellationToken = default);
 }
 
 public class ObtenerCatalogosBandejaHandler(ICatalogosQueryService consultas, IProveedorUsuarioActual proveedorUsuario)

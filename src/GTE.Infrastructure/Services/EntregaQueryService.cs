@@ -166,6 +166,45 @@ public class EntregaQueryService(FabricaContexto fabrica) : IEntregaQueryService
         return detalle;
     }
 
+    public async Task<IReadOnlyList<CandidatoContenidoResponse>> ObtenerCandidatosContenidoAsync(
+        int idRelease, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
+
+        var idProyecto = await contexto.TblRelease.AsNoTracking()
+            .Where(r => r.IdRelease == idRelease)
+            .Select(r => r.IdProyecto)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (idProyecto == 0)
+        {
+            throw new NotFoundException("Release", idRelease);
+        }
+
+        // IdRelease == null deja fuera lo que ya esta en otro release (y lo que ya esta en
+        // este): un WorkItem pertenece a un solo release a la vez. El orden es por folio,
+        // que es la clave con la que se buscan los elementos.
+        return await (
+            from w in contexto.TblWorkItem.AsNoTracking()
+            join t in contexto.TblTipoWorkItem.AsNoTracking() on w.IdTipoWorkItem equals t.Id
+            join s in contexto.TblSprint.AsNoTracking() on w.IdSprint equals s.IdSprint into sprints
+            from s in sprints.DefaultIfEmpty()
+            where w.IdProyecto == idProyecto && w.Activo
+                  && w.IdEstatusWorkItem == EstatusWorkItem.Terminado
+                  && w.IdRelease == null
+            orderby w.Folio
+            select new CandidatoContenidoResponse
+            {
+                IdWorkItem = w.IdWorkItem,
+                Folio = w.Folio,
+                Titulo = w.Titulo,
+                Tipo = t.Nombre,
+                HallazgosPendientes = contexto.TblRevision
+                    .Count(rev => rev.IdWorkItem == w.IdWorkItem && !rev.Corregido && rev.Activo),
+                IdSprint = w.IdSprint,
+                Sprint = s != null ? s.Nombre : null
+            }).ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<MatrizAmbienteResponse>> ObtenerMatrizAmbientesAsync(
         CancellationToken cancellationToken = default)
     {

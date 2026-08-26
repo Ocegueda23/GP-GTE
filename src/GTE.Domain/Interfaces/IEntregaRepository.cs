@@ -32,6 +32,14 @@ public interface IEntregaRepository
 
     Task<int> AgregarArtefactoAsync(ArtefactoNuevo datos, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Baja logica del artefacto y de su vinculo con el release. Devuelve el nombre del
+    /// artefacto que lo usa como reversa si existe, y en ese caso NO borra nada: quitarlo
+    /// dejaria a ese otro artefacto sin rollback y bloqueado por RN-GTE-032 sin explicacion.
+    /// </summary>
+    Task<string?> QuitarArtefactoAsync(
+        int idRelease, int idArtefacto, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<ArtefactoRelease>> ObtenerArtefactosAsync(int idRelease, CancellationToken cancellationToken = default);
 
     /* Aprobaciones */

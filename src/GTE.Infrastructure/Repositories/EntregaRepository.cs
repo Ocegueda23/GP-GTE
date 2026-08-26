@@ -150,6 +150,49 @@ public class EntregaRepository(FabricaContexto fabrica, AuditContext auditoria)
         await RegistrarBitacoraAsync("Release", idRelease, "QUITAR_ITEM", item.Folio, cancellationToken);
     }
 
+    public async Task<string?> QuitarArtefactoAsync(
+        int idRelease, int idArtefacto, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
+
+        var vinculo = await contexto.TblReleaseArtefacto
+            .FirstOrDefaultAsync(
+                ra => ra.IdRelease == idRelease && ra.IdArtefacto == idArtefacto && ra.Activo,
+                cancellationToken);
+        if (vinculo is null)
+        {
+            return null;
+        }
+
+        // Si otro artefacto del release lo tiene como reversa, quitarlo lo dejaria sin
+        // rollback y el release se atoraria en RN-GTE-032 sin decir por que.
+        var dependiente = await (
+            from ra in contexto.TblReleaseArtefacto.AsNoTracking()
+            join a in contexto.TblArtefacto.AsNoTracking() on ra.IdArtefacto equals a.IdArtefacto
+            where ra.IdRelease == idRelease && ra.IdArtefactoRollback == idArtefacto && ra.Activo
+            select a.Nombre).FirstOrDefaultAsync(cancellationToken);
+        if (dependiente is not null)
+        {
+            return dependiente;
+        }
+
+        var artefacto = await contexto.TblArtefacto
+            .FirstOrDefaultAsync(a => a.IdArtefacto == idArtefacto, cancellationToken);
+
+        // tblReleaseArtefacto no tiene columnas de movimiento; la baja queda en bitacora.
+        vinculo.Activo = false;
+        if (artefacto is not null)
+        {
+            artefacto.Activo = false;
+            MarcarMovimientoArtefacto(artefacto);
+        }
+        await contexto.SaveChangesAsync(cancellationToken);
+
+        await RegistrarBitacoraAsync("Release", idRelease, "QUITAR_ARTEFACTO",
+            artefacto?.Nombre ?? idArtefacto.ToString(), cancellationToken);
+        return null;
+    }
+
     public async Task<IReadOnlyList<CandidatoRelease>> ObtenerContenidoAsync(
         int idRelease, CancellationToken cancellationToken = default)
     {
@@ -437,6 +480,12 @@ public class EntregaRepository(FabricaContexto fabrica, AuditContext auditoria)
     }
 
     private void MarcarMovimientoItem(TblWorkItem entidad)
+    {
+        entidad.UsuarioMovto = Auditoria.Usuario.Length > 50 ? Auditoria.Usuario[..50] : Auditoria.Usuario;
+        entidad.FechaMovto = DateTime.Now;
+    }
+
+    private void MarcarMovimientoArtefacto(TblArtefacto entidad)
     {
         entidad.UsuarioMovto = Auditoria.Usuario.Length > 50 ? Auditoria.Usuario[..50] : Auditoria.Usuario;
         entidad.FechaMovto = DateTime.Now;

@@ -2,12 +2,13 @@ import { useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import {
   Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
-  Divider, FormControl, InputLabel, LinearProgress, Link, MenuItem, Paper, Select,
-  Snackbar, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField,
-  Tooltip, Typography,
+  Divider, FormControl, FormControlLabel, IconButton, InputLabel, LinearProgress, Link,
+  MenuItem, Paper, Select, Snackbar, Stack, Switch, Table, TableBody, TableCell,
+  TableContainer, TableHead, TableRow, TextField, Tooltip, Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
@@ -16,10 +17,11 @@ import { EncabezadoOrdenable } from "../../shared/components/EncabezadoOrdenable
 import { useOrdenTabla } from "../../shared/hooks/useOrdenTabla";
 import {
   agregarArtefacto, agregarContenido, cambiarEstatusRelease, colorEstatusRelease,
-  crearRelease, generarNotas, obtenerMatrizAmbientes, obtenerRelease, obtenerReleases,
+  crearRelease, generarNotas, obtenerCandidatosContenido, obtenerCatalogosEntregas,
+  obtenerMatrizAmbientes, obtenerRelease, obtenerReleases, quitarArtefacto, quitarContenido,
   registrarDespliegue, resolverAprobacion,
 } from "../../shared/api/entregas";
-import { filtroInicial, obtenerBandeja, obtenerCatalogosBandeja } from "../../shared/api/workitems";
+import { obtenerCatalogosBandeja } from "../../shared/api/workitems";
 
 function formatearFecha(iso: string | null): string {
   if (!iso) return "-";
@@ -41,8 +43,12 @@ export function ReleasesPage() {
   const [idProyectoNuevo, setIdProyectoNuevo] = useState<number | "">("");
   const [version, setVersion] = useState("");
   const [seleccionados, setSeleccionados] = useState<number[]>([]);
+  const [idSprintFiltro, setIdSprintFiltro] = useState<number | "">("");
+  const [textoCandidatos, setTextoCandidatos] = useState("");
+  const [tipoCandidatos, setTipoCandidatos] = useState("");
+  const [ocultarBloqueados, setOcultarBloqueados] = useState(false);
   const [nombreArtefacto, setNombreArtefacto] = useState("");
-  const [idTipoArtefacto, setIdTipoArtefacto] = useState(1);
+  const [idTipoArtefacto, setIdTipoArtefacto] = useState<number | "">("");
   const [justificacion, setJustificacion] = useState("");
   const [idAmbiente, setIdAmbiente] = useState<number | "">("");
   const [esRollback, setEsRollback] = useState(false);
@@ -56,6 +62,9 @@ export function ReleasesPage() {
   const catalogos = useQuery({
     queryKey: ["catalogos-bandeja"], queryFn: obtenerCatalogosBandeja, staleTime: 5 * 60_000,
   });
+  const catalogosEntregas = useQuery({
+    queryKey: ["catalogos-entregas"], queryFn: obtenerCatalogosEntregas, staleTime: 5 * 60_000,
+  });
   const releases = useQuery({ queryKey: ["releases"], queryFn: () => obtenerReleases() });
   const actual = idRelease === "" ? releases.data?.[0]?.idRelease : (idRelease as number);
 
@@ -66,11 +75,32 @@ export function ReleasesPage() {
   });
 
   const candidatos = useQuery({
-    queryKey: ["candidatos", detalle.data?.idProyecto],
-    queryFn: () => obtenerBandeja({
-      ...filtroInicial, pageSize: 100, estatus: [6], idProyecto: detalle.data!.idProyecto,
-    }),
-    enabled: modalContenido && detalle.data !== undefined,
+    queryKey: ["candidatos-release", actual],
+    queryFn: () => obtenerCandidatosContenido(actual!),
+    enabled: modalContenido && actual !== undefined,
+  });
+
+  // El filtro por sprint se arma con los sprints que de verdad tienen candidatos: asi no
+  // hay que pedir el catalogo de sprints ni ofrecer opciones que no traerian nada. El id 0
+  // representa "terminados fuera de un sprint", que no tienen IdSprint.
+  const sprintsConCandidatos = [...new Map(
+    (candidatos.data ?? []).map((c) => [
+      c.idSprint ?? 0,
+      { id: c.idSprint, nombre: c.sprint ?? "Sin sprint" },
+    ]),
+  ).values()].sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+  const tiposConCandidatos = [...new Set((candidatos.data ?? []).map((c) => c.tipo))].sort();
+  const hayBloqueados = (candidatos.data ?? []).some((c) => c.hallazgosPendientes > 0);
+
+  const candidatosFiltrados = (candidatos.data ?? []).filter((c) => {
+    if (idSprintFiltro !== "" && (c.idSprint ?? 0) !== idSprintFiltro) return false;
+    if (tipoCandidatos && c.tipo !== tipoCandidatos) return false;
+    if (ocultarBloqueados && c.hallazgosPendientes > 0) return false;
+    const texto = textoCandidatos.trim().toLowerCase();
+    if (texto && !c.folio.toLowerCase().includes(texto)
+        && !c.titulo.toLowerCase().includes(texto)) return false;
+    return true;
   });
 
   const releasesFiltrados = (releases.data ?? []).filter((rel) => {
@@ -208,10 +238,22 @@ export function ReleasesPage() {
               <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", alignItems: "flex-start" }}>
                 {r.idEstatus === 1 && (
                   <>
-                    <Button size="small" variant="outlined" onClick={() => setModalContenido(true)}>
+                    <Button size="small" variant="outlined" onClick={() => {
+                      setIdSprintFiltro("");
+                      setTextoCandidatos("");
+                      setTipoCandidatos("");
+                      setOcultarBloqueados(false);
+                      setSeleccionados([]);
+                      setModalContenido(true);
+                    }}>
                       Agregar contenido
                     </Button>
-                    <Button size="small" variant="outlined" onClick={() => setModalArtefacto(true)}>
+                    <Button size="small" variant="outlined" onClick={() => {
+                      if (idTipoArtefacto === "") {
+                        setIdTipoArtefacto(catalogosEntregas.data?.tiposArtefacto[0]?.id ?? "");
+                      }
+                      setModalArtefacto(true);
+                    }}>
                       Agregar artefacto
                     </Button>
                     <Button size="small" variant="contained"
@@ -276,7 +318,17 @@ export function ReleasesPage() {
                     {item.folio}
                   </Link>
                   <Chip size="small" variant="outlined" label={item.tipo} sx={{ height: 18 }} />
-                  <Typography variant="body2" noWrap>{item.titulo}</Typography>
+                  <Typography variant="body2" noWrap sx={{ flex: 1 }}>{item.titulo}</Typography>
+                  {r.idEstatus === 1 && (
+                    <Tooltip title="Quitar del release">
+                      <IconButton size="small" disabled={enviando}
+                        onClick={() => void manejar(
+                          () => quitarContenido(r.idRelease, item.idWorkItem),
+                          "No se pudo quitar el elemento del release.")}>
+                        <DeleteOutlinedIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  )}
                 </Stack>
               ))}
 
@@ -305,6 +357,18 @@ export function ReleasesPage() {
                           {a.justificacionIrreversible && ` - ${a.justificacionIrreversible}`}
                         </Typography>
                       </TableCell>
+                      {r.idEstatus === 1 && (
+                        <TableCell align="right" sx={{ width: 40 }}>
+                          <Tooltip title="Quitar artefacto">
+                            <IconButton size="small" disabled={enviando}
+                              onClick={() => void manejar(
+                                () => quitarArtefacto(r.idRelease, a.idArtefacto),
+                                "No se pudo quitar el artefacto.")}>
+                              <DeleteOutlinedIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -444,19 +508,86 @@ export function ReleasesPage() {
 
       <Dialog open={modalContenido} onClose={() => setModalContenido(false)} fullWidth maxWidth="sm">
         <DialogTitle>Agregar contenido al release</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            Solo aparecen los elementos terminados del proyecto.
+        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
+          <Typography variant="body2" color="text.secondary">
+            Solo aparecen los elementos terminados del proyecto que todavia no estan en ningun
+            release, ordenados por folio.
           </Typography>
+
+          {/* Los filtros se arman con los propios candidatos: acotan la lista Y el boton de
+              seleccionar todo, que es lo que permite meter un sprint completo de un clic. */}
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+            <TextField size="small" label="Folio o titulo" value={textoCandidatos} sx={{ flex: 1 }}
+              onChange={(e) => setTextoCandidatos(e.target.value)} />
+            {sprintsConCandidatos.length > 0 && (
+              <FormControl size="small" sx={{ minWidth: 160 }}>
+                <InputLabel>Sprint</InputLabel>
+                <Select label="Sprint" value={idSprintFiltro}
+                  onChange={(e) => {
+                    const valor = e.target.value as number | "";
+                    setIdSprintFiltro(valor === "" ? "" : Number(valor));
+                    setSeleccionados([]);
+                  }}>
+                  <MenuItem value="">Todos los sprints</MenuItem>
+                  {sprintsConCandidatos.map((s) => (
+                    <MenuItem key={s.id ?? 0} value={s.id ?? 0}>{s.nombre}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
+            {tiposConCandidatos.length > 1 && (
+              <FormControl size="small" sx={{ minWidth: 140 }}>
+                <InputLabel>Tipo</InputLabel>
+                <Select label="Tipo" value={tipoCandidatos}
+                  onChange={(e) => { setTipoCandidatos(e.target.value); setSeleccionados([]); }}>
+                  <MenuItem value="">Todos los tipos</MenuItem>
+                  {tiposConCandidatos.map((t) => (
+                    <MenuItem key={t} value={t}>{t}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
+          </Stack>
+
+          {hayBloqueados && (
+            <FormControlLabel
+              control={<Switch size="small" checked={ocultarBloqueados}
+                onChange={(e) => { setOcultarBloqueados(e.target.checked); setSeleccionados([]); }} />}
+              label="Ocultar los que tienen hallazgos pendientes"
+              slotProps={{ typography: { variant: "body2" } }}
+            />
+          )}
+
           <ComboBuscableMultiple
             label="Elementos"
             resumenSimple
             value={seleccionados}
             onChange={(valores) => setSeleccionados(valores as number[])}
-            opciones={(candidatos.data?.items ?? []).map((item) => ({
-              valor: item.idWorkItem, etiqueta: `${item.folio} - ${item.titulo}`,
+            opciones={candidatosFiltrados.map((item) => ({
+              valor: item.idWorkItem,
+              etiqueta: item.hallazgosPendientes > 0
+                ? `${item.folio} - ${item.titulo} (hallazgos pendientes)`
+                : `${item.folio} - ${item.titulo}`,
             }))}
           />
+
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+            <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
+              {candidatosFiltrados.length} de {(candidatos.data ?? []).length} elemento(s)
+              {seleccionados.length > 0 && ` - ${seleccionados.length} seleccionado(s)`}
+            </Typography>
+            {candidatosFiltrados.length > 1 && (
+              <Button size="small"
+                onClick={() => setSeleccionados(candidatosFiltrados.map((i) => i.idWorkItem))}>
+                Seleccionar los {candidatosFiltrados.length}
+              </Button>
+            )}
+            {seleccionados.length > 0 && (
+              <Button size="small" color="inherit" onClick={() => setSeleccionados([])}>
+                Limpiar
+              </Button>
+            )}
+          </Stack>
         </DialogContent>
         <DialogActions>
           <Button color="error" onClick={() => setModalContenido(false)}>Cancelar</Button>
@@ -479,13 +610,12 @@ export function ReleasesPage() {
             <InputLabel>Tipo</InputLabel>
             <Select label="Tipo" value={idTipoArtefacto}
               onChange={(e) => setIdTipoArtefacto(Number(e.target.value))}>
-              <MenuItem value={1}>Paquete</MenuItem>
-              <MenuItem value={2}>Script SQL</MenuItem>
-              <MenuItem value={3}>Archivo de configuracion</MenuItem>
-              <MenuItem value={4}>Otro</MenuItem>
+              {(catalogosEntregas.data?.tiposArtefacto ?? []).map((t) => (
+                <MenuItem key={t.id} value={t.id}>{t.nombre}</MenuItem>
+              ))}
             </Select>
           </FormControl>
-          {idTipoArtefacto === 2 && (
+          {idTipoArtefacto === catalogosEntregas.data?.idTipoArtefactoScriptSql && (
             <TextField size="small" multiline minRows={2}
               label="Justificacion si no hay script de reversa"
               value={justificacion} onChange={(e) => setJustificacion(e.target.value)}
@@ -494,11 +624,12 @@ export function ReleasesPage() {
         </DialogContent>
         <DialogActions>
           <Button color="error" onClick={() => setModalArtefacto(false)}>Cancelar</Button>
-          <Button variant="contained" disabled={enviando || !nombreArtefacto.trim()}
+          <Button variant="contained"
+            disabled={enviando || !nombreArtefacto.trim() || idTipoArtefacto === ""}
             onClick={() => { setModalArtefacto(false); void manejar(
               () => agregarArtefacto(r!.idRelease, {
                 nombre: nombreArtefacto.trim(),
-                idTipoArtefacto,
+                idTipoArtefacto: idTipoArtefacto as number,
                 ordenEjecucion: null,
                 idArtefactoRollback: null,
                 justificacionIrreversible: justificacion.trim() || null,

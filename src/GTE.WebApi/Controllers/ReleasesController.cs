@@ -50,6 +50,15 @@ public class ReleasesController(IMediator mediator) : ControllerBase
         return Ok(ApiResponse<ReleaseDetalleResponse>.Exito(resultado, $"El release paso a {resultado.Estatus}."));
     }
 
+    /// <summary>Lo que puede entrar al release: terminados del proyecto y sin release todavia.</summary>
+    [HttpGet("releases/{id:int}/candidatos")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<CandidatoContenidoResponse>>>> ObtenerCandidatos(
+        int id, CancellationToken cancellationToken)
+    {
+        var resultado = await mediator.Send(new ObtenerCandidatosContenidoQuery(id), cancellationToken);
+        return Ok(ApiResponse<IReadOnlyList<CandidatoContenidoResponse>>.Exito(resultado));
+    }
+
     /// <summary>Agrega elementos terminados y sin hallazgos pendientes al release.</summary>
     [HttpPost("releases/{id:int}/items")]
     public async Task<ActionResult<ApiResponse<ReleaseDetalleResponse>>> AgregarContenido(
@@ -65,6 +74,14 @@ public class ReleasesController(IMediator mediator) : ControllerBase
     {
         await mediator.Send(new QuitarContenidoCommand(id, idWorkItem), cancellationToken);
         return Ok(ApiResponse<object>.Exito(new { }, "Elemento retirado del release."));
+    }
+
+    [HttpDelete("releases/{id:int}/artefactos/{idArtefacto:int}")]
+    public async Task<ActionResult<ApiResponse<object>>> QuitarArtefacto(
+        int id, int idArtefacto, CancellationToken cancellationToken)
+    {
+        await mediator.Send(new QuitarArtefactoCommand(id, idArtefacto), cancellationToken);
+        return Ok(ApiResponse<object>.Exito(new { }, "Artefacto retirado del release."));
     }
 
     [HttpPost("releases/{id:int}/artefactos")]
