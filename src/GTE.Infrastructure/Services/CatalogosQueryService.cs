@@ -167,7 +167,12 @@ public class CatalogosQueryService(FabricaContexto fabrica) : ICatalogosQuerySer
                 .OrderBy(t => t.Nombre)
                 .Select(t => new CatalogoItemResponse { Id = t.Id, Nombre = t.Nombre })
                 .ToListAsync(cancellationToken),
-            IdTipoArtefactoScriptSql = TipoArtefacto.ScriptSql
+            IdTipoArtefactoScriptSql = TipoArtefacto.ScriptSql,
+            TiposRespaldo = await contexto.TblTipoRespaldo.AsNoTracking()
+                .Where(t => t.Activo)
+                .OrderBy(t => t.Orden)
+                .Select(t => new CatalogoItemResponse { Id = t.Id, Nombre = t.Nombre })
+                .ToListAsync(cancellationToken)
         };
     }
 }

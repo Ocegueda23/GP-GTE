@@ -23,9 +23,15 @@ public partial class TblEquipo
 
     public bool Activo { get; set; }
 
+    public string? AmbitoCentroMando { get; set; }
+
     public virtual TblUsuario? IdLiderNavigation { get; set; }
 
+    public virtual ICollection<TblAlertaGestion> TblAlertaGestion { get; set; } = new List<TblAlertaGestion>();
+
     public virtual ICollection<TblEquipoMiembro> TblEquipoMiembro { get; set; } = new List<TblEquipoMiembro>();
+
+    public virtual ICollection<TblEvaluacionEquipo> TblEvaluacionEquipo { get; set; } = new List<TblEvaluacionEquipo>();
 
     public virtual ICollection<TblObjetivoOkr> TblObjetivoOkr { get; set; } = new List<TblObjetivoOkr>();
 

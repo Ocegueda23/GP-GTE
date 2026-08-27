@@ -15,6 +15,8 @@ public partial class TblRelease
 
     public string? NotasVersion { get; set; }
 
+    public string? InstruccionesImplementacion { get; set; }
+
     public int IdEstatusRelease { get; set; }
 
     public DateOnly? FechaPlan { get; set; }
@@ -42,6 +44,8 @@ public partial class TblRelease
     public virtual ICollection<TblIncidente> TblIncidente { get; set; } = new List<TblIncidente>();
 
     public virtual ICollection<TblReleaseArtefacto> TblReleaseArtefacto { get; set; } = new List<TblReleaseArtefacto>();
+
+    public virtual ICollection<TblReleaseRespaldo> TblReleaseRespaldo { get; set; } = new List<TblReleaseRespaldo>();
 
     public virtual ICollection<TblWorkItem> TblWorkItem { get; set; } = new List<TblWorkItem>();
 }

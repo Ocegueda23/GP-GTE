@@ -51,6 +51,14 @@ SOLO a este proyecto. No migrar sin decision del equipo.
 - El esquema de BD lo gobiernan los scripts idempotentes de DataBase/Scripts
   (nomenclatura y plantillas de InterfloClaude.md seccion 10); NO usar migraciones EF.
   Tras cada cambio de esquema: re-scaffold y revision de computadas/tipos.
+- Cada sesion de Claude Code que agregue scripts de esquema abre su propia carpeta
+  NN_Scripts consecutiva dentro de DataBase/Scripts (las que ya existen, 01_Libera y
+  02_Libera, no se renombran; la siguiente sesion que toque esquema crea 03_Scripts, no
+  le agrega scripts a 02_Libera). Dentro de la carpeta, los scripts individuales siguen
+  su propia numeracion y nomenclatura de siempre (NN_fecha_CATEGORIA_Objeto.sql). Motivo:
+  una carpeta que acumula lotes de sesiones distintas (02_Libera llego a 45 scripts de varios dias)
+  hace dificil saber si a un servidor le falto correr algo puntual -- ya paso (script 41
+  de tblCadenaAprobacionProyecto faltante en un servidor, ver Doctos/PENDIENTES.md).
 - Bajas: logicas (Activo = 0); borradores: hard delete. TRAMPA EF: el default de BD de
   las columnas bit (Activo DEFAULT 1) NO aplica de forma confiable en INSERTs de EF;
   toda alta fija Activo = true explicitamente en la entidad.

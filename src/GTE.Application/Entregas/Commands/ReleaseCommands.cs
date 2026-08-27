@@ -3,6 +3,7 @@ using GTE.Application.Common;
 using GTE.Application.DTOs.Request.Entregas;
 using GTE.Application.DTOs.Responses.Entregas;
 using GTE.Application.Interfaces;
+using GTE.Domain.Archivos;
 using GTE.Domain.Entregas;
 using GTE.Domain.Exceptions;
 using GTE.Domain.Interfaces;
@@ -262,6 +263,8 @@ public class AgregarArtefactoValidator : AbstractValidator<AgregarArtefactoComma
 /// </summary>
 public class AgregarArtefactoHandler(
     IEntregaRepository repositorio,
+    IArchivoRepository archivos,
+    ISanitizadorHtml sanitizador,
     IVerificadorPermisos permisos) : IRequestHandler<AgregarArtefactoCommand, int>
 {
     public async Task<int> Handle(AgregarArtefactoCommand command, CancellationToken cancellationToken)
@@ -276,10 +279,95 @@ public class AgregarArtefactoHandler(
             throw new BusinessException("Los artefactos solo se agregan mientras el release esta En Preparacion.");
         }
 
-        return await repositorio.AgregarArtefactoAsync(new ArtefactoNuevo(
+        var instrucciones = InstruccionesHtml.Limpiar(
+            sanitizador, command.Datos.InstruccionesImplementacion);
+
+        var idArtefacto = await repositorio.AgregarArtefactoAsync(new ArtefactoNuevo(
             command.IdRelease, command.Datos.Nombre.Trim(), command.Datos.IdTipoArtefacto,
             command.Datos.HashSha256, command.Datos.OrdenEjecucion,
-            command.Datos.IdArtefactoRollback, command.Datos.JustificacionIrreversible), cancellationToken);
+            command.Datos.IdArtefactoRollback, command.Datos.JustificacionIrreversible,
+            instrucciones), cancellationToken);
+
+        // Las imagenes pegadas en el instructivo se subieron en borrador; se adjuntan al
+        // release (no al artefacto: el adjunto vive a nivel de la entrega, y sin vinculo
+        // el job de purga las borraria por huerfanas).
+        await archivos.VincularBorradoresAsync(
+            "Release", command.IdRelease, ReferenciasImagenes.ObtenerGuids(instrucciones), cancellationToken);
+
+        return idArtefacto;
+    }
+}
+
+/* ---------- Instrucciones de implementacion ---------- */
+
+/// <summary>
+/// Instructivo de despliegue en HTML enriquecido, tanto del release como de cada artefacto.
+/// Es opcional: un editor "vacio" no manda cadena vacia sino marcado suelto (&lt;p&gt;&lt;/p&gt;),
+/// asi que lo que queda sin texto ni imagenes se guarda como NULL en vez de ensuciar el
+/// reporte impreso con un bloque en blanco.
+/// </summary>
+public static class InstruccionesHtml
+{
+    public static string? Limpiar(ISanitizadorHtml sanitizador, string? html)
+    {
+        if (string.IsNullOrWhiteSpace(html))
+        {
+            return null;
+        }
+
+        var limpio = sanitizador.Sanitizar(html);
+        var soloTexto = System.Text.RegularExpressions.Regex.Replace(limpio, "<[^>]*>", string.Empty);
+        var traeImagen = limpio.Contains("<img", StringComparison.OrdinalIgnoreCase);
+        var traeTabla = limpio.Contains("<table", StringComparison.OrdinalIgnoreCase);
+
+        return string.IsNullOrWhiteSpace(soloTexto) && !traeImagen && !traeTabla ? null : limpio;
+    }
+}
+
+public record ActualizarInstruccionesCommand(int IdRelease, ActualizarInstruccionesRequest Datos)
+    : IRequest<ReleaseDetalleResponse>;
+
+/// <summary>
+/// Instructivo de despliegue del release en HTML enriquecido (formato, tablas e imagenes
+/// pegadas). Solo se edita mientras el release esta En Preparacion: a partir de En Aprobacion
+/// las firmas se dan sobre un instructivo concreto -- el mismo que sale impreso en la
+/// Solicitud de despliegue -- y cambiarlo despues las invalidaria en silencio, igual que
+/// pasa con el contenido y los artefactos.
+/// </summary>
+public class ActualizarInstruccionesHandler(
+    IEntregaRepository repositorio,
+    IEntregaQueryService consultas,
+    IArchivoRepository archivos,
+    ISanitizadorHtml sanitizador,
+    IVerificadorPermisos permisos) : IRequestHandler<ActualizarInstruccionesCommand, ReleaseDetalleResponse>
+{
+    public async Task<ReleaseDetalleResponse> Handle(
+        ActualizarInstruccionesCommand command, CancellationToken cancellationToken)
+    {
+        var release = await repositorio.ObtenerEstadoAsync(command.IdRelease, cancellationToken)
+            ?? throw new NotFoundException("Release", command.IdRelease);
+
+        await permisos.ExigirPermisoAsync(PermisosEntregas.Crear, release.IdProyecto, cancellationToken);
+
+        if (release.IdEstatus != EstatusRelease.EnPreparacion)
+        {
+            throw new BusinessException(
+                "Las instrucciones de implementacion solo se editan mientras el release esta En Preparacion.");
+        }
+
+        var instrucciones = InstruccionesHtml.Limpiar(
+            sanitizador, command.Datos.InstruccionesImplementacion);
+
+        await repositorio.ActualizarInstruccionesAsync(
+            command.IdRelease, instrucciones, cancellationToken);
+
+        // Imagenes pegadas en el instructivo: se subieron en borrador y sin este vinculo el
+        // job de purga las borraria por huerfanas.
+        await archivos.VincularBorradoresAsync(
+            "Release", command.IdRelease, ReferenciasImagenes.ObtenerGuids(instrucciones), cancellationToken);
+
+        return await consultas.ObtenerDetalleAsync(command.IdRelease, cancellationToken)
+            ?? throw new NotFoundException("Release", command.IdRelease);
     }
 }
 
@@ -314,6 +402,80 @@ public class QuitarArtefactoHandler(
             throw new BusinessException(
                 $"No se puede quitar: es el script de reversa de \"{dependiente}\". "
                 + "Quita primero ese artefacto o cambiale la reversa.");
+        }
+
+        return Unit.Value;
+    }
+}
+
+/* ---------- Respaldos previos al despliegue ---------- */
+
+public record AgregarRespaldoCommand(int IdRelease, RespaldoAgregarRequest Datos) : IRequest<int>;
+
+public class AgregarRespaldoValidator : AbstractValidator<AgregarRespaldoCommand>
+{
+    public AgregarRespaldoValidator()
+    {
+        RuleFor(c => c.IdRelease).GreaterThan(0);
+        RuleFor(c => c.Datos.IdTipoRespaldo).GreaterThan(0);
+        RuleFor(c => c.Datos.Descripcion)
+            .NotEmpty().WithMessage("Hay que decir que se respalda (nombre o ubicacion exacta).")
+            .MaximumLength(500);
+    }
+}
+
+/// <summary>
+/// Alta de un respaldo previo al despliegue. Misma ventana que los artefactos: solo En
+/// Preparacion, porque a partir de En Aprobacion las firmas se dieron sobre una lista
+/// concreta de respaldos.
+/// </summary>
+public class AgregarRespaldoHandler(
+    IEntregaRepository repositorio,
+    IVerificadorPermisos permisos) : IRequestHandler<AgregarRespaldoCommand, int>
+{
+    public async Task<int> Handle(AgregarRespaldoCommand command, CancellationToken cancellationToken)
+    {
+        var release = await repositorio.ObtenerEstadoAsync(command.IdRelease, cancellationToken)
+            ?? throw new NotFoundException("Release", command.IdRelease);
+
+        await permisos.ExigirPermisoAsync(PermisosEntregas.Crear, release.IdProyecto, cancellationToken);
+
+        if (release.IdEstatus != EstatusRelease.EnPreparacion)
+        {
+            throw new BusinessException(
+                "Los respaldos solo se agregan mientras el release esta En Preparacion.");
+        }
+
+        return await repositorio.AgregarRespaldoAsync(new RespaldoNuevo(
+            command.IdRelease, command.Datos.IdTipoRespaldo, command.Datos.Descripcion.Trim()),
+            cancellationToken);
+    }
+}
+
+public record QuitarRespaldoCommand(int IdRelease, int IdRespaldo) : IRequest<Unit>;
+
+public class QuitarRespaldoHandler(
+    IEntregaRepository repositorio,
+    IVerificadorPermisos permisos) : IRequestHandler<QuitarRespaldoCommand, Unit>
+{
+    public async Task<Unit> Handle(QuitarRespaldoCommand command, CancellationToken cancellationToken)
+    {
+        var release = await repositorio.ObtenerEstadoAsync(command.IdRelease, cancellationToken)
+            ?? throw new NotFoundException("Release", command.IdRelease);
+
+        await permisos.ExigirPermisoAsync(PermisosEntregas.Crear, release.IdProyecto, cancellationToken);
+
+        if (release.IdEstatus != EstatusRelease.EnPreparacion)
+        {
+            throw new BusinessException(
+                "Los respaldos solo se quitan mientras el release esta En Preparacion.");
+        }
+
+        var quitado = await repositorio.QuitarRespaldoAsync(
+            command.IdRelease, command.IdRespaldo, cancellationToken);
+        if (!quitado)
+        {
+            throw new NotFoundException("Respaldo del release", command.IdRespaldo);
         }
 
         return Unit.Value;

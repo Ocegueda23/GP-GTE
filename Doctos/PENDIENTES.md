@@ -3,7 +3,105 @@
 > Documento de continuidad. Sirve para retomar el proyecto en otra sesión sin
 > contexto previo. Actualizar al cerrar cada bloque de trabajo.
 >
-> **Última actualización:** 2026-08-26 (**Versionado manual estándar Interflo, diagnóstico
+> **Última actualización:** 2026-08-27 (**Centro de Mando TI** — módulo nuevo: evaluación
+> mensual de los responsables de área con diagnóstico de causa raíz y alertas gerenciales.
+> Verificado end-to-end contra la BD de desarrollo; **falta probar en un ambiente real y
+> escribir pruebas automatizadas**.)
+>
+> **Qué es y por qué no duplica lo que ya había.** GTE ya tenía dos dashboards ejecutivos:
+> el P18 (`IndicadoresEjecutivosQueryService`, equipo/proyecto: DORA, costo, OKR) y el de
+> colaborador individual (`DashboardQueryService`, 6 dimensiones por persona). Ninguno de
+> los dos evalúa **áreas**. Este módulo mide al **responsable de un área** (Desarrollo,
+> Infraestructura, Soporte) y, sobre todo, responde *por qué* un score está bajo. La unidad
+> de evaluación es `tblEquipo` y el responsable evaluado es su `IdLider` (decisión del
+> equipo el 2026-08-27; se descartó `tblArea` porque no tiene responsable).
+>
+> **Lo que lo hace distinto de un contador de tickets** (y lo que no hay que romper al
+> tocarlo):
+> - **Diagnóstico de causa raíz** (`DiagnosticoCausaRaiz` en Domain): antes de atribuir un
+>   score bajo a la persona se revisan 6 índices (espera, cambio de prioridad, alcance
+>   inestable, carga, trabajo manual, dependencia única). `Persona` es el diagnóstico **por
+>   descarte**, nunca el primero. Un índice en `null` (no medido) NO es lo mismo que dentro
+>   de umbral: sin ningún índice con dato, el hallazgo es "falta instrumentación", que es
+>   problema de gerencia, no del evaluado.
+> - **Piso de cobertura** (`CalculadoraCentroMando.CoberturaMinima`, 40%): con menos del 40%
+>   de indicadores con dato NO se publica score, se publica `SinDatosSuficientes` y se
+>   nombra qué falta capturar. **Esto se agregó porque la primera verificación real dio
+>   "100/100 Excelente" con 2 indicadores de 27** — exactamente el número engañoso que el
+>   modelo existe para evitar. No quitarlo.
+> - **Regla de piso del IT Health Score** (`CalculadoraSaludTi.TopeConRojo`, 79): si
+>   Seguridad/continuidad o el score de cualquier responsable está en rojo, el score global
+>   se topa en 79 y dice por qué. Impide que un área excelente disfrace una crítica.
+> - **Origen `Manual` vs `Automatico`** en el catálogo: los indicadores sin fuente en GTE
+>   (respaldos, cobertura de monitoreo, deuda técnica…) se reportan "sin datos" y quedan
+>   fuera del score, nunca se les inventa un valor. Misma disciplina que el P18 con DORA
+>   "Lead Time for Changes".
+>
+> **Esquema** (`DataBase/Scripts/03_Scripts/`, carpeta nueva de esta sesión): `01` permiso
+> `AYU.CentroMando`; `02` las 5 tablas (`tblIndicadorGestion`, `tblEvaluacionEquipo`,
+> `tblEvaluacionEquipoDetalle`, `tblDiagnosticoCausa`, `tblAlertaGestion`) + permisos
+> `GES.Ver`/`GES.Administrar`; `03` siembra los **50 indicadores** (16 comunes + 11
+> Desarrollo + 13 Infraestructura + 10 Soporte, pesos verificados en 100 por ámbito); `04`
+> `tblEquipo.AmbitoCentroMando`. Se crearon tablas nuevas y NO se extendió
+> `tblKpiDefinicion`/`tblKpiValor` a propósito: esas ya tienen dueño (widget de KPIs
+> personalizados del P18, alimentado por `spSnapshotKpi`) y meterles categoría/umbral/peso
+> ensuciaría ese widget.
+>
+> **El score de un responsable** = 60% bloque común + 40% bloque técnico de su área, con los
+> pesos re-normalizados sobre los indicadores que sí tienen dato. Normalización: 100 en la
+> meta, 50 en el umbral, lineal y recortada a [0,100] — funciona igual para indicadores que
+> suben y que bajan, y permite promediar unidades incompatibles. El **semáforo se decide
+> contra el valor crudo**, no contra el normalizado, para que "verde" signifique literalmente
+> "cumplió la meta".
+>
+> **Ayuda:** el documento "Centro de Mando TI" (modelo completo, 16 secciones) se sirve por
+> `GET /api/v1/ayuda/centro-mando-ti`, que **exige `AYU.CentroMando`**. Vive en
+> `src/GTE.WebApi/Contenido/Ayuda/`, NO en `wwwroot`, justamente para que no sea legible por
+> quien adivine la URL (el Manual de usuario sí es estático y para todos). El front lo baja
+> autenticado y lo muestra desde un blob. Verificado: 401 sin token, 403 sin el permiso, 200
+> con admin.
+>
+> **Verificado end-to-end** contra `ALIEN\SQLEXPRESS01`/`bdsGTE` con datos de prueba
+> sembrados (20 tickets, 12 WorkItems, 2 incidentes de julio 2026): recálculo de los 3
+> equipos, score de Soporte 71.7 con SLA 70% en rojo y retrabajo 16.7% en rojo, diagnóstico
+> `Dependencia` por índice de espera 23.3%, 3 alertas (2 críticas + 1 con
+> `RequiereGerencia`), y las tres pantallas renderizando. **Hueco encontrado y corregido en
+> la verificación**: el recálculo manual no regeneraba alertas (solo el job de Hangfire lo
+> hacía), así que el tablero se quedaba con alertas de una evaluación ya sobrescrita.
+>
+> **Pendiente real de este módulo:**
+> - **Pruebas automatizadas** (no se escribió ninguna): `CalculadoraCentroMando.Normalizar`
+>   y `DiagnosticoCausaRaiz.Diagnosticar` son lógica pura y son el candidato obvio para
+>   `GTE.Domain.Tests`.
+> - **`com.productividad` NO sirve hasta calibrarlo**: "puntos por hora de capacidad" depende
+>   de cómo estime puntos cada equipo, no hay meta universal. Los valores sembrados (0.10 /
+>   0.05) son un arranque conservador, no una meta con respaldo.
+> - Los 4 índices de diagnóstico sin fuente (`AlcanceInestable`, `TrabajoManual`,
+>   `DependenciaUnica`, y `CambioPrioridad` que hoy es un proxy por `tblHistorialCampo`)
+>   necesitan captura nueva para que el modelo descarte causas con evidencia real.
+> - Los 3 equipos de la BD de desarrollo quedaron con líder y ámbito **de prueba**
+>   (`Desarrollador`→Desarrollo, `Soporte`→Soporte, `QA`→Infraestructura), y hay usuarios y
+>   datos `prueba-claude`/`TST-*`/`WIT-*`/`INT-*` sembrados. Revisar antes de usar esa base
+>   para otra cosa.
+>
+> **TRAMPA DE ENTORNO (esta máquina)**: el repo vive en una carpeta sincronizada de Google
+> Drive (`G:\Otros ordenadores\...`) y su driver mantiene mapeados en memoria los `.exe` y
+> DLL de `bin\`. Se manifiesta como `CreateAppHost` fallando con "sección asignada a usuario
+> abierta" o `MSB3021 Access denied` al copiar dependencias, **sin que haya nada mal en el
+> código**. Rodeos que funcionaron: `dotnet build -p:UseAppHost=false` para verificar
+> compilación, y `dotnet publish -o <carpeta fuera de Drive>` para poder ejecutar. Ojo
+> también: un `git checkout` sobre `Modelos/bdsGTE` puede pisar trabajo sin commitear y el
+> sync puede restaurar archivos por su cuenta — verificar `git status` después.
+>
+> **OJO con el re-scaffold**: `dotnet ef dbcontext scaffold` contra la BD de desarrollo trae
+> las tablas de Hangfire (`Job`, `Server`, `State`…) y las vistas `vwBI*`, que **no** estaban
+> en el modelo commiteado, y además reporta diferencias en ~29 modelos no relacionados (el
+> scaffold commiteado está desincronizado con esa base). En esta sesión se revirtió el
+> scaffold completo y se aplicaron a mano solo las 5 entidades nuevas, la columna de
+> `tblEquipo` y sus bloques de `OnModelCreating`. **Conviene reconciliar ese desfase en una
+> sesión dedicada**, no de pasada.
+>
+> **Actualización anterior:** 2026-08-26 (**Versionado manual estándar Interflo, diagnóstico
 > del almacén de archivos y ajustes de Releases** — fusionado a `main` en el merge commit
 > `5108700`, PR #1, y **ya desplegado y probado en producción por el usuario**. El PR
 > arrastró además 6 commits de sesiones anteriores que nunca habían llegado a `main`.)

@@ -47,6 +47,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Documentos de ayuda que exigen permiso (AyudaController): viven junto al binario,
+         NO en wwwroot, porque un archivo estatico seria legible por cualquiera que adivine
+         la URL. ProveedorDocumentosAyuda los lee desde AppContext.BaseDirectory. -->
+    <Content Include="Contenido\Ayuda\*.html" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\GTE.Application\GTE.Application.csproj" />
     <ProjectReference Include="..\GTE.Infrastructure\GTE.Infrastructure.csproj" />
   </ItemGroup>

@@ -147,9 +147,10 @@ export function BacklogPage() {
     try {
       const { mensaje } = await accion();
       setAviso({ tipo: "success", mensaje });
-      await refrescar();
     } catch (error) {
       setAviso({ tipo: "error", mensaje: error instanceof ErrorApi ? error.message : respaldo });
+    } finally {
+      await refrescar();
     }
   };
 

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link as RouterLink } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
 import {
   Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
   Divider, FormControl, FormControlLabel, IconButton, InputLabel, LinearProgress, Link,
@@ -9,17 +9,21 @@ import {
 import AddIcon from "@mui/icons-material/Add";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
+import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
 import { ComboBuscable, ComboBuscableMultiple } from "../../shared/components/ComboBuscable";
 import { EncabezadoOrdenable } from "../../shared/components/EncabezadoOrdenable";
 import { useOrdenTabla } from "../../shared/hooks/useOrdenTabla";
+import { ContenidoEnriquecido } from "../../shared/editor/ContenidoEnriquecido";
+import { EditorEnriquecido } from "../../shared/editor/EditorEnriquecido";
 import {
+  actualizarInstrucciones,
   agregarArtefacto, agregarContenido, cambiarEstatusRelease, colorEstatusRelease,
   crearRelease, generarNotas, obtenerCandidatosContenido, obtenerCatalogosEntregas,
   obtenerMatrizAmbientes, obtenerRelease, obtenerReleases, quitarArtefacto, quitarContenido,
-  registrarDespliegue, resolverAprobacion,
+  agregarRespaldo, quitarRespaldo, registrarDespliegue, resolverAprobacion,
 } from "../../shared/api/entregas";
 import { obtenerCatalogosBandeja } from "../../shared/api/workitems";
 
@@ -36,6 +40,7 @@ export function ReleasesPage() {
   const [modalNuevo, setModalNuevo] = useState(false);
   const [modalContenido, setModalContenido] = useState(false);
   const [modalArtefacto, setModalArtefacto] = useState(false);
+  const [modalRespaldo, setModalRespaldo] = useState(false);
   const [modalDespliegue, setModalDespliegue] = useState(false);
   const [modalRechazo, setModalRechazo] = useState<number | null>(null);
   const [modalReabrir, setModalReabrir] = useState(false);
@@ -50,6 +55,11 @@ export function ReleasesPage() {
   const [nombreArtefacto, setNombreArtefacto] = useState("");
   const [idTipoArtefacto, setIdTipoArtefacto] = useState<number | "">("");
   const [justificacion, setJustificacion] = useState("");
+  const [instruccionesArtefacto, setInstruccionesArtefacto] = useState("");
+  const [idTipoRespaldo, setIdTipoRespaldo] = useState<number | "">("");
+  const [descripcionRespaldo, setDescripcionRespaldo] = useState("");
+  const [instrucciones, setInstrucciones] = useState("");
+  const [releaseInstrucciones, setReleaseInstrucciones] = useState<number | null>(null);
   const [idAmbiente, setIdAmbiente] = useState<number | "">("");
   const [esRollback, setEsRollback] = useState(false);
   const [bitacora, setBitacora] = useState("");
@@ -58,6 +68,7 @@ export function ReleasesPage() {
   const [busquedaMatriz, setBusquedaMatriz] = useState("");
   const [busquedaReleases, setBusquedaReleases] = useState("");
   const clienteQuery = useQueryClient();
+  const navegar = useNavigate();
 
   const catalogos = useQuery({
     queryKey: ["catalogos-bandeja"], queryFn: obtenerCatalogosBandeja, staleTime: 5 * 60_000,
@@ -135,7 +146,6 @@ export function ReleasesPage() {
     try {
       const { mensaje } = await accion();
       setAviso({ tipo: "success", mensaje });
-      await refrescar();
     } catch (error) {
       if (error instanceof ErrorApi) {
         const d = error.detalle as Record<string, string[]> | undefined;
@@ -150,12 +160,22 @@ export function ReleasesPage() {
         setAviso({ tipo: "error", mensaje: respaldo });
       }
     } finally {
+      await refrescar();
       setEnviando(false);
     }
   };
 
   const r = detalle.data;
   const artefactosIncompletos = r?.artefactos.filter((a) => !a.cumpleRollback) ?? [];
+
+  // El editor de instrucciones es un borrador local: se recarga solo al cambiar de release,
+  // no en cada refresco del detalle -- si no, lo que el usuario lleva escrito se perderia
+  // cada vez que otra accion de la pantalla invalida la consulta.
+  useEffect(() => {
+    if (!r || r.idRelease === releaseInstrucciones) return;
+    setInstrucciones(r.instruccionesImplementacion ?? "");
+    setReleaseInstrucciones(r.idRelease);
+  }, [r, releaseInstrucciones]);
 
   return (
     <Box sx={{ p: 2 }}>
@@ -256,6 +276,14 @@ export function ReleasesPage() {
                     }}>
                       Agregar artefacto
                     </Button>
+                    <Button size="small" variant="outlined" onClick={() => {
+                      if (idTipoRespaldo === "") {
+                        setIdTipoRespaldo(catalogosEntregas.data?.tiposRespaldo[0]?.id ?? "");
+                      }
+                      setModalRespaldo(true);
+                    }}>
+                      Agregar respaldo
+                    </Button>
                     <Button size="small" variant="contained"
                       onClick={() => void manejar(
                         () => cambiarEstatusRelease(r.idRelease, "SOLICITAR_APROBACION"),
@@ -273,6 +301,15 @@ export function ReleasesPage() {
                   <Button size="small" color="warning" variant="outlined"
                     onClick={() => setModalReabrir(true)}>
                     Reabrir
+                  </Button>
+                )}
+                {/* A partir de En Aprobacion el contenido, los artefactos y el instructivo
+                    ya no se pueden mover: hasta entonces el reporte imprimiria algo que
+                    todavia va a cambiar. */}
+                {r.idEstatus !== 1 && (
+                  <Button size="small" variant="outlined" startIcon={<DescriptionOutlinedIcon />}
+                    onClick={() => navegar(`/releases/${r.idRelease}/solicitud`)}>
+                    Solicitud de despliegue
                   </Button>
                 )}
                 <Button size="small" onClick={() => void manejar(
@@ -297,6 +334,38 @@ export function ReleasesPage() {
                 <Typography variant="subtitle2">Notas de version</Typography>
                 <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>{r.notasVersion}</Typography>
               </Box>
+            )}
+          </Paper>
+
+          <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+              Instrucciones de implementacion
+            </Typography>
+            {r.idEstatus === 1 ? (
+              <>
+                <EditorEnriquecido
+                  soportaTablas
+                  minHeight={200}
+                  value={instrucciones}
+                  onChange={setInstrucciones}
+                  placeholder="Que tiene que hacer quien despliega: respaldos, orden de ejecucion, rutas destino, validaciones. Se puede pegar una tabla de Excel o una imagen."
+                  onError={(mensaje) => setAviso({ tipo: "error", mensaje })}
+                />
+                <Stack direction="row" spacing={1} sx={{ mt: 1, justifyContent: "flex-end" }}>
+                  <Button size="small" variant="contained" disabled={enviando}
+                    onClick={() => void manejar(
+                      () => actualizarInstrucciones(r.idRelease, instrucciones),
+                      "No se pudieron guardar las instrucciones.")}>
+                    Guardar instrucciones
+                  </Button>
+                </Stack>
+              </>
+            ) : r.instruccionesImplementacion ? (
+              <ContenidoEnriquecido html={r.instruccionesImplementacion} />
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                Este release se mando a aprobacion sin instrucciones de implementacion.
+              </Typography>
             )}
           </Paper>
 
@@ -356,6 +425,11 @@ export function ReleasesPage() {
                           {a.nombreRollback && ` - reversa: ${a.nombreRollback}`}
                           {a.justificacionIrreversible && ` - ${a.justificacionIrreversible}`}
                         </Typography>
+                        {a.instruccionesImplementacion && (
+                          <Box sx={{ mt: 0.5, pl: 1, borderLeft: "2px solid", borderColor: "divider" }}>
+                            <ContenidoEnriquecido html={a.instruccionesImplementacion} />
+                          </Box>
+                        )}
                       </TableCell>
                       {r.idEstatus === 1 && (
                         <TableCell align="right" sx={{ width: 40 }}>
@@ -364,6 +438,41 @@ export function ReleasesPage() {
                               onClick={() => void manejar(
                                 () => quitarArtefacto(r.idRelease, a.idArtefacto),
                                 "No se pudo quitar el artefacto.")}>
+                              <DeleteOutlinedIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              <Divider sx={{ my: 2 }} />
+
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+                Respaldos previos ({r.respaldos.length})
+              </Typography>
+              {r.respaldos.length === 0 && (
+                <Typography variant="caption" color="text.secondary">
+                  Sin respaldos capturados. Se necesita al menos uno para solicitar la aprobacion.
+                </Typography>
+              )}
+              <Table size="small">
+                <TableBody>
+                  {r.respaldos.map((rp) => (
+                    <TableRow key={rp.idReleaseRespaldo}>
+                      <TableCell>
+                        <Typography variant="body2">{rp.descripcion}</Typography>
+                        <Typography variant="caption" color="text.secondary">{rp.tipo}</Typography>
+                      </TableCell>
+                      {r.idEstatus === 1 && (
+                        <TableCell align="right" sx={{ width: 40 }}>
+                          <Tooltip title="Quitar respaldo">
+                            <IconButton size="small" disabled={enviando}
+                              onClick={() => void manejar(
+                                () => quitarRespaldo(r.idRelease, rp.idReleaseRespaldo),
+                                "No se pudo quitar el respaldo.")}>
                               <DeleteOutlinedIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
@@ -601,7 +710,7 @@ export function ReleasesPage() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={modalArtefacto} onClose={() => setModalArtefacto(false)} fullWidth maxWidth="sm">
+      <Dialog open={modalArtefacto} onClose={() => setModalArtefacto(false)} fullWidth maxWidth="md">
         <DialogTitle>Agregar artefacto</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
           <TextField size="small" required label="Nombre del archivo" value={nombreArtefacto}
@@ -621,6 +730,15 @@ export function ReleasesPage() {
               value={justificacion} onChange={(e) => setJustificacion(e.target.value)}
               helperText="Un script SQL necesita reversa o esta justificacion para poder aprobarse" />
           )}
+          <EditorEnriquecido
+            soportaTablas
+            minHeight={160}
+            label="Instrucciones de implementacion (opcional)"
+            value={instruccionesArtefacto}
+            onChange={setInstruccionesArtefacto}
+            placeholder="Como se aplica este objeto en particular: base destino, ruta, accion, validaciones. Admite tablas e imagenes."
+            onError={(mensaje) => setAviso({ tipo: "error", mensaje })}
+          />
         </DialogContent>
         <DialogActions>
           <Button color="error" onClick={() => setModalArtefacto(false)}>Cancelar</Button>
@@ -633,8 +751,53 @@ export function ReleasesPage() {
                 ordenEjecucion: null,
                 idArtefactoRollback: null,
                 justificacionIrreversible: justificacion.trim() || null,
-              }).then((res) => { setNombreArtefacto(""); setJustificacion(""); return res; }),
+                instruccionesImplementacion: instruccionesArtefacto || null,
+              }).then((res) => {
+                setNombreArtefacto("");
+                setJustificacion("");
+                setInstruccionesArtefacto("");
+                return res;
+              }),
               "No se pudo agregar el artefacto."); }}>
+            Agregar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Respaldos previos: que se respalda antes de tocar produccion. El gate de
+          SOLICITAR_APROBACION exige al menos uno, porque es un apartado propio de la
+          Solicitud de despliegue que se manda a firmar. */}
+      <Dialog open={modalRespaldo} onClose={() => setModalRespaldo(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Agregar respaldo</DialogTitle>
+        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
+          <FormControl size="small" fullWidth>
+            <InputLabel>Tipo</InputLabel>
+            <Select label="Tipo" value={idTipoRespaldo}
+              onChange={(e) => setIdTipoRespaldo(Number(e.target.value))}>
+              {(catalogosEntregas.data?.tiposRespaldo ?? []).map((t) => (
+                <MenuItem key={t.id} value={t.id}>{t.nombre}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <TextField size="small" required multiline minRows={2}
+            label="Nombre o ubicacion exacta"
+            helperText="Ejemplo: bdsGTE, Servicio GTE.WebApi, https://gte.interflo, C:\inetpub\gte"
+            value={descripcionRespaldo}
+            onChange={(e) => setDescripcionRespaldo(e.target.value)} />
+        </DialogContent>
+        <DialogActions>
+          <Button color="error" onClick={() => setModalRespaldo(false)}>Cancelar</Button>
+          <Button variant="contained"
+            disabled={enviando || !descripcionRespaldo.trim() || idTipoRespaldo === ""}
+            onClick={() => { setModalRespaldo(false); void manejar(
+              () => agregarRespaldo(r!.idRelease, {
+                idTipoRespaldo: idTipoRespaldo as number,
+                descripcion: descripcionRespaldo.trim(),
+              }).then((res) => {
+                setDescripcionRespaldo("");
+                return res;
+              }),
+              "No se pudo agregar el respaldo."); }}>
             Agregar
           </Button>
         </DialogActions>
@@ -704,8 +867,8 @@ export function ReleasesPage() {
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
             El release regresa a preparacion para agregar contenido o artefactos. Esto invalida
-            las firmas ya puestas: al volver a solicitar aprobacion, QA/Lider/Negocio deben firmar
-            de nuevo.
+            las firmas ya puestas: al volver a solicitar aprobacion, toda la cadena de firmantes
+            debe firmar de nuevo.
           </Typography>
           <TextField autoFocus fullWidth multiline minRows={2} margin="dense"
             label="Motivo de la reapertura (obligatorio)"

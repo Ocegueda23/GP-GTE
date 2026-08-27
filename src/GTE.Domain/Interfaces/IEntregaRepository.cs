@@ -13,6 +13,10 @@ public interface IEntregaRepository
 
     Task ActualizarNotasAsync(int idRelease, string notas, CancellationToken cancellationToken = default);
 
+    /// <summary>Instructivo de despliegue del release en HTML enriquecido; nulo lo limpia.</summary>
+    Task ActualizarInstruccionesAsync(
+        int idRelease, string? instrucciones, CancellationToken cancellationToken = default);
+
     Task AplicarEfectosTransicionAsync(int idRelease, string accion, CancellationToken cancellationToken = default);
 
     /// <summary>Marca la fecha de liberacion al desplegar a produccion.</summary>
@@ -41,6 +45,17 @@ public interface IEntregaRepository
         int idRelease, int idArtefacto, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<ArtefactoRelease>> ObtenerArtefactosAsync(int idRelease, CancellationToken cancellationToken = default);
+
+    /* Respaldos previos al despliegue */
+
+    Task<int> AgregarRespaldoAsync(RespaldoNuevo datos, CancellationToken cancellationToken = default);
+
+    /// <summary>Baja logica del respaldo. Devuelve false si no pertenece al release.</summary>
+    Task<bool> QuitarRespaldoAsync(
+        int idRelease, int idRespaldo, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<RespaldoRelease>> ObtenerRespaldosAsync(
+        int idRelease, CancellationToken cancellationToken = default);
 
     /* Aprobaciones */
 

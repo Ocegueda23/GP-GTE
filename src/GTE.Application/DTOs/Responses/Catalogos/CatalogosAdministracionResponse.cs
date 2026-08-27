@@ -28,4 +28,7 @@ public class CatalogosEntregasResponse
     /// la justificacion de irreversibilidad, y asi no clava el 2 a mano.
     /// </summary>
     public int IdTipoArtefactoScriptSql { get; set; }
+
+    /// <summary>Tipos de respaldo previos al despliegue (base de datos, servicio, sitio...).</summary>
+    public List<CatalogoItemResponse> TiposRespaldo { get; set; } = [];
 }

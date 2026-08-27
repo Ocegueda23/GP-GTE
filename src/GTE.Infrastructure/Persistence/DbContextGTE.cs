@@ -20,6 +20,8 @@ public partial class DbContextGTE : DbContext
 
     public virtual DbSet<TblArchivoVinculo> TblArchivoVinculo { get; set; }
 
+    public virtual DbSet<TblAlertaGestion> TblAlertaGestion { get; set; }
+
     public virtual DbSet<TblArea> TblArea { get; set; }
 
     public virtual DbSet<TblArtefacto> TblArtefacto { get; set; }
@@ -80,6 +82,8 @@ public partial class DbContextGTE : DbContext
 
     public virtual DbSet<TblDespliegue> TblDespliegue { get; set; }
 
+    public virtual DbSet<TblDiagnosticoCausa> TblDiagnosticoCausa { get; set; }
+
     public virtual DbSet<TblDiaFestivo> TblDiaFestivo { get; set; }
 
     public virtual DbSet<TblEjecucionPrueba> TblEjecucionPrueba { get; set; }
@@ -89,6 +93,10 @@ public partial class DbContextGTE : DbContext
     public virtual DbSet<TblEquipo> TblEquipo { get; set; }
 
     public virtual DbSet<TblEquipoMiembro> TblEquipoMiembro { get; set; }
+
+    public virtual DbSet<TblEvaluacionEquipo> TblEvaluacionEquipo { get; set; }
+
+    public virtual DbSet<TblEvaluacionEquipoDetalle> TblEvaluacionEquipoDetalle { get; set; }
 
     public virtual DbSet<TblEstatusAprobacion> TblEstatusAprobacion { get; set; }
 
@@ -131,6 +139,8 @@ public partial class DbContextGTE : DbContext
     public virtual DbSet<TblHorarioTramo> TblHorarioTramo { get; set; }
 
     public virtual DbSet<TblIncidente> TblIncidente { get; set; }
+
+    public virtual DbSet<TblIndicadorGestion> TblIndicadorGestion { get; set; }
 
     public virtual DbSet<TblKpiDefinicion> TblKpiDefinicion { get; set; }
 
@@ -178,6 +188,8 @@ public partial class DbContextGTE : DbContext
 
     public virtual DbSet<TblReleaseArtefacto> TblReleaseArtefacto { get; set; }
 
+    public virtual DbSet<TblReleaseRespaldo> TblReleaseRespaldo { get; set; }
+
     public virtual DbSet<TblRepositorio> TblRepositorio { get; set; }
 
     public virtual DbSet<TblResultadoClave> TblResultadoClave { get; set; }
@@ -213,6 +225,8 @@ public partial class DbContextGTE : DbContext
     public virtual DbSet<TblTipoAusencia> TblTipoAusencia { get; set; }
 
     public virtual DbSet<TblTipoPrueba> TblTipoPrueba { get; set; }
+
+    public virtual DbSet<TblTipoRespaldo> TblTipoRespaldo { get; set; }
 
     public virtual DbSet<TblTipoSolicitud> TblTipoSolicitud { get; set; }
 
@@ -339,6 +353,36 @@ public partial class DbContextGTE : DbContext
                 .HasForeignKey(d => d.IdArchivo)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_tblArchivoVinculo_tblArchivo");
+        });
+
+        modelBuilder.Entity<TblAlertaGestion>(entity =>
+        {
+            entity.HasKey(e => e.IdAlertaGestion);
+
+            entity.ToTable("tblAlertaGestion");
+
+            entity.HasIndex(e => new { e.Activo, e.Atendida, e.Anio, e.Mes }, "IX_tblAlertaGestion_Vigentes");
+
+            entity.HasIndex(e => e.Clave, "UQ_tblAlertaGestion_Clave").IsUnique();
+
+            entity.Property(e => e.Activo).HasDefaultValue(true);
+            entity.Property(e => e.AtendidaPor).HasMaxLength(200);
+            entity.Property(e => e.Clave).HasMaxLength(200);
+            entity.Property(e => e.FechaMovto).HasColumnType("datetime");
+            entity.Property(e => e.FechaRegistro).HasDefaultValueSql("(sysdatetime())");
+            entity.Property(e => e.Mensaje).HasMaxLength(1000);
+            entity.Property(e => e.Severidad).HasMaxLength(10);
+            entity.Property(e => e.Titulo).HasMaxLength(200);
+            entity.Property(e => e.UsuarioMovto).HasMaxLength(50);
+            entity.Property(e => e.UsuarioRegistro).HasMaxLength(200);
+
+            entity.HasOne(d => d.IdEquipoNavigation).WithMany(p => p.TblAlertaGestion)
+                .HasForeignKey(d => d.IdEquipo)
+                .HasConstraintName("FK_tblAlertaGestion_Equipo");
+
+            entity.HasOne(d => d.IdIndicadorGestionNavigation).WithMany(p => p.TblAlertaGestion)
+                .HasForeignKey(d => d.IdIndicadorGestion)
+                .HasConstraintName("FK_tblAlertaGestion_Indicador");
         });
 
         modelBuilder.Entity<TblArea>(entity =>
@@ -863,6 +907,7 @@ public partial class DbContextGTE : DbContext
             entity.HasIndex(e => e.Nombre, "UQ_tblEquipo_Nombre").IsUnique();
 
             entity.Property(e => e.Activo).HasDefaultValue(true);
+            entity.Property(e => e.AmbitoCentroMando).HasMaxLength(30);
             entity.Property(e => e.Descripcion).HasMaxLength(500);
             entity.Property(e => e.FechaMovto).HasColumnType("datetime");
             entity.Property(e => e.FechaRegistro).HasDefaultValueSql("(sysdatetime())");
@@ -873,6 +918,119 @@ public partial class DbContextGTE : DbContext
             entity.HasOne(d => d.IdLiderNavigation).WithMany(p => p.TblEquipo)
                 .HasForeignKey(d => d.IdLider)
                 .HasConstraintName("FK_tblEquipo_tblUsuario");
+        });
+
+        modelBuilder.Entity<TblDiagnosticoCausa>(entity =>
+        {
+            entity.HasKey(e => e.IdDiagnosticoCausa);
+
+            entity.ToTable("tblDiagnosticoCausa");
+
+            entity.HasIndex(e => new { e.IdEvaluacionEquipo, e.IndiceClave }, "UQ_tblDiagnosticoCausa_Indice").IsUnique();
+
+            entity.Property(e => e.Causa).HasMaxLength(20);
+            entity.Property(e => e.Evidencia).HasMaxLength(1000);
+            entity.Property(e => e.FechaRegistro).HasDefaultValueSql("(sysdatetime())");
+            entity.Property(e => e.IndiceClave).HasMaxLength(100);
+            entity.Property(e => e.Umbral).HasColumnType("decimal(18, 4)");
+            entity.Property(e => e.UsuarioRegistro).HasMaxLength(200);
+            entity.Property(e => e.Valor).HasColumnType("decimal(18, 4)");
+
+            entity.HasOne(d => d.IdEvaluacionEquipoNavigation).WithMany(p => p.TblDiagnosticoCausa)
+                .HasForeignKey(d => d.IdEvaluacionEquipo)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_tblDiagnosticoCausa_Evaluacion");
+        });
+
+        modelBuilder.Entity<TblEvaluacionEquipo>(entity =>
+        {
+            entity.HasKey(e => e.IdEvaluacionEquipo);
+
+            entity.ToTable("tblEvaluacionEquipo");
+
+            entity.HasIndex(e => new { e.Anio, e.Mes, e.Activo }, "IX_tblEvaluacionEquipo_Periodo");
+
+            entity.HasIndex(e => new { e.IdEquipo, e.Anio, e.Mes }, "UQ_tblEvaluacionEquipo_Periodo").IsUnique();
+
+            entity.Property(e => e.Activo).HasDefaultValue(true);
+            entity.Property(e => e.FechaCalculo).HasDefaultValueSql("(sysdatetime())");
+            entity.Property(e => e.FechaMovto).HasColumnType("datetime");
+            entity.Property(e => e.FechaRegistro).HasDefaultValueSql("(sysdatetime())");
+            entity.Property(e => e.IndiceCarga).HasColumnType("decimal(9, 2)");
+            entity.Property(e => e.Nivel).HasMaxLength(30);
+            entity.Property(e => e.ScoreGeneral).HasColumnType("decimal(9, 2)");
+            entity.Property(e => e.Semaforo).HasMaxLength(10);
+            entity.Property(e => e.UsuarioMovto).HasMaxLength(50);
+            entity.Property(e => e.UsuarioRegistro).HasMaxLength(200);
+
+            entity.HasOne(d => d.IdEquipoNavigation).WithMany(p => p.TblEvaluacionEquipo)
+                .HasForeignKey(d => d.IdEquipo)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_tblEvaluacionEquipo_Equipo");
+
+            entity.HasOne(d => d.IdResponsableNavigation).WithMany(p => p.TblEvaluacionEquipo)
+                .HasForeignKey(d => d.IdResponsable)
+                .HasConstraintName("FK_tblEvaluacionEquipo_Responsable");
+        });
+
+        modelBuilder.Entity<TblEvaluacionEquipoDetalle>(entity =>
+        {
+            entity.HasKey(e => e.IdEvaluacionEquipoDetalle);
+
+            entity.ToTable("tblEvaluacionEquipoDetalle");
+
+            entity.HasIndex(e => new { e.IdEvaluacionEquipo, e.IdIndicadorGestion }, "UQ_tblEvalEquipoDet_Indicador").IsUnique();
+
+            entity.Property(e => e.FechaRegistro).HasDefaultValueSql("(sysdatetime())");
+            entity.Property(e => e.Semaforo).HasMaxLength(10);
+            entity.Property(e => e.UsuarioRegistro).HasMaxLength(200);
+            entity.Property(e => e.Valor).HasColumnType("decimal(18, 4)");
+            entity.Property(e => e.ValorNormalizado).HasColumnType("decimal(9, 2)");
+            entity.Property(e => e.ValorPeriodoAnterior).HasColumnType("decimal(18, 4)");
+
+            entity.HasOne(d => d.IdEvaluacionEquipoNavigation).WithMany(p => p.TblEvaluacionEquipoDetalle)
+                .HasForeignKey(d => d.IdEvaluacionEquipo)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_tblEvalEquipoDet_Evaluacion");
+
+            entity.HasOne(d => d.IdIndicadorGestionNavigation).WithMany(p => p.TblEvaluacionEquipoDetalle)
+                .HasForeignKey(d => d.IdIndicadorGestion)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_tblEvalEquipoDet_Indicador");
+        });
+
+        modelBuilder.Entity<TblIndicadorGestion>(entity =>
+        {
+            entity.HasKey(e => e.IdIndicadorGestion);
+
+            entity.ToTable("tblIndicadorGestion");
+
+            entity.HasIndex(e => e.Clave, "UQ_tblIndicadorGestion_Clave").IsUnique();
+
+            entity.Property(e => e.AccionSugerida).HasMaxLength(1000);
+            entity.Property(e => e.Activo).HasDefaultValue(true);
+            entity.Property(e => e.Ambito).HasMaxLength(30);
+            entity.Property(e => e.Categoria).HasMaxLength(60);
+            entity.Property(e => e.Clave).HasMaxLength(100);
+            entity.Property(e => e.Descripcion).HasMaxLength(1000);
+            entity.Property(e => e.Direccion).HasMaxLength(10);
+            entity.Property(e => e.FechaMovto).HasColumnType("datetime");
+            entity.Property(e => e.FechaRegistro).HasDefaultValueSql("(sysdatetime())");
+            entity.Property(e => e.Formula).HasMaxLength(500);
+            entity.Property(e => e.InterpretacionBuena).HasMaxLength(500);
+            entity.Property(e => e.InterpretacionMala).HasMaxLength(500);
+            entity.Property(e => e.Meta).HasColumnType("decimal(18, 4)");
+            entity.Property(e => e.Nombre).HasMaxLength(200);
+            entity.Property(e => e.Origen).HasMaxLength(20);
+            entity.Property(e => e.Periodicidad)
+                .HasMaxLength(20)
+                .HasDefaultValue("Mensual");
+            entity.Property(e => e.Peso).HasColumnType("decimal(9, 4)");
+            entity.Property(e => e.PonderaEnScore).HasDefaultValue(true);
+            entity.Property(e => e.UmbralAlerta).HasColumnType("decimal(18, 4)");
+            entity.Property(e => e.Unidad).HasMaxLength(20);
+            entity.Property(e => e.UsuarioMovto).HasMaxLength(50);
+            entity.Property(e => e.UsuarioRegistro).HasMaxLength(200);
         });
 
         modelBuilder.Entity<TblEquipoMiembro>(entity =>
@@ -1728,6 +1886,30 @@ public partial class DbContextGTE : DbContext
                 .HasConstraintName("FK_tblReleaseArtefacto_tblRelease");
         });
 
+        modelBuilder.Entity<TblReleaseRespaldo>(entity =>
+        {
+            entity.HasKey(e => e.IdReleaseRespaldo);
+
+            entity.ToTable("tblReleaseRespaldo");
+
+            entity.HasIndex(e => e.IdRelease, "IX_tblReleaseRespaldo_IdRelease");
+
+            entity.Property(e => e.Activo).HasDefaultValue(true);
+            entity.Property(e => e.Descripcion).HasMaxLength(500);
+            entity.Property(e => e.FechaRegistro).HasDefaultValueSql("(sysdatetime())");
+            entity.Property(e => e.UsuarioRegistro).HasMaxLength(200);
+
+            entity.HasOne(d => d.IdReleaseNavigation).WithMany(p => p.TblReleaseRespaldo)
+                .HasForeignKey(d => d.IdRelease)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_tblReleaseRespaldo_tblRelease");
+
+            entity.HasOne(d => d.IdTipoRespaldoNavigation).WithMany(p => p.TblReleaseRespaldo)
+                .HasForeignKey(d => d.IdTipoRespaldo)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_tblReleaseRespaldo_tblTipoRespaldo");
+        });
+
         modelBuilder.Entity<TblRepositorio>(entity =>
         {
             entity.HasKey(e => e.IdRepositorio);
@@ -2182,6 +2364,17 @@ public partial class DbContextGTE : DbContext
             entity.Property(e => e.Nombre).HasMaxLength(100);
             entity.Property(e => e.UsuarioMovto).HasMaxLength(50);
             entity.Property(e => e.UsuarioRegistro).HasMaxLength(200);
+        });
+
+        modelBuilder.Entity<TblTipoRespaldo>(entity =>
+        {
+            entity.ToTable("tblTipoRespaldo");
+
+            entity.HasIndex(e => e.Nombre, "UQ_tblTipoRespaldo_Nombre").IsUnique();
+
+            entity.Property(e => e.Id).ValueGeneratedNever();
+            entity.Property(e => e.Activo).HasDefaultValue(true);
+            entity.Property(e => e.Nombre).HasMaxLength(100);
         });
 
         modelBuilder.Entity<TblTipoSolicitud>(entity =>

@@ -47,6 +47,16 @@ public static class TipoArtefacto
     public const int Otro = 4;
 }
 
+/// <summary>IDs de dbo.tblTipoRespaldo (catalogo enumerado de ID fijo).</summary>
+public static class TipoRespaldo
+{
+    public const int BaseDeDatos = 1;
+    public const int Servicio = 2;
+    public const int SitioWeb = 3;
+    public const int Ubicacion = 4;
+    public const int Otro = 5;
+}
+
 public static class PermisosEntregas
 {
     public const string Crear = "REL.Crear";
@@ -57,9 +67,17 @@ public static class PermisosEntregas
 /// <summary>Cadena de aprobacion estandar de un release.</summary>
 public static class RolesAprobacion
 {
-    public const string Qa = "QA";
+    public const string GerenteAreaSolicitante = "Gerente del area solicitante";
+    public const string Solicitante = "Solicitante";
+    public const string UsuarioQuePrueba = "Usuario que prueba";
+    public const string GerenteTi = "Gerente de TI";
     public const string Lider = "Lider";
-    public const string Negocio = "Negocio";
+    public const string IngSoporte = "Ing. Soporte";
 
-    public static readonly string[] Cadena = [Qa, Lider, Negocio];
+    /// <summary>
+    /// Orden en que se pintan las firmas en la Solicitud de despliegue, igual que el
+    /// formato que se llenaba a mano (Doctos/Solicitud de despliegue.xlsx).
+    /// </summary>
+    public static readonly string[] Cadena =
+        [GerenteAreaSolicitante, Solicitante, UsuarioQuePrueba, GerenteTi, Lider, IngSoporte];
 }

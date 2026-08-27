@@ -17,7 +17,8 @@ public record ArtefactoNuevo(
     string? HashSha256,
     int? OrdenEjecucion,
     int? IdArtefactoRollback,
-    string? JustificacionIrreversible);
+    string? JustificacionIrreversible,
+    string? InstruccionesImplementacion);
 
 /// <summary>Artefacto del release con su pareja de rollback, para validar RN-GTE-032.</summary>
 public record ArtefactoRelease(
@@ -27,7 +28,21 @@ public record ArtefactoRelease(
     int IdTipoArtefacto,
     int? OrdenEjecucion,
     int? IdArtefactoRollback,
-    string? JustificacionIrreversible);
+    string? JustificacionIrreversible,
+    string? InstruccionesImplementacion);
+
+/// <summary>
+/// Respaldo que se tiene que tomar antes de desplegar: la base de datos, el servicio, el
+/// sitio o la ubicacion exacta. Es un apartado propio de la Solicitud de despliegue y el
+/// gate de aprobacion exige al menos uno (ver ValidarListoParaAprobacionAsync).
+/// </summary>
+public record RespaldoNuevo(int IdRelease, int IdTipoRespaldo, string Descripcion);
+
+public record RespaldoRelease(
+    int IdReleaseRespaldo,
+    int IdTipoRespaldo,
+    string Tipo,
+    string Descripcion);
 
 public record AprobacionRelease(
     int IdAprobacion,

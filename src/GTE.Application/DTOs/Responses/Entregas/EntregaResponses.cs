@@ -9,6 +9,11 @@ public class ReleaseResponse
     public string Version { get; set; } = string.Empty;
     public string? Folio { get; set; }
     public string? NotasVersion { get; set; }
+
+    /// <summary>HTML enriquecido (formato, tablas e imagenes por GUID) con el instructivo de
+    /// despliegue del release; alimenta la Solicitud de despliegue imprimible.</summary>
+    public string? InstruccionesImplementacion { get; set; }
+
     public int IdEstatus { get; set; }
     public string Estatus { get; set; } = string.Empty;
     public DateOnly? FechaPlan { get; set; }
@@ -56,8 +61,21 @@ public class ArtefactoResponse
     public int? IdArtefactoRollback { get; set; }
     public string? NombreRollback { get; set; }
     public string? JustificacionIrreversible { get; set; }
+
+    /// <summary>Instructivo propio del artefacto, en HTML enriquecido (ver ReleaseResponse).</summary>
+    public string? InstruccionesImplementacion { get; set; }
+
     public bool RequiereRollback { get; set; }
     public bool CumpleRollback { get; set; }
+}
+
+/// <summary>Respaldo previo al despliegue (apartado propio de la Solicitud de despliegue).</summary>
+public class RespaldoResponse
+{
+    public int IdReleaseRespaldo { get; set; }
+    public int IdTipoRespaldo { get; set; }
+    public string Tipo { get; set; } = string.Empty;
+    public string Descripcion { get; set; } = string.Empty;
 }
 
 public class AprobacionResponse
@@ -89,6 +107,7 @@ public class ReleaseDetalleResponse : ReleaseResponse
 {
     public IReadOnlyList<ItemReleaseResponse> Items { get; set; } = [];
     public IReadOnlyList<ArtefactoResponse> Artefactos { get; set; } = [];
+    public IReadOnlyList<RespaldoResponse> Respaldos { get; set; } = [];
     public IReadOnlyList<AprobacionResponse> Aprobaciones { get; set; } = [];
     public IReadOnlyList<DespliegueResponse> Despliegues { get; set; } = [];
 }

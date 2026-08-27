@@ -49,6 +49,24 @@ public class ArtefactoAgregarRequest
 
     /// <summary>Alternativa al rollback: explicar por que el cambio es irreversible.</summary>
     public string? JustificacionIrreversible { get; set; }
+
+    /// <summary>HTML enriquecido con el instructivo propio de este artefacto.</summary>
+    public string? InstruccionesImplementacion { get; set; }
+}
+
+/// <summary>Respaldo que se debe tomar antes de desplegar (apartado de la Solicitud).</summary>
+public class RespaldoAgregarRequest
+{
+    public int IdTipoRespaldo { get; set; }
+
+    /// <summary>Nombre o ubicacion exacta: la base, el servicio, el sitio o la ruta.</summary>
+    public string Descripcion { get; set; } = string.Empty;
+}
+
+/// <summary>Instructivo de despliegue del release, en HTML enriquecido. Vacio lo limpia.</summary>
+public class ActualizarInstruccionesRequest
+{
+    public string? InstruccionesImplementacion { get; set; }
 }
 
 public class ResolverAprobacionRequest

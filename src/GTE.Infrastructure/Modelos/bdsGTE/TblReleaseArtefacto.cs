@@ -17,6 +17,8 @@ public partial class TblReleaseArtefacto
 
     public string? JustificacionIrreversible { get; set; }
 
+    public string? InstruccionesImplementacion { get; set; }
+
     public DateTime FechaRegistro { get; set; }
 
     public string UsuarioRegistro { get; set; } = null!;
