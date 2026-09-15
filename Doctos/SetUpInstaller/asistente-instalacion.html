@@ -1,0 +1,1243 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Asistente de instalacion GTE</title>
+<style>
+  :root {
+    --slate-50:#f8fafc; --slate-100:#f1f5f9; --slate-200:#e2e8f0; --slate-300:#cbd5e1;
+    --slate-400:#94a3b8; --slate-500:#64748b; --slate-600:#475569; --slate-700:#334155;
+    --slate-800:#1e293b; --slate-900:#0f172a;
+    --red-700:#b91c1c; --red-50:#fef2f2; --red-200:#fecaca;
+    --emerald-700:#047857; --emerald-50:#ecfdf5; --emerald-200:#a7f3d0;
+    --orange-700:#c2410c; --orange-50:#fff7ed; --orange-200:#fed7aa;
+    --blue-700:#1d4ed8; --blue-50:#eff6ff; --blue-200:#bfdbfe;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin:0; background:var(--slate-100); color:var(--slate-800);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif; font-size:14px; line-height:1.5;
+  }
+  header {
+    background:var(--slate-800); color:#fff; padding:20px 24px;
+  }
+  header h1 { margin:0; font-size:20px; font-weight:700; }
+  header p { margin:6px 0 0; font-size:13px; color:var(--slate-300); max-width:900px; }
+  .aviso-local {
+    margin-top:10px; display:inline-block; background:var(--slate-700); color:var(--slate-100);
+    border-radius:6px; padding:6px 10px; font-size:12px;
+  }
+  main { max-width:1500px; margin:0 auto; padding:20px; display:grid; grid-template-columns:1fr; gap:20px; }
+  @media (min-width:1180px) { main { grid-template-columns: minmax(0,1fr) minmax(0,1fr); align-items:start; } }
+  section.tarjeta {
+    background:#fff; border:1px solid var(--slate-200); border-radius:12px; padding:18px; margin-bottom:16px;
+  }
+  section.tarjeta > h2 {
+    margin:0 0 4px; font-size:15px; font-weight:700; color:var(--slate-800);
+    display:flex; align-items:center; gap:8px;
+  }
+  .paso {
+    background:var(--slate-800); color:#fff; width:22px; height:22px; border-radius:999px;
+    display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; flex:none;
+  }
+  section.tarjeta > p.ayuda { margin:0 0 14px; font-size:12px; color:var(--slate-500); }
+  .campos { display:grid; grid-template-columns:1fr; gap:12px; }
+  @media (min-width:640px) { .campos.dos { grid-template-columns:1fr 1fr; } }
+  label { display:block; font-size:12px; font-weight:600; color:var(--slate-600); margin-bottom:4px; }
+  label .req { color:var(--red-700); }
+  input[type=text], input[type=password], input[type=number], select {
+    width:100%; background:var(--slate-200); border:1px solid var(--slate-300); border-radius:6px;
+    padding:8px 10px; font-size:13px; color:var(--slate-900); font-family:inherit;
+  }
+  input:focus, select:focus { outline:2px solid var(--slate-400); outline-offset:-1px; }
+  input.error { border-color:var(--red-700); background:var(--red-50); }
+  .pista { font-size:11px; color:var(--slate-500); margin-top:4px; }
+  .msg-error { font-size:11px; color:var(--red-700); margin-top:4px; font-weight:600; display:none; }
+  .msg-error.visible { display:block; }
+  .check { display:flex; gap:8px; align-items:flex-start; background:var(--slate-50); border:1px solid var(--slate-200); border-radius:6px; padding:10px; }
+  .check input { margin-top:2px; flex:none; width:16px; height:16px; }
+  .check label { margin:0; font-weight:600; color:var(--slate-700); font-size:12px; }
+  .check .pista { margin-top:2px; }
+  .grupo-condicional { margin-top:12px; }
+  .grupo-condicional[hidden] { display:none; }
+  fieldset { border:1px solid var(--slate-200); border-radius:8px; padding:12px; margin:0; }
+  legend { font-size:12px; font-weight:700; color:var(--slate-600); padding:0 6px; }
+  .radios { display:flex; flex-wrap:wrap; gap:14px; }
+  .radios label { display:flex; align-items:center; gap:6px; font-weight:600; color:var(--slate-700); margin:0; font-size:12px; }
+  .nota { border-radius:8px; padding:10px 12px; font-size:12px; margin-top:12px; }
+  .nota.info { background:var(--blue-50); border:1px solid var(--blue-200); color:var(--blue-700); }
+  .nota.warn { background:var(--orange-50); border:1px solid var(--orange-200); color:var(--orange-700); }
+  .nota.peligro { background:var(--red-50); border:1px solid var(--red-200); color:var(--red-700); }
+  .nota strong { font-weight:700; }
+  .panel-salida { position:sticky; top:20px; }
+  .barra-acciones { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+  button {
+    border:none; border-radius:6px; padding:9px 14px; font-size:13px; font-weight:600;
+    cursor:pointer; font-family:inherit; transition:transform .05s;
+  }
+  button:active { transform:scale(.97); }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .btn-primario { background:var(--slate-800); color:#fff; }
+  .btn-primario:hover:not(:disabled) { background:var(--slate-700); }
+  .btn-secundario { background:var(--slate-200); color:var(--slate-800); }
+  .btn-secundario:hover:not(:disabled) { background:var(--slate-300); }
+  #estadoValidacion { font-size:12px; font-weight:600; padding:8px 12px; border-radius:6px; margin-bottom:12px; }
+  #estadoValidacion.ok { background:var(--emerald-50); border:1px solid var(--emerald-200); color:var(--emerald-700); }
+  #estadoValidacion.mal { background:var(--red-50); border:1px solid var(--red-200); color:var(--red-700); }
+  #estadoValidacion ul { margin:6px 0 0; padding-left:18px; font-weight:500; }
+  pre#vistaPrevia {
+    background:var(--slate-900); color:#e2e8f0; border-radius:8px; padding:14px; overflow:auto;
+    max-height:640px; font-family:Consolas, "Courier New", monospace; font-size:11.5px; line-height:1.45;
+    margin:0; white-space:pre; tab-size:4;
+  }
+  ol.pasos-script { margin:0; padding-left:20px; font-size:12px; color:var(--slate-600); }
+  ol.pasos-script li { margin-bottom:3px; }
+  ol.pasos-script li.apagado { color:var(--slate-400); text-decoration:line-through; }
+  code {
+    background:var(--slate-200); border-radius:4px; padding:1px 5px;
+    font-family:Consolas, "Courier New", monospace; font-size:11.5px; color:var(--slate-800);
+  }
+  .toast {
+    position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+    background:var(--slate-800); color:#fff; padding:10px 18px; border-radius:8px; font-size:13px;
+    opacity:0; pointer-events:none; transition:opacity .2s;
+  }
+  .toast.visible { opacity:1; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Asistente de instalacion de GTE</h1>
+  <p>
+    Captura aqui los datos de la computadora nueva. Al final se genera <strong>instalar-gte.ps1</strong>,
+    un instalador que se corre como administrador en esa maquina y deja GTE funcionando:
+    scripts de base de datos, servicio de Windows, variables de entorno, puerto, firewall y el
+    usuario administrador con el que se entra la primera vez.
+  </p>
+  <span class="aviso-local">Todo se procesa en esta pagina. No se envia nada por red ni queda guardado en ningun lado.</span>
+</header>
+
+<main>
+
+  <!-- ============================= COLUMNA IZQUIERDA: CAPTURA ============================= -->
+  <div>
+
+    <section class="tarjeta">
+      <h2><span class="paso">1</span> Equipo, servicio y aplicacion</h2>
+      <p class="ayuda">Datos de la computadora donde va a quedar corriendo GTE permanentemente.</p>
+
+      <div class="campos dos">
+        <div>
+          <label for="nombreServicio">Nombre del servicio de Windows <span class="req">*</span></label>
+          <input type="text" id="nombreServicio" value="GTE" data-obligatorio>
+          <div class="pista">Sin espacios. Es el nombre con el que se controla: <code>sc stop GTE</code>.</div>
+          <div class="msg-error" id="err-nombreServicio"></div>
+        </div>
+        <div>
+          <label for="displayName">Nombre para mostrar <span class="req">*</span></label>
+          <input type="text" id="displayName" value="GTE - Gestor Tecnologico Empresarial" data-obligatorio>
+          <div class="pista">Como se ve en la consola de Servicios de Windows.</div>
+          <div class="msg-error" id="err-displayName"></div>
+        </div>
+        <div>
+          <label for="rutaInstalacion">Carpeta de instalacion <span class="req">*</span></label>
+          <input type="text" id="rutaInstalacion" value="C:\Servicios\GTE" data-obligatorio>
+          <div class="pista">Donde vive el ejecutable en la maquina nueva.</div>
+          <div class="msg-error" id="err-rutaInstalacion"></div>
+        </div>
+        <div>
+          <label for="puerto">Puerto HTTP de Kestrel <span class="req">*</span></label>
+          <input type="number" id="puerto" value="5090" min="1" max="65535" data-obligatorio>
+          <div class="pista">Cambialo si el 5090 ya esta ocupado en esa maquina.</div>
+          <div class="msg-error" id="err-puerto"></div>
+        </div>
+      </div>
+
+      <div class="grupo-condicional">
+        <div class="check">
+          <input type="checkbox" id="copiarPublish" checked>
+          <div>
+            <label for="copiarPublish">Copiar la aplicacion publicada a la carpeta de instalacion</label>
+            <div class="pista">
+              El instalador limpia la carpeta destino antes de copiar (obligatorio: mezclar un publish
+              viejo con uno nuevo rompe la instalacion).
+            </div>
+          </div>
+        </div>
+        <div id="grupoOrigenPublish" style="margin-top:12px">
+          <label for="rutaOrigenPublish">Carpeta de origen del publish <span class="req">*</span></label>
+          <input type="text" id="rutaOrigenPublish" value="D:\GTE\publicado" data-obligatorio-si="copiarPublish">
+          <div class="pista">La carpeta que genero <code>publicar.bat</code>, ya copiada a la maquina nueva (USB o red).</div>
+          <div class="msg-error" id="err-rutaOrigenPublish"></div>
+        </div>
+      </div>
+
+      <div class="grupo-condicional">
+        <div class="check">
+          <input type="checkbox" id="abrirFirewall" checked>
+          <div>
+            <label for="abrirFirewall">Abrir el puerto en el Firewall de Windows</label>
+            <div class="pista">Necesario para entrar a GTE desde otras computadoras de la red.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grupo-condicional">
+        <label for="rutaAlmacen">Ruta del almacen de archivos <span class="req">*</span></label>
+        <input type="text" id="rutaAlmacen" value="C:\GTE\Archivos">
+        <div class="pista">
+          Donde se guardan los adjuntos y las imagenes pegadas en descripciones, comentarios
+          y articulos. Carpeta local del servidor (<code>C:\GTE\Archivos</code>) o share de
+          red (<code>\\servidor\GTE\Archivos</code>); en share, la cuenta del servicio
+          necesita lectura y escritura ahi. <strong>Se fija siempre</strong>: el valor que
+          trae <code>appsettings.json</code> apunta a la unidad <code>D:</code> de la maquina
+          de desarrollo, y si el servidor no la tiene, toda subida de archivos falla.
+        </div>
+        <div class="msg-error" id="err-rutaAlmacen"></div>
+      </div>
+    </section>
+
+    <section class="tarjeta">
+      <h2><span class="paso">2</span> Conexion a la base de datos</h2>
+      <p class="ayuda">
+        La base <code>bdsGTE</code> ya debe existir (Paso 1 del manual de instalacion). El login
+        con el que la aplicacion se conecta a diario se puede crear aqui mismo, o usar uno que ya
+        tengas -- tu decides.
+      </p>
+
+      <div class="campos dos">
+        <div>
+          <label for="servidorSql">Servidor SQL <span class="req">*</span></label>
+          <input type="text" id="servidorSql" placeholder="SRVPROD\NASA" data-obligatorio>
+          <div class="pista">Nombre de instancia, o <code>servidor,1433</code> si usa otro puerto.</div>
+          <div class="msg-error" id="err-servidorSql"></div>
+        </div>
+        <div>
+          <label for="usuarioSql">Usuario de conexion a SQL <span class="req">*</span></label>
+          <input type="text" id="usuarioSql" value="svc_gte" data-obligatorio>
+          <div class="pista">
+            Con el que la aplicacion se conecta a diario (por defecto <code>svc_gte</code>, puede
+            ser cualquier otro, incluido <code>sa</code>).
+          </div>
+          <div class="msg-error" id="err-usuarioSql"></div>
+        </div>
+        <div>
+          <label for="passwordSql">Contrasena de esa cuenta <span class="req">*</span></label>
+          <input type="password" id="passwordSql" data-obligatorio>
+          <div class="pista">
+            Si el checkbox de abajo esta marcado, esta es la contrasena con la que el instalador
+            va a crear la cuenta -- no hace falta que exista todavia. Si esta desmarcado, tiene que
+            ser exactamente la contrasena que esa cuenta ya tiene.
+          </div>
+          <div class="msg-error" id="err-passwordSql"></div>
+        </div>
+        <div>
+          <label for="passwordSql2">Confirmar contrasena <span class="req">*</span></label>
+          <input type="password" id="passwordSql2" data-obligatorio>
+          <div class="msg-error" id="err-passwordSql2"></div>
+        </div>
+      </div>
+
+      <div class="grupo-condicional">
+        <div class="check">
+          <input type="checkbox" id="crearLogin" checked>
+          <div>
+            <label for="crearLogin">Crear este login ahora si no existe todavia</label>
+            <div class="pista">
+              El instalador lo crea con la contrasena de arriba y le da permisos minimos en
+              bdsGTE (lectura/escritura + ejecutar los procedimientos del motor propio -- nunca
+              db_owner). Si ya existe, no lo toca. Desmarca esto si el login ya existe con sus
+              permisos y solo quieres que el instalador se conecte con el.
+            </div>
+          </div>
+        </div>
+
+        <div id="grupoAdminSql" style="margin-top:12px">
+          <fieldset>
+            <legend>Con que cuenta se crea</legend>
+            <p class="pista" style="margin:0 0 8px">
+              Crear un login exige permisos de administrador de SQL Server -- una cuenta distinta
+              a la de conexion de arriba.
+            </p>
+            <div class="radios">
+              <label><input type="radio" name="authAdminAlta" value="windows" checked> Autenticacion de Windows (la sesion actual)</label>
+              <label><input type="radio" name="authAdminAlta" value="sql"> Usuario de SQL Server</label>
+            </div>
+            <div id="grupoCredencialesAdmin" hidden style="margin-top:12px">
+              <div class="campos dos">
+                <div>
+                  <label for="usuarioAdminAlta">Usuario administrador de SQL <span class="req">*</span></label>
+                  <input type="text" id="usuarioAdminAlta" placeholder="sa">
+                  <div class="msg-error" id="err-usuarioAdminAlta"></div>
+                </div>
+                <div>
+                  <label for="passwordAdminAlta">Contrasena <span class="req">*</span></label>
+                  <input type="password" id="passwordAdminAlta">
+                  <div class="msg-error" id="err-passwordAdminAlta"></div>
+                </div>
+              </div>
+            </div>
+          </fieldset>
+        </div>
+      </div>
+    </section>
+
+    <section class="tarjeta">
+      <h2><span class="paso">3</span> Usuario administrador de GTE</h2>
+      <p class="ayuda">
+        Con esta cuenta se entra la primera vez. Si ya la diste de alta al correr los scripts a mano,
+        el instalador solo le pone la contrasena que captures aqui; si no existe todavia, la crea.
+      </p>
+
+      <div class="campos dos">
+        <div>
+          <label for="adminDominio">Usuario <span class="req">*</span></label>
+          <input type="text" id="adminDominio" value="Administrador" data-obligatorio>
+          <div class="pista">Es lo que se escribe en la pantalla de login (columna Dominio).</div>
+          <div class="msg-error" id="err-adminDominio"></div>
+        </div>
+        <div>
+          <label for="adminNombre">Nombre para mostrar <span class="req">*</span></label>
+          <input type="text" id="adminNombre" value="Administrador" data-obligatorio>
+          <div class="msg-error" id="err-adminNombre"></div>
+        </div>
+        <div>
+          <label for="adminPassword">Contrasena <span class="req">*</span></label>
+          <input type="password" id="adminPassword" data-obligatorio>
+          <div class="pista">Minimo 8 caracteres (misma regla que valida la API).</div>
+          <div class="msg-error" id="err-adminPassword"></div>
+        </div>
+        <div>
+          <label for="adminPassword2">Confirmar contrasena <span class="req">*</span></label>
+          <input type="password" id="adminPassword2" data-obligatorio>
+          <div class="msg-error" id="err-adminPassword2"></div>
+        </div>
+      </div>
+
+      <div class="grupo-condicional">
+        <div class="check">
+          <input type="checkbox" id="forzarCambio">
+          <div>
+            <label for="forzarCambio">Obligar a cambiar la contrasena en el primer inicio de sesion</label>
+            <div class="pista">
+              Util si vas a entregarle la contrasena a otra persona: GTE le exige cambiarla al entrar.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="nota info">
+        <strong>Como queda hasheada:</strong> el instalador da de alta la cuenta con una contrasena temporal
+        aleatoria (generada al momento de instalar, no queda ninguna fija en el repositorio) y despues, ya
+        con el servicio arriba, entra a la API y la cambia por la que capturaste aqui. Asi la contrasena
+        se hashea con la misma version de BCrypt que usa GTE, sin instalar el SDK de .NET en la maquina nueva.
+      </div>
+    </section>
+
+    <section class="tarjeta">
+      <h2><span class="paso">4</span> Manejo de las contrasenas en el script</h2>
+      <p class="ayuda">Decide si el archivo .ps1 lleva las contrasenas escritas o las pide al ejecutarse.</p>
+      <div class="radios" style="flex-direction:column; gap:10px">
+        <label>
+          <input type="radio" name="modoSecretos" value="preguntar" checked>
+          Pedirlas al ejecutar (recomendado)
+        </label>
+        <div class="pista" style="margin:-4px 0 0 24px">
+          El .ps1 no contiene ninguna contrasena: las pide en consola al arrancar. Puedes guardarlo o
+          mandarlo por correo sin riesgo.
+        </div>
+        <label>
+          <input type="radio" name="modoSecretos" value="incrustar">
+          Escribirlas dentro del script
+        </label>
+        <div class="pista" style="margin:-4px 0 0 24px">
+          Corre sin intervencion, pero el archivo queda con las contrasenas en texto plano.
+        </div>
+      </div>
+      <div class="nota peligro" id="avisoSecretos" hidden>
+        <strong>Cuidado:</strong> el archivo generado va a contener la contrasena de SQL y la del
+        administrador en texto plano. Borralo de la maquina en cuanto termine la instalacion y no lo
+        subas al repositorio ni lo mandes por correo o chat.
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ============================= COLUMNA DERECHA: SALIDA ============================= -->
+  <div class="panel-salida">
+    <section class="tarjeta">
+      <h2><span class="paso">5</span> Instalador generado</h2>
+      <p class="ayuda">Se actualiza solo conforme llenas los datos.</p>
+
+      <div id="estadoValidacion" class="mal">Faltan datos por capturar.</div>
+
+      <div class="barra-acciones">
+        <button class="btn-primario" id="btnDescargar" disabled>Descargar instalar-gte.ps1</button>
+        <button class="btn-secundario" id="btnCopiar" disabled>Copiar script</button>
+      </div>
+
+      <p class="ayuda" style="margin-bottom:8px"><strong>Que va a hacer en la maquina nueva:</strong></p>
+      <ol class="pasos-script" id="listaPasos">
+        <li id="p-req">Verificar permisos de administrador y el runtime de .NET 8</li>
+        <li id="p-login">Crear el login de conexion a bdsGTE (si no existia) con permisos minimos</li>
+        <li id="p-admin-sql">Dar de alta el usuario administrador (si no existia) con rol Administrador</li>
+        <li id="p-copiar">Copiar la aplicacion publicada a la carpeta de instalacion</li>
+        <li id="p-puerto">Fijar el puerto en appsettings.Production.json</li>
+        <li id="p-servicio">Crear el servicio de Windows</li>
+        <li id="p-vars">Registrar las variables de entorno (ambiente, cadena de conexion y clave JWT nueva)</li>
+        <li id="p-fw">Abrir el puerto en el firewall</li>
+        <li id="p-arranque">Arrancar el servicio y verificar /health</li>
+        <li id="p-password">Fijar la contrasena real del administrador contra la API</li>
+      </ol>
+
+      <div class="nota warn" style="margin-top:14px">
+        <strong>Para correrlo</strong> en la maquina nueva, en PowerShell <strong>como administrador</strong>:
+        <div style="margin-top:6px"><code>powershell -ExecutionPolicy Bypass -File .\instalar-gte.ps1</code></div>
+      </div>
+    </section>
+
+    <section class="tarjeta">
+      <h2>Vista previa</h2>
+      <pre id="vistaPrevia">Captura los datos para generar el script.</pre>
+    </section>
+  </div>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+
+var $ = function (id) { return document.getElementById(id); };
+
+// ---------------------------------------------------------------- utilidades de escapado
+
+// Literal de PowerShell entre comillas simples: adentro solo hay que duplicar la comilla simple.
+function psLiteral(valor) {
+  return "'" + String(valor === undefined || valor === null ? "" : valor).replace(/'/g, "''") + "'";
+}
+
+// Literal de SQL Server: misma regla, duplicar la comilla simple.
+function sqlLiteral(valor) {
+  return "N'" + String(valor === undefined || valor === null ? "" : valor).replace(/'/g, "''") + "'";
+}
+
+function leerDatos() {
+  var modoSecretos = document.querySelector('input[name="modoSecretos"]:checked').value;
+  var authAdminAlta = document.querySelector('input[name="authAdminAlta"]:checked').value;
+  return {
+    nombreServicio: $("nombreServicio").value.trim(),
+    displayName: $("displayName").value.trim(),
+    rutaInstalacion: $("rutaInstalacion").value.trim().replace(/[\\/]+$/, ""),
+    puerto: $("puerto").value.trim(),
+    copiarPublish: $("copiarPublish").checked,
+    rutaOrigenPublish: $("rutaOrigenPublish").value.trim().replace(/[\\/]+$/, ""),
+    abrirFirewall: $("abrirFirewall").checked,
+    rutaAlmacen: $("rutaAlmacen").value.trim(),
+    servidorSql: $("servidorSql").value.trim(),
+    usuarioSql: $("usuarioSql").value.trim(),
+    passwordSql: $("passwordSql").value,
+    passwordSql2: $("passwordSql2").value,
+    crearLogin: $("crearLogin").checked,
+    authAdminAlta: authAdminAlta,
+    usuarioAdminAlta: $("usuarioAdminAlta").value.trim(),
+    passwordAdminAlta: $("passwordAdminAlta").value,
+    adminDominio: $("adminDominio").value.trim(),
+    adminNombre: $("adminNombre").value.trim(),
+    adminPassword: $("adminPassword").value,
+    adminPassword2: $("adminPassword2").value,
+    forzarCambio: $("forzarCambio").checked,
+    modoSecretos: modoSecretos
+  };
+}
+
+// ---------------------------------------------------------------- validacion
+
+function validar(d) {
+  var errores = {};
+
+  if (!d.nombreServicio) errores.nombreServicio = "Obligatorio.";
+  else if (/\s/.test(d.nombreServicio)) errores.nombreServicio = "No puede llevar espacios.";
+
+  if (!d.displayName) errores.displayName = "Obligatorio.";
+
+  if (!d.rutaInstalacion) errores.rutaInstalacion = "Obligatorio.";
+  else if (!/^[a-zA-Z]:\\|^\\\\/.test(d.rutaInstalacion)) errores.rutaInstalacion = "Debe ser una ruta completa (C:\\... o \\\\servidor\\...).";
+
+  var puerto = parseInt(d.puerto, 10);
+  if (!d.puerto) errores.puerto = "Obligatorio.";
+  else if (isNaN(puerto) || puerto < 1 || puerto > 65535) errores.puerto = "Debe ser un numero entre 1 y 65535.";
+
+  if (d.copiarPublish) {
+    if (!d.rutaOrigenPublish) errores.rutaOrigenPublish = "Obligatorio si se copia el publish.";
+    else if (d.rutaOrigenPublish.toLowerCase() === d.rutaInstalacion.toLowerCase()) {
+      errores.rutaOrigenPublish = "El origen no puede ser la misma carpeta de instalacion.";
+    }
+  }
+
+  // Obligatoria siempre: si no se fija la variable de entorno, gana la ruta de
+  // appsettings.json (D:GTEArchivos, la de la maquina de desarrollo) y ninguna subida
+  // de archivos funciona en el servidor.
+  if (!d.rutaAlmacen) errores.rutaAlmacen = "Obligatorio.";
+
+  if (!d.servidorSql) errores.servidorSql = "Obligatorio.";
+  if (!d.usuarioSql) errores.usuarioSql = "Obligatorio.";
+
+  if (!d.passwordSql) errores.passwordSql = "Obligatorio.";
+  else if (d.passwordSql.length < 8) errores.passwordSql = "Minimo 8 caracteres.";
+  if (d.passwordSql && d.passwordSql2 !== d.passwordSql) errores.passwordSql2 = "Las contrasenas no coinciden.";
+
+  if (d.crearLogin && d.authAdminAlta === "sql") {
+    if (!d.usuarioAdminAlta) errores.usuarioAdminAlta = "Obligatorio.";
+    if (!d.passwordAdminAlta) errores.passwordAdminAlta = "Obligatorio.";
+  }
+
+  if (!d.adminDominio) errores.adminDominio = "Obligatorio.";
+  if (!d.adminNombre) errores.adminNombre = "Obligatorio.";
+
+  if (!d.adminPassword) errores.adminPassword = "Obligatorio.";
+  else if (d.adminPassword.length < 8) errores.adminPassword = "Minimo 8 caracteres.";
+  if (d.adminPassword && d.adminPassword2 !== d.adminPassword) errores.adminPassword2 = "Las contrasenas no coinciden.";
+
+  return errores;
+}
+
+// ---------------------------------------------------------------- generacion del instalador
+
+function generarScript(d) {
+  var pedir = d.modoSecretos === "preguntar";
+  var L = [];
+  var add = function (linea) { L.push(linea === undefined ? "" : linea); };
+
+  var urlBase = "http://localhost:" + d.puerto;
+
+  add("<#");
+  add("    Instalador de GTE (Gestor Tecnologico Empresarial)");
+  add("    Generado con asistente-instalacion.html el " + new Date().toLocaleString("es-MX"));
+  add("");
+  add("    Equipo destino  : servicio " + d.nombreServicio + " en " + d.rutaInstalacion);
+  add("    Servidor SQL    : " + d.servidorSql + " / bdsGTE");
+  add("    Puerto          : " + d.puerto);
+  add("");
+  add("    Correr en la maquina nueva, en PowerShell COMO ADMINISTRADOR:");
+  add("        powershell -ExecutionPolicy Bypass -File .\\instalar-gte.ps1");
+  add("");
+  add("    Es idempotente: si un paso ya estaba hecho lo reporta como SKIP y sigue.");
+  if (!pedir) {
+    add("");
+    add("    ATENCION: este archivo contiene contrasenas en texto plano. Borralo cuando");
+    add("    termine la instalacion y no lo subas al repositorio.");
+  }
+  add("#>");
+  add();
+  add("$ErrorActionPreference = 'Stop'");
+  add("$ProgressPreference = 'SilentlyContinue'");
+  add();
+
+  add("# ============================ Datos capturados en el asistente ============================");
+  add("$NombreServicio   = " + psLiteral(d.nombreServicio));
+  add("$DisplayName      = " + psLiteral(d.displayName));
+  add("$RutaInstalacion  = " + psLiteral(d.rutaInstalacion));
+  add("$Puerto           = " + parseInt(d.puerto, 10));
+  add("$ServidorSql      = " + psLiteral(d.servidorSql));
+  add("$UsuarioSql       = " + psLiteral(d.usuarioSql));
+  add("$CrearLogin       = $" + (d.crearLogin ? "true" : "false"));
+  add("$AuthAdminAlta    = " + psLiteral(d.crearLogin ? d.authAdminAlta : "windows"));
+  add("$UsuarioAdminAlta = " + psLiteral(d.crearLogin && d.authAdminAlta === "sql" ? d.usuarioAdminAlta : ""));
+  add("$AdminDominio     = " + psLiteral(d.adminDominio));
+  add("$AdminNombre      = " + psLiteral(d.adminNombre));
+  add("$ForzarCambio     = $" + (d.forzarCambio ? "true" : "false"));
+  add("$CopiarPublish    = $" + (d.copiarPublish ? "true" : "false"));
+  add("$RutaOrigen       = " + psLiteral(d.copiarPublish ? d.rutaOrigenPublish : ""));
+  add("$AbrirFirewall    = $" + (d.abrirFirewall ? "true" : "false"));
+  add("$RutaAlmacen      = " + psLiteral(d.rutaAlmacen));
+  add("$UrlBase          = " + psLiteral(urlBase));
+  add();
+
+  add("# ============================ Contrasenas ============================");
+  if (pedir) {
+    add("# Se piden al ejecutar: este archivo no guarda ninguna contrasena.");
+    add("function LeerPassword {");
+    add("    param([string]$Titulo)");
+    add("    while ($true) {");
+    add("        $segura = Read-Host -Prompt $Titulo -AsSecureString");
+    add("        $texto = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(");
+    add("            [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($segura))");
+    add("        if (-not [string]::IsNullOrWhiteSpace($texto)) { return $texto }");
+    add("        Write-Host 'No puede quedar vacia.' -ForegroundColor Yellow");
+    add("    }");
+    add("}");
+    add();
+    add("Write-Host 'Contrasenas de esta instalacion' -ForegroundColor Cyan");
+    if (d.crearLogin) {
+      add("$PasswordSql = LeerPassword -Titulo (\"Contrasena CON LA QUE SE VA A CREAR '$UsuarioSql'\")");
+    } else {
+      add("$PasswordSql = LeerPassword -Titulo (\"Contrasena de conexion a SQL '$UsuarioSql'\")");
+    }
+    add("$AdminPassword = LeerPassword -Titulo (\"Contrasena del usuario administrador '$AdminDominio' de GTE\")");
+    if (d.crearLogin && d.authAdminAlta === "sql") {
+      add("$PasswordAdminAlta = LeerPassword -Titulo (\"Contrasena del administrador de SQL '$UsuarioAdminAlta' (para crear el login)\")");
+    } else {
+      add("$PasswordAdminAlta = ''");
+    }
+  } else {
+    add("# ATENCION: contrasenas en texto plano. Borrar este archivo al terminar.");
+    add("$PasswordSql      = " + psLiteral(d.passwordSql));
+    add("$AdminPassword    = " + psLiteral(d.adminPassword));
+    add("$PasswordAdminAlta = " + psLiteral(d.crearLogin && d.authAdminAlta === "sql" ? d.passwordAdminAlta : ""));
+  }
+  add();
+
+  // ------------------------------------------------------------ infraestructura del script
+  add("# ============================ Utilidades ============================");
+  add("$Global:Resumen = @()");
+  add();
+  add("function Titulo {");
+  add("    param([string]$Texto)");
+  add("    Write-Host ''");
+  add("    Write-Host ('=' * 70) -ForegroundColor DarkGray");
+  add("    Write-Host \"  $Texto\" -ForegroundColor Cyan");
+  add("    Write-Host ('=' * 70) -ForegroundColor DarkGray");
+  add("}");
+  add();
+  add("function Ok    { param([string]$T) Write-Host \"  OK   : $T\" -ForegroundColor Green;  $Global:Resumen += \"OK   : $T\" }");
+  add("function Salto { param([string]$T) Write-Host \"  SKIP : $T\" -ForegroundColor DarkGray; $Global:Resumen += \"SKIP : $T\" }");
+  add("function Aviso { param([string]$T) Write-Host \"  AVISO: $T\" -ForegroundColor Yellow; $Global:Resumen += \"AVISO: $T\" }");
+  add("function Detener {");
+  add("    param([string]$T)");
+  add("    Write-Host ''");
+  add("    Write-Host \"ERROR: $T\" -ForegroundColor Red");
+  add("    Write-Host 'La instalacion se detuvo. Corrige el punto de arriba y vuelve a correr este script.' -ForegroundColor Red");
+  add("    exit 1");
+  add("}");
+  add();
+
+  // Ejecucion de sqlcmd centralizada. Por defecto usa el login de conexion de la aplicacion
+  // (svc_gte o el que se haya capturado); -ComoAdmin usa en cambio la cuenta administradora de
+  // SQL (solo hace falta para crear el login, que un login de bajo privilegio no puede crearse
+  // a si mismo). Las consultas sueltas pasan por archivo temporal: -Q con texto multilinea y
+  // comillas es fragil, -i no.
+  add("function EjecutarSql {");
+  add("    param([string]$Archivo, [string]$Consulta, [string]$BaseDatos = 'bdsGTE', [switch]$ComoAdmin)");
+  add("    $temporalConsulta = $null");
+  add("    if (-not $Archivo) {");
+  add("        $temporalConsulta = Join-Path $env:TEMP ('gte-consulta-' + [guid]::NewGuid().ToString('N') + '.sql')");
+  add("        Set-Content -Path $temporalConsulta -Value $Consulta -Encoding UTF8");
+  add("        $Archivo = $temporalConsulta");
+  add("    }");
+  add("    $argumentos = @('-S', $ServidorSql, '-d', $BaseDatos, '-I', '-b', '-i', $Archivo)");
+  add("    if ($ComoAdmin -and $AuthAdminAlta -eq 'sql') { $argumentos += @('-U', $UsuarioAdminAlta, '-P', $PasswordAdminAlta) }");
+  add("    elseif ($ComoAdmin) { $argumentos += '-E' }");
+  add("    else { $argumentos += @('-U', $UsuarioSql, '-P', $PasswordSql) }");
+  add("    # sqlcmd escribe sus errores en stderr: con ErrorActionPreference en Stop, PowerShell 5.1");
+  add("    # los convierte en excepcion y se pierde el detalle. Se baja solo mientras corre sqlcmd.");
+  add("    $anterior = $ErrorActionPreference");
+  add("    $ErrorActionPreference = 'Continue'");
+  add("    try {");
+  add("        $salida = & sqlcmd @argumentos 2>&1");
+  add("        $codigo = $LASTEXITCODE");
+  add("    } finally {");
+  add("        $ErrorActionPreference = $anterior");
+  add("        if ($temporalConsulta -and (Test-Path $temporalConsulta)) { Remove-Item $temporalConsulta -Force }");
+  add("    }");
+  add("    return @{ Codigo = $codigo; Salida = ($salida | Out-String) }");
+  add("}");
+  add();
+
+  // ---------------------------------------------------------------- paso 1
+  add("Titulo 'Paso 1 de " + totalPasos(d) + ": requisitos de la maquina'");
+  add();
+  add("$identidad = [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()");
+  add("if (-not $identidad.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {");
+  add("    Detener 'Esta consola no es de administrador. Cierrala y abre PowerShell con \"Ejecutar como administrador\".'");
+  add("}");
+  add("Ok 'La consola corre como administrador'");
+  add();
+  add("$runtimes = & dotnet --list-runtimes 2>$null");
+  add("if ($LASTEXITCODE -ne 0 -or -not $runtimes) {");
+  add("    Detener 'No se encontro .NET en esta maquina. Instala el ASP.NET Core Runtime 8.0 (x64) desde https://dotnet.microsoft.com/download/dotnet/8.0 y vuelve a correr este script.'");
+  add("}");
+  add("if (-not ($runtimes | Where-Object { $_ -like 'Microsoft.AspNetCore.App 8.*' })) {");
+  add("    Write-Host ($runtimes | Out-String) -ForegroundColor DarkGray");
+  add("    Detener 'Falta el ASP.NET Core Runtime 8.0 (x64). .NET no usa otra version mayor aunque este instalada: instalalo desde https://dotnet.microsoft.com/download/dotnet/8.0'");
+  add("}");
+  add("Ok 'ASP.NET Core Runtime 8.0 presente'");
+  add();
+  add("if (-not (Get-Command sqlcmd -ErrorAction SilentlyContinue)) {");
+  add("    Detener 'No se encontro sqlcmd en esta maquina. Instala las herramientas de linea de comandos de SQL Server (sqlcmd) y vuelve a correr este script.'");
+  add("}");
+  add("Ok 'sqlcmd disponible'");
+  add();
+  if (d.copiarPublish) {
+    add("if (-not (Test-Path $RutaOrigen)) { Detener \"No existe la carpeta de origen del publish: $RutaOrigen\" }");
+    add("if (-not (Test-Path (Join-Path $RutaOrigen 'GTE.WebApi.exe'))) {");
+    add("    Detener \"En $RutaOrigen no esta GTE.WebApi.exe. Apunta a la carpeta que genero publicar.bat.\"");
+    add("}");
+    add("Ok \"Publish encontrado en $RutaOrigen\"");
+    add();
+  }
+  add("$conexionSql = Test-NetConnection -ComputerName ($ServidorSql -split '[\\\\,]')[0] -Port 1433 -WarningAction SilentlyContinue");
+  add("if (-not $conexionSql.TcpTestSucceeded) {");
+  add("    Aviso 'No hubo respuesta en el puerto 1433 del servidor SQL. Puede ser normal si usa un puerto o instancia con nombre distinto; si los scripts fallan mas adelante, revisa red y firewall de SQL.'");
+  add("} else {");
+  add("    Ok 'Hay conectividad de red hacia el servidor SQL (1433)'");
+  add("}");
+  add();
+
+  // ---------------------------------------------------------------- crear login de conexion
+  var paso = 2;
+  if (d.crearLogin) {
+    add("Titulo 'Paso " + paso + " de " + totalPasos(d) + ": login de conexion a bdsGTE'");
+    add();
+    add("# Mismo contenido que DataBase/Scripts/01_Libera/01_2026-08-01_SCRIPT_bdsGTE_UsuarioServicio.sql");
+    add("# del repositorio, con svc_gte/CAMBIAR-ESTA-CONTRASENA sustituidos por los valores reales");
+    add("# capturados en el asistente. Requiere permisos de administrador de SQL (crear un login es");
+    add("# a nivel de servidor, un login de bajo privilegio no puede crearse a si mismo).");
+    add("$plantillaLogin = @'");
+    add("USE [master]");
+    add("GO");
+    add("SET XACT_ABORT ON");
+    add("GO");
+    add("BEGIN TRANSACTION");
+    add("BEGIN TRY");
+    add("    DECLARE @NombreLogin SYSNAME = N'svc_gte';");
+    add("    DECLARE @Password NVARCHAR(128) = N'CAMBIAR-ESTA-CONTRASENA';");
+    add("    DECLARE @Sql NVARCHAR(MAX);");
+    add("    IF @Password = N'CAMBIAR-ESTA-CONTRASENA'");
+    add("    BEGIN");
+    add("        RAISERROR(N'Falta sustituir la contrasena de ejemplo.', 16, 1);");
+    add("    END");
+    add("    IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = @NombreLogin)");
+    add("    BEGIN");
+    add("        SET @Sql = N'CREATE LOGIN ' + QUOTENAME(@NombreLogin) + N'");
+    add("                     WITH PASSWORD = ' + QUOTENAME(@Password, N'''') + N',");
+    add("                     CHECK_POLICY = ON, CHECK_EXPIRATION = OFF,");
+    add("                     DEFAULT_DATABASE = [bdsGTE]';");
+    add("        EXEC sp_executesql @Sql;");
+    add("        PRINT 'OK: login ' + @NombreLogin + ' creado';");
+    add("    END");
+    add("    ELSE");
+    add("        PRINT 'SKIP: el login ' + @NombreLogin + ' ya existe';");
+    add("    COMMIT TRANSACTION");
+    add("    PRINT '===== Bloque 1 (login) ejecutado correctamente ====='");
+    add("END TRY");
+    add("BEGIN CATCH");
+    add("    IF @@TRANCOUNT > 0");
+    add("        ROLLBACK TRANSACTION;");
+    add("    PRINT '===== ERROR en Bloque 1 (login) -- Se hizo ROLLBACK =====';");
+    add("    PRINT 'Mensaje : ' + ERROR_MESSAGE();");
+    add("    PRINT 'Numero  : ' + CAST(ERROR_NUMBER() AS NVARCHAR(10));");
+    add("    THROW;");
+    add("END CATCH");
+    add("GO");
+    add("USE [bdsGTE]");
+    add("GO");
+    add("SET XACT_ABORT ON");
+    add("GO");
+    add("BEGIN TRANSACTION");
+    add("BEGIN TRY");
+    add("    DECLARE @NombreLogin SYSNAME = N'svc_gte';");
+    add("    DECLARE @Sql NVARCHAR(MAX);");
+    add("    IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = @NombreLogin)");
+    add("    BEGIN");
+    add("        SET @Sql = N'CREATE USER ' + QUOTENAME(@NombreLogin) + N' FOR LOGIN ' + QUOTENAME(@NombreLogin);");
+    add("        EXEC sp_executesql @Sql;");
+    add("        PRINT 'OK: usuario ' + @NombreLogin + ' creado en bdsGTE';");
+    add("    END");
+    add("    ELSE");
+    add("        PRINT 'SKIP: el usuario ' + @NombreLogin + ' ya existe en bdsGTE';");
+    add("    IF NOT EXISTS (SELECT 1 FROM sys.database_role_members rm");
+    add("                   JOIN sys.database_principals r ON r.principal_id = rm.role_principal_id");
+    add("                   JOIN sys.database_principals m ON m.principal_id = rm.member_principal_id");
+    add("                   WHERE r.name = 'db_datareader' AND m.name = @NombreLogin)");
+    add("    BEGIN");
+    add("        SET @Sql = N'ALTER ROLE db_datareader ADD MEMBER ' + QUOTENAME(@NombreLogin);");
+    add("        EXEC sp_executesql @Sql;");
+    add("        PRINT 'OK: ' + @NombreLogin + ' agregado a db_datareader';");
+    add("    END");
+    add("    ELSE");
+    add("        PRINT 'SKIP: ' + @NombreLogin + ' ya es miembro de db_datareader';");
+    add("    IF NOT EXISTS (SELECT 1 FROM sys.database_role_members rm");
+    add("                   JOIN sys.database_principals r ON r.principal_id = rm.role_principal_id");
+    add("                   JOIN sys.database_principals m ON m.principal_id = rm.member_principal_id");
+    add("                   WHERE r.name = 'db_datawriter' AND m.name = @NombreLogin)");
+    add("    BEGIN");
+    add("        SET @Sql = N'ALTER ROLE db_datawriter ADD MEMBER ' + QUOTENAME(@NombreLogin);");
+    add("        EXEC sp_executesql @Sql;");
+    add("        PRINT 'OK: ' + @NombreLogin + ' agregado a db_datawriter';");
+    add("    END");
+    add("    ELSE");
+    add("        PRINT 'SKIP: ' + @NombreLogin + ' ya es miembro de db_datawriter';");
+    add("    DECLARE @Procs TABLE (Nombre SYSNAME);");
+    add("    INSERT INTO @Procs (Nombre) VALUES");
+    add("        (N'spCambiarEstatus'), (N'spGenerarFolio'),");
+    add("        (N'spRegistrarBitacora'), (N'spSnapshotKpi');");
+    add("    DECLARE @Proc SYSNAME;");
+    add("    DECLARE cur CURSOR LOCAL FAST_FORWARD FOR SELECT Nombre FROM @Procs;");
+    add("    OPEN cur;");
+    add("    FETCH NEXT FROM cur INTO @Proc;");
+    add("    WHILE @@FETCH_STATUS = 0");
+    add("    BEGIN");
+    add("        IF NOT EXISTS (");
+    add("            SELECT 1 FROM sys.database_permissions dp");
+    add("            JOIN sys.database_principals p ON p.principal_id = dp.grantee_principal_id");
+    add("            WHERE dp.major_id = OBJECT_ID(N'dbo.' + @Proc)");
+    add("              AND dp.permission_name = 'EXECUTE' AND p.name = @NombreLogin)");
+    add("        BEGIN");
+    add("            SET @Sql = N'GRANT EXECUTE ON dbo.' + QUOTENAME(@Proc) + N' TO ' + QUOTENAME(@NombreLogin);");
+    add("            EXEC sp_executesql @Sql;");
+    add("            PRINT 'OK: EXECUTE sobre dbo.' + @Proc + ' concedido a ' + @NombreLogin;");
+    add("        END");
+    add("        ELSE");
+    add("            PRINT 'SKIP: ' + @NombreLogin + ' ya tiene EXECUTE sobre dbo.' + @Proc;");
+    add("        FETCH NEXT FROM cur INTO @Proc;");
+    add("    END");
+    add("    CLOSE cur;");
+    add("    DEALLOCATE cur;");
+    add("    COMMIT TRANSACTION");
+    add("    PRINT '===== Bloque 2 (usuario y permisos) ejecutado correctamente ====='");
+    add("END TRY");
+    add("BEGIN CATCH");
+    add("    IF @@TRANCOUNT > 0");
+    add("        ROLLBACK TRANSACTION;");
+    add("    IF CURSOR_STATUS('local', 'cur') >= -1");
+    add("    BEGIN");
+    add("        CLOSE cur;");
+    add("        DEALLOCATE cur;");
+    add("    END");
+    add("    PRINT '===== ERROR en Bloque 2 (usuario y permisos) -- Se hizo ROLLBACK =====';");
+    add("    PRINT 'Mensaje : ' + ERROR_MESSAGE();");
+    add("    PRINT 'Numero  : ' + CAST(ERROR_NUMBER() AS NVARCHAR(10));");
+    add("    THROW;");
+    add("END CATCH");
+    add("GO");
+    add("'@");
+    add();
+    add("$contenidoLogin = $plantillaLogin.Replace(\"N'CAMBIAR-ESTA-CONTRASENA'\", (\"N'\" + $PasswordSql.Replace(\"'\", \"''\") + \"'\"))");
+    add("if ($UsuarioSql -ne 'svc_gte') { $contenidoLogin = $contenidoLogin.Replace(\"N'svc_gte'\", (\"N'\" + $UsuarioSql.Replace(\"'\", \"''\") + \"'\")) }");
+    add();
+    add("$temporalLogin = Join-Path $env:TEMP ('gte-login-' + [guid]::NewGuid().ToString('N') + '.sql')");
+    add("try {");
+    add("    Set-Content -Path $temporalLogin -Value $contenidoLogin -Encoding UTF8");
+    add("    $r = EjecutarSql -Archivo $temporalLogin -BaseDatos 'master' -ComoAdmin");
+    add("    if ($r.Codigo -ne 0) {");
+    add("        Write-Host $r.Salida -ForegroundColor DarkGray");
+    add("        Detener \"No se pudo crear el login $UsuarioSql. Revisa las credenciales de administrador de SQL y que el servidor tenga habilitado el modo mixto.\"");
+    add("    }");
+    add("    Ok \"Login $UsuarioSql listo, con permisos minimos en bdsGTE\"");
+    add("} finally {");
+    add("    if (Test-Path $temporalLogin) { Remove-Item $temporalLogin -Force }");
+    add("}");
+    add();
+    paso++;
+  }
+
+  // ---------------------------------------------------------------- copia del publish
+  add("Titulo 'Paso " + paso + " de " + totalPasos(d) + ": aplicacion en la carpeta de instalacion'");
+  add();
+  add("$servicioExistente = Get-Service -Name $NombreServicio -ErrorAction SilentlyContinue");
+  add("if ($servicioExistente -and $servicioExistente.Status -ne 'Stopped') {");
+  add("    Stop-Service -Name $NombreServicio -Force");
+  add("    Ok \"Servicio $NombreServicio detenido para actualizar los archivos\"");
+  add("}");
+  add();
+  if (d.copiarPublish) {
+    add("# La carpeta destino se limpia por completo: dejar restos de un publish anterior mezcla");
+    add("# ensamblados de dos versiones distintas y la aplicacion truena al arrancar.");
+    add("if (Test-Path $RutaInstalacion) {");
+    add("    Get-ChildItem -Path $RutaInstalacion -Force | Remove-Item -Recurse -Force");
+    add("    Ok \"Contenido anterior de $RutaInstalacion eliminado\"");
+    add("} else {");
+    add("    New-Item -ItemType Directory -Path $RutaInstalacion -Force | Out-Null");
+    add("    Ok \"Carpeta $RutaInstalacion creada\"");
+    add("}");
+    add();
+    add("Copy-Item -Path (Join-Path $RutaOrigen '*') -Destination $RutaInstalacion -Recurse -Force");
+    add("Ok \"Aplicacion copiada desde $RutaOrigen\"");
+  } else {
+    add("if (-not (Test-Path (Join-Path $RutaInstalacion 'GTE.WebApi.exe'))) {");
+    add("    Detener \"No esta GTE.WebApi.exe en $RutaInstalacion. Copia ahi el publish, o marca la copia automatica en el asistente.\"");
+    add("}");
+    add("Salto 'No se copia el publish (asi se pidio en el asistente)'");
+  }
+  add();
+  add("$rutaExe = Join-Path $RutaInstalacion 'GTE.WebApi.exe'");
+  add("if (-not (Test-Path $rutaExe)) { Detener \"No quedo GTE.WebApi.exe en $RutaInstalacion.\" }");
+  add("if (-not (Test-Path (Join-Path $RutaInstalacion 'wwwroot\\assets'))) {");
+  add("    Aviso 'No hay wwwroot/assets en la carpeta instalada: la pantalla de login puede quedar sin estilos. Revisa que publicar.bat haya corrido completo.'");
+  add("}");
+  add();
+  paso++;
+
+  // ---------------------------------------------------------------- alta del administrador
+  add("Titulo 'Paso " + paso + " de " + totalPasos(d) + ": usuario administrador de GTE'");
+  add();
+  add("# La contrasena temporal se genera aqui mismo, al vuelo: no queda ninguna contrasena fija en");
+  add("# el repositorio. Se hashea con BCrypt.Net-Next.dll (la misma libreria que usa la API, ya");
+  add("# copiada a $RutaInstalacion en el paso anterior) para que el login de mas abajo la verifique");
+  add("# igual que si la hubiera puesto la propia API.");
+  add("$rutaBCrypt = Join-Path $RutaInstalacion 'BCrypt.Net-Next.dll'");
+  add("if (-not (Test-Path $rutaBCrypt)) { Detener \"No se encontro BCrypt.Net-Next.dll en $RutaInstalacion.\" }");
+  add("Add-Type -Path $rutaBCrypt");
+  add("$bytesTemporal = New-Object byte[] 24");
+  add("(New-Object System.Security.Cryptography.RNGCryptoServiceProvider).GetBytes($bytesTemporal)");
+  add("$PasswordTemporal = [Convert]::ToBase64String($bytesTemporal)");
+  add("$HashTemporal = [BCrypt.Net.BCrypt]::HashPassword($PasswordTemporal)");
+  add();
+  add("# Alta idempotente: si ya diste de alta al Administrador corriendo los scripts a mano, esto");
+  add("# solo confirma que existe y sigue de largo (mas adelante se le ajusta la contrasena). Si no");
+  add("# existe todavia, lo crea con la contrasena temporal generada arriba.");
+  add("$sqlAdmin = @\"");
+  add("IF NOT EXISTS (SELECT 1 FROM dbo.tblUsuario WHERE Dominio = " + sqlLiteral(d.adminDominio) + ")");
+  add("BEGIN");
+  add("    DECLARE @IdUsuario INT;");
+  add("    INSERT INTO dbo.tblUsuario (Dominio, Nombre, Activo, FechaRegistro, UsuarioRegistro, PasswordHash, RequiereCambioPassword)");
+  add("    VALUES (" + sqlLiteral(d.adminDominio) + ", " + sqlLiteral(d.adminNombre) + ", 1, SYSDATETIME(), N'instalador-gte', N'$HashTemporal', 1);");
+  add("    SET @IdUsuario = SCOPE_IDENTITY();");
+  add("    INSERT INTO dbo.tblUsuarioRol (IdUsuario, IdRol, FechaRegistro, UsuarioRegistro, Activo)");
+  add("    SELECT @IdUsuario, IdRol, SYSDATETIME(), N'instalador-gte', 1");
+  add("    FROM dbo.tblRol WHERE Nombre = N'Administrador';");
+  add("    PRINT 'CREADO';");
+  add("END");
+  add("ELSE");
+  add("    PRINT 'YA_EXISTIA';");
+  add("\"@");
+  add();
+  add("$r = EjecutarSql -Consulta $sqlAdmin");
+  add("if ($r.Codigo -ne 0) {");
+  add("    Write-Host $r.Salida -ForegroundColor DarkGray");
+  add("    Detener 'No se pudo dar de alta el usuario administrador. Revisa que los scripts de esquema hayan corrido completos.'");
+  add("}");
+  add("$adminRecienCreado = $r.Salida -match 'CREADO'");
+  add("if ($adminRecienCreado) { Ok \"Usuario administrador '$AdminDominio' creado con rol Administrador\" }");
+  add("else { Salto \"El usuario '$AdminDominio' ya existia en bdsGTE (no se toca su contrasena)\" }");
+  add();
+  paso++;
+
+  // ---------------------------------------------------------------- puerto
+  add("Titulo 'Paso " + paso + " de " + totalPasos(d) + ": puerto " + d.puerto + " en appsettings.Production.json'");
+  add();
+  add("$rutaProduccion = Join-Path $RutaInstalacion 'appsettings.Production.json'");
+  add("$configuracion = @{ Kestrel = @{ Endpoints = @{ Http = @{ Url = \"http://0.0.0.0:$Puerto\" } } } }");
+  add("if (Test-Path $rutaProduccion) {");
+  add("    try {");
+  add("        $actual = Get-Content -Path $rutaProduccion -Raw | ConvertFrom-Json");
+  add("        # Se conserva lo que ya trajera el archivo y solo se reescribe el endpoint HTTP.");
+  add("        $propiedades = @{}");
+  add("        foreach ($p in $actual.PSObject.Properties) { if ($p.Name -ne 'Kestrel') { $propiedades[$p.Name] = $p.Value } }");
+  add("        $propiedades['Kestrel'] = $configuracion.Kestrel");
+  add("        $configuracion = $propiedades");
+  add("    } catch {");
+  add("        Aviso 'appsettings.Production.json no se pudo leer como JSON, se reescribe completo'");
+  add("    }");
+  add("}");
+  add("$configuracion | ConvertTo-Json -Depth 10 | Set-Content -Path $rutaProduccion -Encoding UTF8");
+  add("Ok \"Kestrel escuchando en http://0.0.0.0:$Puerto\"");
+  add();
+  paso++;
+
+  // ---------------------------------------------------------------- servicio
+  add("Titulo 'Paso " + paso + " de " + totalPasos(d) + ": servicio de Windows'");
+  add();
+  add("if ($servicioExistente) {");
+  add("    # Ya existia: solo se reapunta el ejecutable por si cambio la carpeta de instalacion.");
+  add("    & sc.exe config $NombreServicio binPath= \"$rutaExe\" start= auto DisplayName= \"$DisplayName\" | Out-Null");
+  add("    if ($LASTEXITCODE -ne 0) { Detener \"No se pudo reconfigurar el servicio $NombreServicio.\" }");
+  add("    Salto \"El servicio $NombreServicio ya existia (se actualizo su ruta y nombre para mostrar)\"");
+  add("} else {");
+  add("    & sc.exe create $NombreServicio binPath= \"$rutaExe\" start= auto DisplayName= \"$DisplayName\" | Out-Null");
+  add("    if ($LASTEXITCODE -ne 0) { Detener \"No se pudo crear el servicio $NombreServicio.\" }");
+  add("    Ok \"Servicio $NombreServicio creado (corre como LocalSystem)\"");
+  add("}");
+  add();
+  paso++;
+
+  // ---------------------------------------------------------------- variables de entorno
+  add("Titulo 'Paso " + paso + " de " + totalPasos(d) + ": variables de entorno del servicio'");
+  add();
+  add("# Mismo mecanismo que configurar-servicio-completo.ps1: se conserva lo que ya haya en el");
+  add("# registro del servicio y solo se reemplaza la linea de cada variable que se toca.");
+  add("$rutaRegistro = \"HKLM:\\SYSTEM\\CurrentControlSet\\Services\\$NombreServicio\"");
+  add();
+  add("function ActualizarVariable {");
+  add("    param([string]$Clave, [string]$Valor)");
+  add("    $actuales = @()");
+  add("    try { $actuales = (Get-ItemProperty -Path $rutaRegistro -Name Environment -ErrorAction Stop).Environment } catch { $actuales = @() }");
+  add("    $sinClave = @($actuales | Where-Object { $_ -notlike \"$Clave=*\" })");
+  add("    $nuevas = $sinClave + \"$Clave=$Valor\"");
+  add("    New-ItemProperty -Path $rutaRegistro -Name Environment -PropertyType MultiString -Value $nuevas -Force | Out-Null");
+  add("}");
+  add();
+  add("ActualizarVariable -Clave 'ASPNETCORE_ENVIRONMENT' -Valor 'Production'");
+  add("Ok 'ASPNETCORE_ENVIRONMENT = Production'");
+  add();
+  add("$cadenaConexion = \"Server=$ServidorSql;Database=bdsGTE;User Id=$UsuarioSql;Password=$PasswordSql;TrustServerCertificate=True;Application Name=GTE.WebApi\"");
+  add("ActualizarVariable -Clave 'ConnectionStrings__bdsGTE' -Valor $cadenaConexion");
+  add("Ok \"ConnectionStrings__bdsGTE apuntando a $ServidorSql como $UsuarioSql\"");
+  add();
+  add("# Clave de firma nueva y distinta por ambiente: la API no arranca sin ella fuera de Development.");
+  add("$bytes = New-Object byte[] 48");
+  add("$generador = [System.Security.Cryptography.RandomNumberGenerator]::Create()");
+  add("$generador.GetBytes($bytes)");
+  add("$claveJwt = [Convert]::ToBase64String($bytes)");
+  add("ActualizarVariable -Clave 'Jwt__ClaveFirma' -Valor $claveJwt");
+  add("Ok 'Jwt__ClaveFirma generada (aleatoria, exclusiva de esta instalacion)'");
+  add();
+  // Siempre, no opcional: sin esta variable gana la ruta de appsettings.json, que apunta a
+  // la unidad D: de la maquina de desarrollo, y toda subida de archivos falla en el servidor.
+  add("ActualizarVariable -Clave 'AlmacenArchivos__Ruta' -Valor $RutaAlmacen");
+  add("Ok \"AlmacenArchivos__Ruta = $RutaAlmacen\"");
+  add();
+  add("# Se crea aqui para que el servicio no tenga que crearla en la primera subida, y para");
+  add("# que un error de ruta o de permisos salte durante la instalacion y no en produccion.");
+  add("if ($RutaAlmacen -like '\\\\*') {");
+  add("    Aviso \"El almacen es un share de red. Confirma que la cuenta del servicio tenga lectura y escritura sobre $RutaAlmacen.\"");
+  add("} else {");
+  add("    try {");
+  add("        if (-not (Test-Path $RutaAlmacen)) { New-Item -ItemType Directory -Path $RutaAlmacen -Force -ErrorAction Stop | Out-Null }");
+  add("        # Combine y no Join-Path: Join-Path valida la unidad y tapa el error real con un");
+  add("        # 'la ruta no puede ser nula' que no le dice nada a quien instala.");
+  add("        $sonda = [IO.Path]::Combine($RutaAlmacen, '.sonda-' + [Guid]::NewGuid().ToString('N'))");
+  add("        [IO.File]::WriteAllBytes($sonda, [byte[]]@(0))");
+  add("        Remove-Item $sonda -Force");
+  add("        Ok \"El almacen de archivos $RutaAlmacen existe y acepta escritura\"");
+  add("    } catch {");
+  add("        Detener \"No se pudo escribir en el almacen de archivos $($RutaAlmacen): $($_.Exception.Message). Corrige la ruta o los permisos: sin esto ninguna subida de archivos va a funcionar.\"");
+  add("    }");
+  add("}");
+  add();
+  paso++;
+
+  // ---------------------------------------------------------------- firewall
+  if (d.abrirFirewall) {
+    add("Titulo 'Paso " + paso + " de " + totalPasos(d) + ": firewall'");
+    add();
+    add("$nombreRegla = \"GTE ($NombreServicio)\"");
+    add("$reglaExistente = Get-NetFirewallRule -DisplayName $nombreRegla -ErrorAction SilentlyContinue");
+    add("if ($reglaExistente) {");
+    add("    Salto \"La regla de firewall '$nombreRegla' ya existia\"");
+    add("} else {");
+    add("    New-NetFirewallRule -DisplayName $nombreRegla -Direction Inbound -Action Allow -Protocol TCP -LocalPort $Puerto | Out-Null");
+    add("    Ok \"Puerto $Puerto abierto para entrada (regla '$nombreRegla')\"");
+    add("}");
+    add();
+    paso++;
+  }
+
+  // ---------------------------------------------------------------- arranque y health
+  add("Titulo 'Paso " + paso + " de " + totalPasos(d) + ": arranque y verificacion'");
+  add();
+  add("Start-Service -Name $NombreServicio");
+  add("Start-Sleep -Seconds 3");
+  add("$estado = (Get-Service -Name $NombreServicio).Status");
+  add("if ($estado -ne 'Running') {");
+  add("    Detener \"El servicio quedo en estado '$estado'. Revisa el Visor de Eventos (Application) y los archivos logs/gte-*.log dentro de $RutaInstalacion.\"");
+  add("}");
+  add("Ok \"Servicio $NombreServicio corriendo\"");
+  add();
+  add("$salud = $null");
+  add("foreach ($intento in 1..10) {");
+  add("    try {");
+  add("        $salud = Invoke-RestMethod -Uri \"$UrlBase/health\" -TimeoutSec 5");
+  add("        break");
+  add("    } catch {");
+  add("        Start-Sleep -Seconds 2");
+  add("    }");
+  add("}");
+  add("if (-not $salud -or $salud.estado -ne 'ok') {");
+  add("    Detener \"La API no respondio en $UrlBase/health. Revisa logs/gte-*.log dentro de $($RutaInstalacion). Casi siempre es la cadena de conexion o los permisos del login $UsuarioSql.\"");
+  add("}");
+  add("Ok \"La API responde en $UrlBase/health\"");
+  add();
+  paso++;
+
+  // ---------------------------------------------------------------- contrasena real del admin
+  add("Titulo 'Paso " + paso + " de " + totalPasos(d) + ": contrasena del administrador'");
+  add();
+  add("# La contrasena real se fija contra la propia API para que la hashee con la misma version de");
+  add("# BCrypt que usa GTE al validar el login. Solo aplica si el instalador acaba de crear la cuenta.");
+  add("if (-not $adminRecienCreado) {");
+  add("    Salto \"'$AdminDominio' ya existia: conserva la contrasena que ya tenia\"");
+  add("} else {");
+  add("    try {");
+  add("        $login = Invoke-RestMethod -Uri \"$UrlBase/api/v1/auth/login\" -Method Post -ContentType 'application/json' -TimeoutSec 15 -Body (@{");
+  add("            dominio = $AdminDominio");
+  add("            password = $PasswordTemporal");
+  add("        } | ConvertTo-Json)");
+  add();
+  add("        $token = $login.response.token");
+  add("        if (-not $token) { throw 'La API no devolvio token.' }");
+  add();
+  add("        Invoke-RestMethod -Uri \"$UrlBase/api/v1/auth/cambiar-password\" -Method Post -ContentType 'application/json' -TimeoutSec 15 -Headers @{ Authorization = \"Bearer $token\" } -Body (@{");
+  add("            passwordActual = $PasswordTemporal");
+  add("            passwordNueva = $AdminPassword");
+  add("        } | ConvertTo-Json) | Out-Null");
+  add();
+  add("        Ok \"Contrasena de '$AdminDominio' establecida\"");
+  add();
+  if (d.forzarCambio) {
+    add("        $r = EjecutarSql -Consulta (\"UPDATE dbo.tblUsuario SET RequiereCambioPassword = 1 WHERE Dominio = N'\" + $AdminDominio.Replace(\"'\", \"''\") + \"'\")");
+    add("        if ($r.Codigo -eq 0) { Ok 'Se le va a exigir cambiar la contrasena en el primer inicio de sesion' }");
+    add("        else { Aviso 'No se pudo marcar RequiereCambioPassword: la cuenta entra directo con la contrasena capturada.' }");
+  }
+  add("    } catch {");
+  add("        Write-Host \"    Detalle: $($_.Exception.Message)\" -ForegroundColor DarkGray");
+  add("        Aviso \"No se pudo fijar la contrasena capturada. La cuenta '$AdminDominio' quedo con la contrasena TEMPORAL '$PasswordTemporal', que es publica en el repositorio: entra a $UrlBase y cambiala de inmediato.\"");
+  add("    }");
+  add("}");
+  add();
+
+  // ---------------------------------------------------------------- cierre
+  add("Titulo 'Instalacion terminada'");
+  add();
+  add("foreach ($linea in $Global:Resumen) {");
+  add("    if ($linea -like 'AVISO*') { Write-Host \"  $linea\" -ForegroundColor Yellow }");
+  add("    elseif ($linea -like 'SKIP*') { Write-Host \"  $linea\" -ForegroundColor DarkGray }");
+  add("    else { Write-Host \"  $linea\" -ForegroundColor Green }");
+  add("}");
+  add();
+  add("Write-Host ''");
+  add("Write-Host 'GTE quedo instalado en esta maquina.' -ForegroundColor Green");
+  add("Write-Host \"  Direccion    : http://$env:COMPUTERNAME`:$Puerto/\"");
+  add("Write-Host \"  Usuario      : $AdminDominio\"");
+  add("Write-Host \"  Servicio     : $NombreServicio ($DisplayName)\"");
+  add("Write-Host \"  Base de datos: bdsGTE en $ServidorSql\"");
+  add("Write-Host ''");
+  add("Write-Host 'Guarda en el gestor de contrasenas del equipo:' -ForegroundColor Cyan");
+  add("Write-Host \"  - La contrasena del login de SQL $UsuarioSql\"");
+  add("Write-Host \"  - La contrasena del usuario $AdminDominio\"");
+  add("Write-Host '  - La clave Jwt__ClaveFirma que se genero en este equipo:'");
+  add("Write-Host \"    $claveJwt\"");
+  if (!pedir) {
+    add("Write-Host ''");
+    add("Write-Host 'Borra este archivo .ps1: contiene contrasenas en texto plano.' -ForegroundColor Yellow");
+  }
+  add("Write-Host ''");
+
+  return L.join("\r\n");
+}
+
+function totalPasos(d) {
+  // requisitos + admin + aplicacion + puerto + servicio + variables + arranque + contrasena
+  var total = 8;
+  if (d.crearLogin) total++;
+  if (d.abrirFirewall) total++;
+  return total;
+}
+
+// ---------------------------------------------------------------- pintado de la UI
+
+var scriptActual = "";
+
+function pintarPasos(d) {
+  var mapa = {
+    "p-login": d.crearLogin,
+    "p-copiar": d.copiarPublish,
+    "p-fw": d.abrirFirewall
+  };
+  Object.keys(mapa).forEach(function (id) {
+    $(id).classList.toggle("apagado", !mapa[id]);
+  });
+}
+
+function refrescar() {
+  var d = leerDatos();
+
+  // Secciones que aparecen o desaparecen segun los checkboxes
+  $("grupoOrigenPublish").hidden = !d.copiarPublish;
+  $("grupoAdminSql").hidden = !d.crearLogin;
+  $("grupoCredencialesAdmin").hidden = !(d.crearLogin && d.authAdminAlta === "sql");
+  $("avisoSecretos").hidden = d.modoSecretos !== "incrustar";
+
+  var errores = validar(d);
+
+  // Mensajes de error campo por campo
+  ["nombreServicio","displayName","rutaInstalacion","puerto","rutaOrigenPublish","rutaAlmacen",
+   "servidorSql","usuarioSql","passwordSql","passwordSql2","usuarioAdminAlta","passwordAdminAlta",
+   "adminDominio","adminNombre","adminPassword","adminPassword2"].forEach(function (campo) {
+    var input = $(campo);
+    var caja = $("err-" + campo);
+    if (!input || !caja) return;
+    var mensaje = errores[campo];
+    caja.textContent = mensaje || "";
+    caja.classList.toggle("visible", !!mensaje);
+    input.classList.toggle("error", !!mensaje);
+  });
+
+  var listaErrores = Object.keys(errores);
+  var estado = $("estadoValidacion");
+
+  if (listaErrores.length) {
+    estado.className = "mal";
+    estado.innerHTML = "Faltan " + listaErrores.length + " dato(s) por corregir:<ul>" +
+      listaErrores.slice(0, 6).map(function (k) {
+        var etiqueta = document.querySelector('label[for="' + k + '"]');
+        var nombre = etiqueta ? etiqueta.textContent.replace("*", "").trim() : k;
+        return "<li>" + nombre + ": " + errores[k] + "</li>";
+      }).join("") + "</ul>";
+    $("btnDescargar").disabled = true;
+    $("btnCopiar").disabled = true;
+    $("vistaPrevia").textContent = "Corrige los datos marcados para generar el instalador.";
+    scriptActual = "";
+  } else {
+    estado.className = "ok";
+    estado.textContent = "Datos completos. El instalador esta listo para descargar.";
+    $("btnDescargar").disabled = false;
+    $("btnCopiar").disabled = false;
+    scriptActual = generarScript(d);
+    $("vistaPrevia").textContent = scriptActual;
+  }
+
+  pintarPasos(d);
+}
+
+function avisar(texto) {
+  var toast = $("toast");
+  toast.textContent = texto;
+  toast.classList.add("visible");
+  setTimeout(function () { toast.classList.remove("visible"); }, 2200);
+}
+
+$("btnDescargar").addEventListener("click", function () {
+  if (!scriptActual) return;
+  // BOM incluido: PowerShell 5.1 lee el archivo como UTF-8 solo si lo trae.
+  var blob = new Blob(["\ufeff" + scriptActual], { type: "text/plain;charset=utf-8" });
+  var url = URL.createObjectURL(blob);
+  var enlace = document.createElement("a");
+  enlace.href = url;
+  enlace.download = "instalar-gte.ps1";
+  document.body.appendChild(enlace);
+  enlace.click();
+  document.body.removeChild(enlace);
+  setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  avisar("instalar-gte.ps1 descargado");
+});
+
+$("btnCopiar").addEventListener("click", function () {
+  if (!scriptActual) return;
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(scriptActual).then(function () { avisar("Script copiado"); });
+    return;
+  }
+  // file:// no siempre es contexto seguro: respaldo con textarea.
+  var area = document.createElement("textarea");
+  area.value = scriptActual;
+  area.style.position = "fixed";
+  area.style.opacity = "0";
+  document.body.appendChild(area);
+  area.select();
+  try { document.execCommand("copy"); avisar("Script copiado"); }
+  catch (e) { avisar("No se pudo copiar: selecciona el texto de la vista previa"); }
+  document.body.removeChild(area);
+});
+
+document.addEventListener("input", refrescar);
+document.addEventListener("change", refrescar);
+refrescar();
+</script>
+
+</body>
+</html>

@@ -26,6 +26,9 @@
          sobre EPPlus porque EPPlus exige licencia comercial de paga desde su v5 para uso
          empresarial (decision confirmada con el usuario antes de codear este bloque). -->
     <PackageReference Include="ClosedXML" Version="0.104.1" />
+    <!-- Referencia directa para forzar la version resuelta de una dependencia transitiva de
+         ClosedXML/DocumentFormat.OpenXml: la 8.0.0 tiene CVE-2024-43484 (DoS). -->
+    <PackageReference Include="System.IO.Packaging" Version="8.0.1" />
   </ItemGroup>
 
   <ItemGroup>

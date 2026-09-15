@@ -23,6 +23,9 @@
          mismo bdsGTE, schema [HangFire] separado que la libreria crea/migra sola. -->
     <PackageReference Include="Hangfire.AspNetCore" Version="1.8.14" />
     <PackageReference Include="Hangfire.SqlServer" Version="1.8.14" />
+    <!-- Referencia directa para forzar la version resuelta de una dependencia transitiva
+         (Hangfire.SqlServer trae 11.0.1): CVE-2024-21907 (DoS por JSON anidado). -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
 
   <ItemGroup>

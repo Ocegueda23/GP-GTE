@@ -110,6 +110,12 @@ builder.Services.AddScoped<GTE.Application.Interfaces.IMiDiaQueryService, GTE.In
 builder.Services.AddScoped<GTE.Domain.Interfaces.ISolicitudRepository, GTE.Infrastructure.Repositories.SolicitudRepository>();
 builder.Services.AddScoped<GTE.Application.Interfaces.ISolicitudQueryService, GTE.Infrastructure.Services.SolicitudQueryService>();
 
+// Modulo Ausencias (registro y aprobacion)
+builder.Services.AddScoped<GTE.Domain.Interfaces.IAusenciaRepository, GTE.Infrastructure.Repositories.AusenciaRepository>();
+builder.Services.AddScoped<GTE.Application.Interfaces.IAusenciaQueryService, GTE.Infrastructure.Services.AusenciaQueryService>();
+builder.Services.AddScoped<GTE.Domain.Interfaces.INotaVersionRepository, GTE.Infrastructure.Repositories.NotaVersionRepository>();
+builder.Services.AddScoped<GTE.Application.Interfaces.INotaVersionQueryService, GTE.Infrastructure.Services.NotaVersionQueryService>();
+
 // Modulo Tickets (Mesa de ayuda y SLA)
 builder.Services.AddScoped<GTE.Domain.Interfaces.ITicketRepository, GTE.Infrastructure.Repositories.TicketRepository>();
 builder.Services.AddScoped<GTE.Application.Interfaces.ITicketQueryService, GTE.Infrastructure.Services.TicketQueryService>();
@@ -298,6 +304,26 @@ else
 }
 
 app.UseSerilogRequestLogging();
+
+// Cabeceras defensivas en toda respuesta (API, SPA y estaticos): sin CSP porque el SPA hoy
+// usa scripts/estilos inline generados por Vite y romperia sin una politica afinada por
+// nonce/hash -- queda pendiente para cuando se revise el build de produccion.
+app.Use(async (contexto, siguiente) =>
+{
+    contexto.Response.OnStarting(() =>
+    {
+        contexto.Response.Headers.Append("X-Content-Type-Options", "nosniff");
+        contexto.Response.Headers.Append("X-Frame-Options", "DENY");
+        contexto.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
+        if (contexto.Request.IsHttps)
+        {
+            contexto.Response.Headers.Append("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+        }
+        return Task.CompletedTask;
+    });
+    await siguiente();
+});
+
 app.UseMiddleware<GlobalExceptionMiddleware>();
 
 if (app.Environment.IsDevelopment())
