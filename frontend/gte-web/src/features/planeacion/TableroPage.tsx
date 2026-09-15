@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import {
-  Alert, Box, Chip, LinearProgress, Link,
+  Alert, Box, Button, Chip, LinearProgress, Link,
   Paper, Snackbar, Stack, Typography,
 } from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
 import {
   DndContext, DragOverlay, PointerSensor, useDraggable, useDroppable,
   useSensor, useSensors, type DragEndEvent, type DragStartEvent,
@@ -14,8 +15,13 @@ import { ComboBuscable } from "../../shared/components/ComboBuscable";
 import { moverTarjeta, obtenerTablero, type ColumnaTablero } from "../../shared/api/planeacion";
 import { obtenerCatalogosBandeja, type BandejaItem } from "../../shared/api/workitems";
 import { useSesion } from "../../shared/api/sesion";
+import { NuevoItemModal } from "../trabajo/NuevoItemModal";
 
 const TODOS_LOS_EQUIPOS = "todos";
+const TODAS_LAS_PERSONAS = "todas";
+
+/** dbo.tblEstatusWorkItem.Suspendido: el tablero lo pinta como apartado, no como etapa. */
+const ESTATUS_SUSPENDIDO = 5;
 
 function Tarjeta({ item, arrastrable = true, ajena = false }: {
   item: BandejaItem; arrastrable?: boolean; ajena?: boolean;
@@ -64,6 +70,7 @@ function Tarjeta({ item, arrastrable = true, ajena = false }: {
 function Columna({ columna, esPropia }: { columna: ColumnaTablero; esPropia: (item: BandejaItem) => boolean }) {
   const { setNodeRef, isOver } = useDroppable({ id: `col-${columna.idEstatusWorkItem}` });
   const excedeWip = columna.limiteWip !== null && columna.items.length >= columna.limiteWip;
+  const detenida = columna.idEstatusWorkItem === ESTATUS_SUSPENDIDO;
 
   return (
     <Paper
@@ -74,11 +81,15 @@ function Columna({ columna, esPropia }: { columna: ColumnaTablero; esPropia: (it
         minWidth: 240,
         flex: 1,
         backgroundColor: isOver ? "action.hover" : "background.paper",
-        borderColor: isOver ? "primary.main" : undefined,
+        borderColor: isOver ? "primary.main" : detenida ? "warning.light" : undefined,
+        borderStyle: detenida ? "dashed" : undefined,
       }}
     >
       <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", mb: 1 }}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{columna.nombre}</Typography>
+        <Typography variant="subtitle2"
+          sx={{ fontWeight: 700, color: detenida ? "warning.dark" : undefined }}>
+          {columna.nombre}
+        </Typography>
         <Chip
           size="small"
           color={excedeWip ? "warning" : "default"}
@@ -88,7 +99,9 @@ function Columna({ columna, esPropia }: { columna: ColumnaTablero; esPropia: (it
         />
       </Stack>
       {columna.items.length === 0 && (
-        <Typography variant="caption" color="text.secondary">Sin elementos.</Typography>
+        <Typography variant="caption" color="text.secondary">
+          {detenida ? "Nada detenido." : "Sin elementos."}
+        </Typography>
       )}
       {columna.items.map((item) => {
         const propia = esPropia(item);
@@ -107,6 +120,11 @@ export function TableroPage() {
   const sensores = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const sesion = useSesion((estado) => estado.sesion);
   const puede = useSesion((estado) => estado.puede);
+  // El tablero abre en "solo lo mio", que es como se usa a diario; el combo permite ver
+  // el tablero completo del equipo eligiendo "Todas las personas".
+  const [idAsignado, setIdAsignado] = useState<number | typeof TODAS_LAS_PERSONAS>(
+    sesion?.idUsuario ?? TODAS_LAS_PERSONAS);
+  const [modalNuevo, setModalNuevo] = useState(false);
 
   const catalogos = useQuery({
     queryKey: ["catalogos-bandeja"],
@@ -116,10 +134,11 @@ export function TableroPage() {
 
   const equipos = catalogos.data?.equipos ?? [];
   const equipoActual = idEquipo === TODOS_LOS_EQUIPOS ? undefined : idEquipo;
+  const asignadoActual = idAsignado === TODAS_LAS_PERSONAS ? undefined : idAsignado;
 
   const tablero = useQuery({
-    queryKey: ["tablero", equipoActual ?? TODOS_LOS_EQUIPOS],
-    queryFn: () => obtenerTablero(equipoActual),
+    queryKey: ["tablero", equipoActual ?? TODOS_LOS_EQUIPOS, asignadoActual ?? TODAS_LAS_PERSONAS],
+    queryFn: () => obtenerTablero(equipoActual, asignadoActual),
   });
 
   // RN-GTE-021: un usuario no puede arrastrar (y por lo tanto mover de columna) una
@@ -128,6 +147,18 @@ export function TableroPage() {
   // (RN-GTE-012), esto evita el intento fallido y avisa por que en la propia tarjeta.
   const esPropia = (item: BandejaItem) =>
     item.idAsignado === sesion?.idUsuario || puede("WI.ModificarAjeno");
+
+  // El alta desde el tablero abre con el contexto que el tablero ya conoce, y todo sigue
+  // editable en el modal: el proyecto solo si el equipo filtrado tiene uno solo (con varios
+  // no hay default honesto) y el sprint activo solo si la persona puede comprometer sprints,
+  // porque el backend lo exige de todas formas (RN-GTE-019).
+  const proyectosDelEquipo = (catalogos.data?.proyectos ?? [])
+    .filter((p) => equipoActual !== undefined && p.idEquipo === equipoActual);
+  const inicialAlta = {
+    idProyecto: proyectosDelEquipo.length === 1 ? proyectosDelEquipo[0].id : undefined,
+    idSprint: puede("PLA.GestionarSprints") ? (tablero.data?.idSprintActivo ?? undefined) : undefined,
+    idAsignado: asignadoActual,
+  };
 
   const alIniciarArrastre = (evento: DragStartEvent) => {
     const id = Number(evento.active.id);
@@ -164,10 +195,21 @@ export function TableroPage() {
     <Box sx={{ p: 2 }}>
       <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", mb: 2 }}>
         <Typography variant="h5" sx={{ fontWeight: 700 }}>Tablero</Typography>
-        <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
+        <Stack direction="row" spacing={2}
+          sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 1, justifyContent: "flex-end" }}>
           {tablero.data?.sprintActivo && (
             <Chip color="success" label={`Sprint activo: ${tablero.data.sprintActivo}`} />
           )}
+          <ComboBuscable
+            label="Asignado"
+            value={idAsignado}
+            onChange={(v) => setIdAsignado(v === TODAS_LAS_PERSONAS ? TODAS_LAS_PERSONAS : (v as number))}
+            opciones={[
+              { valor: TODAS_LAS_PERSONAS, etiqueta: "Todas las personas" },
+              ...(catalogos.data?.usuarios ?? []).map((u) => ({ valor: u.id, etiqueta: u.nombre })),
+            ]}
+            sx={{ minWidth: 200 }}
+          />
           <ComboBuscable
             label="Equipo"
             value={idEquipo}
@@ -178,6 +220,9 @@ export function TableroPage() {
             ]}
             sx={{ minWidth: 200 }}
           />
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setModalNuevo(true)}>
+            Nuevo
+          </Button>
         </Stack>
       </Stack>
 
@@ -203,6 +248,20 @@ export function TableroPage() {
             {arrastrando && <Tarjeta item={arrastrando} arrastrable={false} ajena={!esPropia(arrastrando)} />}
           </DragOverlay>
         </DndContext>
+      )}
+
+      {modalNuevo && (
+        <NuevoItemModal
+          abierto
+          catalogos={catalogos.data}
+          inicial={inicialAlta}
+          alCerrar={() => setModalNuevo(false)}
+          alExito={(mensaje) => {
+            setAviso({ tipo: "success", mensaje });
+            void clienteQuery.invalidateQueries({ queryKey: ["tablero"] });
+          }}
+          alError={(mensaje) => setAviso({ tipo: "error", mensaje })}
+        />
       )}
 
       <Snackbar open={aviso !== null} autoHideDuration={6000} onClose={() => setAviso(null)}

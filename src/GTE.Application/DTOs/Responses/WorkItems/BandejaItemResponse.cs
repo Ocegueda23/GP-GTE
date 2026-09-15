@@ -17,6 +17,7 @@ public class BandejaItemResponse
     public int? IdAsignado { get; set; }
     public string? Asignado { get; set; }
     public string? Sprint { get; set; }
+    public string? FolioSprint { get; set; }
     public DateTime? FechaCompromiso { get; set; }
     public bool EsVencida { get; set; }
     public decimal? PuntosHistoria { get; set; }

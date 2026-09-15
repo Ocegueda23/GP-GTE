@@ -17,14 +17,23 @@ public class PlaneacionQueryService(FabricaContexto fabrica) : IPlaneacionQueryS
     ];
 
     public async Task<IReadOnlyList<SprintResponse>> ObtenerSprintsAsync(
-        int? idEquipo, bool soloAbiertos, CancellationToken cancellationToken = default)
+        int? idSprint, int? idEstatus, int? idLider, bool soloAbiertos,
+        CancellationToken cancellationToken = default)
     {
         await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
 
         var consulta = Proyectar(contexto);
-        if (idEquipo.HasValue)
+        if (idSprint.HasValue)
         {
-            consulta = consulta.Where(s => s.IdEquipo == idEquipo.Value);
+            consulta = consulta.Where(s => s.IdSprint == idSprint.Value);
+        }
+        if (idEstatus.HasValue)
+        {
+            consulta = consulta.Where(s => s.IdEstatus == idEstatus.Value);
+        }
+        if (idLider.HasValue)
+        {
+            consulta = consulta.Where(s => s.IdLider == idLider.Value);
         }
         if (soloAbiertos)
         {
@@ -126,9 +135,12 @@ public class PlaneacionQueryService(FabricaContexto fabrica) : IPlaneacionQueryS
         };
     }
 
-    /// <summary>idEquipo null = vista consolidada: todos los equipos y usuarios a la vez.</summary>
+    /// <summary>
+    /// idEquipo null = vista consolidada: todos los equipos y usuarios a la vez.
+    /// idAsignado null = sin filtro de persona; con valor, solo lo asignado a esa persona.
+    /// </summary>
     public async Task<TableroResponse> ObtenerTableroAsync(
-        int? idEquipo, CancellationToken cancellationToken = default)
+        int? idEquipo, int? idAsignado, CancellationToken cancellationToken = default)
     {
         await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
 
@@ -138,18 +150,24 @@ public class PlaneacionQueryService(FabricaContexto fabrica) : IPlaneacionQueryS
 
         if (idEquipo.HasValue)
         {
-            equipo = await contexto.TblEquipo.AsNoTracking()
+            var datosEquipo = await contexto.TblEquipo.AsNoTracking()
                 .Where(e => e.IdEquipo == idEquipo.Value)
-                .Select(e => e.Nombre)
-                .FirstOrDefaultAsync(cancellationToken) ?? "Equipo";
-
-            var sprint = await contexto.TblSprint.AsNoTracking()
-                .Where(s => s.IdEquipo == idEquipo.Value && s.IdEstatusSprint == EstatusSprint.Activo && s.Activo)
-                .Select(s => new { s.IdSprint, s.Nombre })
+                .Select(e => new { e.Nombre, e.IdLider })
                 .FirstOrDefaultAsync(cancellationToken);
-            if (sprint is not null)
+            equipo = datosEquipo?.Nombre ?? "Equipo";
+
+            // El sprint activo del tablero es el del lider del equipo (Sprint ya no se
+            // asigna por equipo, ver ADR de Backlog/Sprint 2026-09-02).
+            if (datosEquipo?.IdLider is int idLider)
             {
-                sprintActivo = (sprint.IdSprint, sprint.Nombre);
+                var sprint = await contexto.TblSprint.AsNoTracking()
+                    .Where(s => s.IdLider == idLider && s.IdEstatusSprint == EstatusSprint.Activo && s.Activo)
+                    .Select(s => new { s.IdSprint, s.Nombre })
+                    .FirstOrDefaultAsync(cancellationToken);
+                if (sprint is not null)
+                {
+                    sprintActivo = (sprint.IdSprint, sprint.Nombre);
+                }
             }
 
             columnas = await (
@@ -184,6 +202,7 @@ public class PlaneacionQueryService(FabricaContexto fabrica) : IPlaneacionQueryS
             from x in ConsultaBase(contexto)
             join p in contexto.TblProyecto.AsNoTracking() on x.Item.IdProyecto equals p.IdProyecto
             where (idEquipo == null || p.IdEquipo == idEquipo.Value)
+                  && (idAsignado == null || x.Item.IdAsignado == idAsignado.Value)
                   && (idSprintActivo == null || x.Item.IdSprint == idSprintActivo)
                   && (x.Vista.IdEstatusWorkItem != EstatusWorkItem.Terminado
                       || (x.Item.FechaFin != null && x.Item.FechaFin >= inicioMesActual))
@@ -285,20 +304,28 @@ public class PlaneacionQueryService(FabricaContexto fabrica) : IPlaneacionQueryS
     private static IQueryable<SprintResponse> Proyectar(DbContextGTE contexto)
     {
         return from s in contexto.TblSprint.AsNoTracking()
-               join e in contexto.TblEquipo.AsNoTracking() on s.IdEquipo equals e.IdEquipo
                join es in contexto.TblEstatusSprint.AsNoTracking() on s.IdEstatusSprint equals es.Id
+               join lid in contexto.TblUsuario.AsNoTracking() on s.IdLider equals lid.IdUsuario into liderJoin
+               from lid in liderJoin.DefaultIfEmpty()
                where s.Activo
                select new SprintResponse
                {
                    IdSprint = s.IdSprint,
-                   IdEquipo = s.IdEquipo,
-                   Equipo = e.Nombre,
+                   Folio = s.Folio,
+                   IdLider = s.IdLider,
+                   Lider = lid != null ? lid.Nombre : null,
                    Nombre = s.Nombre,
                    Objetivo = s.Objetivo,
                    FechaInicio = s.FechaInicio,
                    FechaFin = s.FechaFin,
                    IdEstatus = s.IdEstatusSprint,
                    Estatus = es.Descripcion,
+                   CreadoPor = s.UsuarioRegistro,
+                   FechaCreacion = s.FechaRegistro,
+                   FechaCierre = contexto.TblHistorialEstatus
+                       .Where(h => h.Proceso == "Sprint" && h.IdRegistro == s.IdSprint
+                                   && h.IdEstatus == EstatusSprint.Cerrado)
+                       .Min(h => (DateTime?)h.FechaInicio),
                    TotalItems = contexto.TblWorkItem.Count(w => w.IdSprint == s.IdSprint && w.Activo),
                    ItemsTerminados = contexto.TblWorkItem.Count(w => w.IdSprint == s.IdSprint && w.Activo
                        && w.IdEstatusWorkItem == EstatusWorkItem.Terminado),

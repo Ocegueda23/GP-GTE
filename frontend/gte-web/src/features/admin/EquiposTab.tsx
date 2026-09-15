@@ -12,11 +12,19 @@ import { ComboBuscable } from "../../shared/components/ComboBuscable";
 import { EncabezadoOrdenable } from "../../shared/components/EncabezadoOrdenable";
 import { useOrdenTabla } from "../../shared/hooks/useOrdenTabla";
 import {
-  agregarMiembroEquipo, crearEquipo, obtenerCatalogosAdministracion, obtenerEquipo, obtenerEquipos,
-  retirarMiembroEquipo,
+  actualizarEquipo, agregarMiembroEquipo, crearEquipo, obtenerCatalogosAdministracion,
+  obtenerEquipo, obtenerEquipos, retirarMiembroEquipo,
 } from "../../shared/api/administracion";
 
-/** P20 - Equipos con miembros, lider y porcentaje de dedicacion. */
+/**
+ * Ambito del Centro de Mando TI: que bloque tecnico de indicadores se le evalua al equipo,
+ * ademas del bloque comun. Espejo de GTE.Domain.CentroMando.AmbitoCentroMando; vacio
+ * significa "solo bloque comun" y es un valor valido a proposito -- un equipo nuevo no
+ * deberia arrancar con el bloque tecnico completo en rojo por falta de captura.
+ */
+const AMBITOS_CENTRO_MANDO = ["Desarrollo", "Infraestructura", "Soporte"];
+
+/** P20 - Equipos con miembros, lider, ambito del Centro de Mando y dedicacion. */
 export function EquiposTab() {
   const [idEquipo, setIdEquipo] = useState<number | "">("");
   const [modalEquipo, setModalEquipo] = useState(false);
@@ -24,6 +32,9 @@ export function EquiposTab() {
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [idLider, setIdLider] = useState<number | "">("");
+  const [ambito, setAmbito] = useState("");
+  /** null = el modal esta creando; con id = editando ese equipo. */
+  const [equipoEditando, setEquipoEditando] = useState<number | null>(null);
   const [idUsuarioNuevo, setIdUsuarioNuevo] = useState<number | "">("");
   const [porcentaje, setPorcentaje] = useState(100);
   const [aviso, setAviso] = useState<{ tipo: "success" | "error"; mensaje: string } | null>(null);
@@ -53,19 +64,46 @@ export function EquiposTab() {
     clienteQuery.invalidateQueries({ queryKey: ["equipo-detalle"] }),
   ]);
 
+  const abrirNuevoEquipo = () => {
+    setEquipoEditando(null);
+    setNombre(""); setDescripcion(""); setIdLider(""); setAmbito("");
+    setModalEquipo(true);
+  };
+
+  const abrirEdicionEquipo = () => {
+    const eq = detalle.data;
+    if (!eq) return;
+    setEquipoEditando(eq.idEquipo);
+    setNombre(eq.nombre);
+    setDescripcion(eq.descripcion ?? "");
+    setIdLider(eq.idLider ?? "");
+    setAmbito(eq.ambitoCentroMando ?? "");
+    setModalEquipo(true);
+  };
+
   const guardarEquipo = async () => {
+    const datos = {
+      nombre: nombre.trim(),
+      descripcion: descripcion.trim() || null,
+      idLider: idLider === "" ? null : (idLider as number),
+      ambitoCentroMando: ambito || null,
+    };
     try {
-      const { mensaje, dato } = await crearEquipo({
-        nombre: nombre.trim(), descripcion: descripcion.trim() || null,
-        idLider: idLider === "" ? null : (idLider as number),
-      });
+      const { mensaje, dato } = equipoEditando === null
+        ? await crearEquipo(datos)
+        : await actualizarEquipo(equipoEditando, datos);
       avisar(mensaje);
       setModalEquipo(false);
-      setNombre(""); setDescripcion(""); setIdLider("");
+      setNombre(""); setDescripcion(""); setIdLider(""); setAmbito("");
+      setEquipoEditando(null);
       setIdEquipo(dato.idEquipo);
       await refrescar();
     } catch (error) {
-      avisar(error instanceof ErrorApi ? error.message : "No se pudo crear el equipo.", true);
+      avisar(
+        error instanceof ErrorApi
+          ? error.message
+          : `No se pudo ${equipoEditando === null ? "crear" : "actualizar"} el equipo.`,
+        true);
     }
   };
 
@@ -97,7 +135,7 @@ export function EquiposTab() {
     <Box>
       <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", mb: 2 }}>
         <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Equipos</Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setModalEquipo(true)}>
+        <Button variant="contained" startIcon={<AddIcon />} onClick={abrirNuevoEquipo}>
           Nuevo equipo
         </Button>
       </Stack>
@@ -118,6 +156,7 @@ export function EquiposTab() {
               <Typography variant="body2" sx={{ fontWeight: 600 }}>{eq.nombre}</Typography>
               <Typography variant="caption" color="text.secondary">
                 {eq.lider ? `Lider: ${eq.lider}` : "Sin lider"} - {eq.totalMiembros} miembro(s)
+                {eq.ambitoCentroMando && ` - ${eq.ambitoCentroMando}`}
               </Typography>
             </Box>
           ))}
@@ -131,15 +170,23 @@ export function EquiposTab() {
             <>
               <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", mb: 1 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{detalle.data.nombre}</Typography>
-                <Button size="small" variant="outlined" startIcon={<AddIcon />} onClick={() => setModalMiembro(true)}>
-                  Agregar miembro
-                </Button>
+                <Stack direction="row" spacing={1}>
+                  <Button size="small" variant="outlined" onClick={abrirEdicionEquipo}>
+                    Editar equipo
+                  </Button>
+                  <Button size="small" variant="outlined" startIcon={<AddIcon />} onClick={() => setModalMiembro(true)}>
+                    Agregar miembro
+                  </Button>
+                </Stack>
               </Stack>
               {detalle.data.descripcion && (
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                   {detalle.data.descripcion}
                 </Typography>
               )}
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+                Ambito Centro de Mando: {detalle.data.ambitoCentroMando ?? "solo bloque comun"}
+              </Typography>
               <Table size="small">
                 <TableHead>
                   <TableRow>
@@ -184,7 +231,7 @@ export function EquiposTab() {
       </Stack>
 
       <Dialog open={modalEquipo} onClose={() => setModalEquipo(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Nuevo equipo</DialogTitle>
+        <DialogTitle>{equipoEditando === null ? "Nuevo equipo" : "Editar equipo"}</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
           <TextField size="small" required label="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} />
           <TextField size="small" label="Descripcion" multiline minRows={2} value={descripcion}
@@ -198,11 +245,20 @@ export function EquiposTab() {
               ...(catalogos.data?.usuarios ?? []).map((u) => ({ valor: u.id, etiqueta: u.nombre })),
             ]}
           />
+          <ComboBuscable
+            label="Ambito Centro de Mando"
+            value={ambito}
+            onChange={(v) => setAmbito(String(v))}
+            opciones={[
+              { valor: "", etiqueta: "Solo bloque comun" },
+              ...AMBITOS_CENTRO_MANDO.map((a) => ({ valor: a, etiqueta: a })),
+            ]}
+          />
         </DialogContent>
         <DialogActions>
           <Button color="error" onClick={() => setModalEquipo(false)}>Cancelar</Button>
           <Button variant="contained" disabled={nombre.trim().length === 0} onClick={() => void guardarEquipo()}>
-            Crear
+            {equipoEditando === null ? "Crear" : "Guardar"}
           </Button>
         </DialogActions>
       </Dialog>

@@ -20,6 +20,12 @@ public static class AccionesRelease
     public const string Rollback = "ROLLBACK";
     public const string Cancelar = "CANCELAR";
     public const string Reabrir = "REABRIR";
+
+    /// <summary>
+    /// Autorizacion del release: mueve En Aprobacion -> Aprobado sin esperar a la cadena
+    /// de firmas. Puerta propia (PermisosEntregas.Autorizar), no la de firmar.
+    /// </summary>
+    public const string Autorizar = "AUTORIZAR";
 }
 
 /// <summary>IDs de dbo.tblEstatusAprobacion.</summary>
@@ -28,6 +34,13 @@ public static class EstatusAprobacion
     public const int Pendiente = 1;
     public const int Aprobada = 2;
     public const int Rechazada = 3;
+
+    /// <summary>
+    /// Firma que ya no se pidio porque alguien autorizo el release (AUTORIZAR). Se
+    /// distingue de Aprobada a proposito: la Solicitud de despliegue tiene que poder decir
+    /// quien firmo de verdad y quien quedo cubierto por la autorizacion.
+    /// </summary>
+    public const int Omitida = 4;
 }
 
 /// <summary>IDs de dbo.tblEstatusDespliegue.</summary>
@@ -62,6 +75,13 @@ public static class PermisosEntregas
     public const string Crear = "REL.Crear";
     public const string Aprobar = "REL.Aprobar";
     public const string Desplegar = "REL.Desplegar";
+
+    /// <summary>
+    /// Autoriza un release saltandose la cadena de firmas. Acceso independiente de
+    /// REL.Aprobar a proposito: firmar es una cosa y dispensar las firmas es otra, y quien
+    /// puede lo segundo tiene que poder nombrarse por separado en el rol.
+    /// </summary>
+    public const string Autorizar = "REL.Autorizar";
 }
 
 /// <summary>Cadena de aprobacion estandar de un release.</summary>

@@ -41,6 +41,8 @@ public partial class VwBandejaTrabajo
 
     public string? Sprint { get; set; }
 
+    public string? FolioSprint { get; set; }
+
     public decimal? PuntosHistoria { get; set; }
 
     public int? MinutosPresupuesto { get; set; }

@@ -14,7 +14,7 @@ import { ContenidoEnriquecido } from "../../shared/editor/ContenidoEnriquecido";
 import {
   eliminarArticulo, obtenerArticulo, obtenerVersionArticulo, obtenerVersionesArticulo,
 } from "../../shared/api/conocimiento";
-import { PERMISO_ADMINISTRAR_CONOCIMIENTO } from "./permisos";
+import { PERMISO_ADMINISTRAR_CONOCIMIENTO, PERMISO_ELIMINAR_CONOCIMIENTO } from "./permisos";
 import { ArticuloModal } from "./ArticuloModal";
 import { PanelAdjuntosArticulo } from "./PanelAdjuntosArticulo";
 
@@ -36,6 +36,7 @@ export function DetalleArticuloPage() {
 
   const puede = useSesion((estado) => estado.puede);
   const puedeAdministrar = puede(PERMISO_ADMINISTRAR_CONOCIMIENTO);
+  const puedeEliminar = puede(PERMISO_ELIMINAR_CONOCIMIENTO);
 
   const articulo = useQuery({
     queryKey: ["articulo", idArticulo],
@@ -102,16 +103,21 @@ export function DetalleArticuloPage() {
           {dato.esGlosario && <Chip size="small" label="Glosario" color="secondary" variant="outlined" />}
           {dato.esPublico && <Chip size="small" label="Publico" color="success" variant="outlined" />}
         </Stack>
-        {puedeAdministrar && (
+        {(puedeAdministrar || puedeEliminar) && (
           <Stack direction="row" spacing={1}>
-            <Button size="small" variant="outlined" startIcon={<EditOutlinedIcon />}
-              onClick={() => setModalAbierto(true)}>
-              Editar
-            </Button>
-            <Button size="small" variant="outlined" color="error" startIcon={<DeleteOutlineOutlinedIcon />}
-              onClick={() => setConfirmandoBaja(true)}>
-              Eliminar
-            </Button>
+            {puedeAdministrar && (
+              <Button size="small" variant="outlined" startIcon={<EditOutlinedIcon />}
+                onClick={() => setModalAbierto(true)}>
+                Editar
+              </Button>
+            )}
+            {/* La baja pide su propio permiso: redactar no alcanza para borrar. */}
+            {puedeEliminar && (
+              <Button size="small" variant="outlined" color="error" startIcon={<DeleteOutlineOutlinedIcon />}
+                onClick={() => setConfirmandoBaja(true)}>
+                Eliminar
+              </Button>
+            )}
           </Stack>
         )}
       </Stack>

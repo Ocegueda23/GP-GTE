@@ -2,10 +2,11 @@ import { useState } from "react";
 import {
   Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
   FormControl, IconButton, InputLabel, LinearProgress, MenuItem, Paper, Select,
-  Snackbar, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography,
+  Snackbar, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Tooltip, Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlineOutlined";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
 import { ComboBuscable } from "../../shared/components/ComboBuscable";
@@ -20,7 +21,7 @@ import {
 /** Administracion del catalogo de casos de prueba reutilizables de un proyecto:
  * buscador/orden, editar (titulo, precondiciones, resultado esperado, pasos) y
  * retirar (baja logica), mostrando cuantos WorkItems tienen el caso asignado. */
-export function CasosPruebaTab() {
+export function CasosPruebaPage() {
   const [idProyecto, setIdProyecto] = useState<number | "">("");
   const [busqueda, setBusqueda] = useState("");
   const [casoEditar, setCasoEditar] = useState<CasoAdmin | null>(null);
@@ -98,8 +99,8 @@ export function CasosPruebaTab() {
   };
 
   return (
-    <Box>
-      <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>Casos de prueba</Typography>
+    <Box sx={{ p: 2 }}>
+      <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>Casos de prueba</Typography>
 
       <Stack direction="row" spacing={2} sx={{ mb: 2, flexWrap: "wrap" }}>
         <ComboBuscable
@@ -155,9 +156,17 @@ export function CasosPruebaTab() {
                   <TableCell align="right">{c.totalAsignaciones}</TableCell>
                   <TableCell align="right">
                     <Stack direction="row" spacing={0.5} sx={{ justifyContent: "flex-end" }}>
-                      <Button size="small" onClick={() => abrirEditar(c)}>Editar</Button>
+                      <Tooltip title="Editar caso">
+                        <IconButton size="small" onClick={() => abrirEditar(c)}>
+                          <EditOutlinedIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
                       {c.activo && (
-                        <Button size="small" color="error" onClick={() => setCasoRetirar(c)}>Retirar</Button>
+                        <Tooltip title="Retirar caso">
+                          <IconButton size="small" color="error" onClick={() => setCasoRetirar(c)}>
+                            <DeleteOutlineIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
                       )}
                     </Stack>
                   </TableCell>

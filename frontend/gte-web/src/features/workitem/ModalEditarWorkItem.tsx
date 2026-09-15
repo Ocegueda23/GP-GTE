@@ -2,13 +2,17 @@ import { useEffect, useState } from "react";
 import {
   Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField,
 } from "@mui/material";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
 import { ComboBuscable } from "../../shared/components/ComboBuscable";
 import { EditorEnriquecido } from "../../shared/editor/EditorEnriquecido";
 import {
-  actualizarWorkItem, type CatalogosBandeja, type WorkItemDetalle,
+  actualizarWorkItem, filtrarComplejidades, type CatalogosBandeja, type WorkItemDetalle,
 } from "../../shared/api/workitems";
+import { obtenerSprints } from "../../shared/api/planeacion";
+import { useEsMovil } from "../../shared/hooks/useEsMovil";
+import { useSesion } from "../../shared/api/sesion";
+import { PresupuestoComplejidad } from "./PresupuestoComplejidad";
 
 interface Props {
   abierto: boolean;
@@ -28,9 +32,11 @@ export function ModalEditarWorkItem({ abierto, item, catalogos, alCerrar, alExit
   const [idPrioridad, setIdPrioridad] = useState<number | "">(item.idPrioridad);
   const [idComplejidad, setIdComplejidad] = useState<number | "">(item.idComplejidad ?? "");
   const [idAsignado, setIdAsignado] = useState<number | "">(item.idAsignado ?? "");
+  const [idSprint, setIdSprint] = useState<number | "">(item.idSprint ?? "");
   const [compromiso, setCompromiso] = useState(item.fechaCompromiso?.slice(0, 10) ?? "");
   const [enviando, setEnviando] = useState(false);
   const clienteQuery = useQueryClient();
+  const esMovil = useEsMovil();
 
   useEffect(() => {
     if (!abierto) return;
@@ -40,10 +46,29 @@ export function ModalEditarWorkItem({ abierto, item, catalogos, alCerrar, alExit
     setIdPrioridad(item.idPrioridad);
     setIdComplejidad(item.idComplejidad ?? "");
     setIdAsignado(item.idAsignado ?? "");
+    setIdSprint(item.idSprint ?? "");
     setCompromiso(item.fechaCompromiso?.slice(0, 10) ?? "");
   }, [abierto, item]);
 
   const valido = titulo.trim().length > 0 && idPrioridad !== "" && idComplejidad !== "";
+
+  // Solo las complejidades de la categoria del proyecto del elemento; si el elemento trae
+  // una complejidad de otra categoria (dato previo al filtro) se conserva para no perderla.
+  const complejidades = filtrarComplejidades(catalogos?.complejidades, item.idCategoriaProyecto);
+  const opcionesComplejidad = complejidades.some((c) => c.id === item.idComplejidad)
+    ? complejidades
+    : [...complejidades, ...(catalogos?.complejidades ?? []).filter((c) => c.id === item.idComplejidad)];
+
+  // Mover el elemento de sprint exige el permiso de planeacion (el backend lo valida igual);
+  // sin el, el combo no se muestra y el sprint actual se conserva.
+  const puede = useSesion((estado) => estado.puede);
+  const puedeAsignarSprint = puede("PLA.GestionarSprints");
+  const sprints = useQuery({
+    queryKey: ["sprints", "abiertos"],
+    queryFn: () => obtenerSprints({ soloAbiertos: true }),
+    enabled: abierto && puedeAsignarSprint,
+    staleTime: 60_000,
+  });
 
   const guardar = async () => {
     if (!valido) return;
@@ -57,6 +82,7 @@ export function ModalEditarWorkItem({ abierto, item, catalogos, alCerrar, alExit
         idComplejidad: idComplejidad as number,
         idAsignado: idAsignado === "" ? null : (idAsignado as number),
         fechaCompromiso: compromiso || null,
+        idSprint: idSprint === "" ? null : (idSprint as number),
       });
       alExito(mensaje);
       alCerrar();
@@ -73,7 +99,7 @@ export function ModalEditarWorkItem({ abierto, item, catalogos, alCerrar, alExit
   };
 
   return (
-    <Dialog open={abierto} onClose={alCerrar} fullWidth maxWidth="sm">
+    <Dialog open={abierto} onClose={alCerrar} fullWidth maxWidth="sm" fullScreen={esMovil}>
       <DialogTitle>Editar {item.folio}</DialogTitle>
       <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
         <TextField
@@ -104,8 +130,9 @@ export function ModalEditarWorkItem({ abierto, item, catalogos, alCerrar, alExit
           required
           value={idComplejidad}
           onChange={(v) => setIdComplejidad(v as number | "")}
-          opciones={(catalogos?.complejidades ?? []).map((c) => ({ valor: c.id, etiqueta: c.nombre }))}
+          opciones={opcionesComplejidad.map((c) => ({ valor: c.id, etiqueta: c.nombre }))}
         />
+        <PresupuestoComplejidad idComplejidad={idComplejidad} idAsignado={idAsignado} />
         <ComboBuscable
           label="Asignado"
           value={idAsignado}
@@ -115,6 +142,25 @@ export function ModalEditarWorkItem({ abierto, item, catalogos, alCerrar, alExit
             ...(catalogos?.usuarios ?? []).map((u) => ({ valor: u.id, etiqueta: u.nombre })),
           ]}
         />
+        {puedeAsignarSprint && (
+          <ComboBuscable
+            label="Sprint"
+            value={idSprint}
+            onChange={(v) => setIdSprint(v as number | "")}
+            opciones={[
+              { valor: "", etiqueta: "Backlog (sin sprint)" },
+              // El sprint actual puede estar cerrado (no viene en los abiertos): se agrega
+              // para que el combo no se vea vacio ni lo borre sin que nadie lo pida.
+              ...(item.idSprint !== null && !(sprints.data ?? []).some((s) => s.idSprint === item.idSprint)
+                ? [{ valor: item.idSprint, etiqueta: `${item.folioSprint ?? item.sprint ?? "Sprint actual"} (actual)` }]
+                : []),
+              ...(sprints.data ?? []).map((s) => ({
+                valor: s.idSprint,
+                etiqueta: `${s.folio ?? s.nombre} - ${s.nombre} (${s.estatus})`,
+              })),
+            ]}
+          />
+        )}
         <TextField
           size="small" type="date" label="Fecha compromiso"
           value={compromiso} onChange={(e) => setCompromiso(e.target.value)}

@@ -17,7 +17,8 @@ public record WorkItemNuevo(
     decimal? PuntosHistoria,
     int? MinutosPresupuesto,
     DateTime? FechaCompromiso,
-    int? IdUsuarioSolicitante = null);
+    int? IdUsuarioSolicitante = null,
+    int? IdSprint = null);
 
 /// <summary>
 /// Datos editables de un elemento de trabajo. ActualizarPresupuesto distingue
@@ -34,7 +35,8 @@ public record WorkItemEdicion(
     decimal? PuntosHistoria,
     bool ActualizarPresupuesto,
     int? MinutosPresupuesto,
-    DateTime? FechaCompromiso);
+    DateTime? FechaCompromiso,
+    int? IdSprint);
 
 /// <summary>Estado minimo de un item para evaluar reglas de negocio.</summary>
 public record EstadoWorkItem(
@@ -49,7 +51,8 @@ public record EstadoWorkItem(
     DateTime? FechaCompromiso,
     bool Activo,
     bool Administrado,
-    int IdCategoriaProyecto);
+    int IdCategoriaProyecto,
+    int? IdSprint);
 
 /// <summary>Resumen de proyecto para reglas y folios.</summary>
 public record ProyectoResumen(

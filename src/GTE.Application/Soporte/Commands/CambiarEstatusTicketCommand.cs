@@ -64,8 +64,10 @@ public class CambiarEstatusTicketHandler(
             }
         }
 
+        // El horario del SLA va al motor para que dbo.spCambiarEstatus materialice los
+        // minutos laborales del intervalo que cierra: de ahi sale el tiempo de atencion.
         await motor.EjecutarAccionAsync(
-            "Ticket", command.IdTicket, command.Accion, command.Motivo, null, cancellationToken);
+            "Ticket", command.IdTicket, command.Accion, command.Motivo, estado.IdHorario, cancellationToken);
         await repositorio.AplicarEfectosTransicionAsync(
             command.IdTicket, command.Accion, command.Solucion, command.MinutosSolucion, cancellationToken);
 

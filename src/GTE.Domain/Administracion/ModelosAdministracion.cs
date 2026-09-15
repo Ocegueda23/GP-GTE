@@ -26,9 +26,9 @@ public record ProyectoEdicion(
 /// <summary>Estado minimo necesario para validar y aplicar una transicion de estatus.</summary>
 public record EstadoProyecto(int IdProyecto, string? Folio, string Clave, int IdEstatus, bool Activo);
 
-public record EquipoNuevo(string Nombre, string? Descripcion, int? IdLider);
+public record EquipoNuevo(string Nombre, string? Descripcion, int? IdLider, string? AmbitoCentroMando);
 
-public record EquipoEdicion(int IdEquipo, string Nombre, string? Descripcion, int? IdLider);
+public record EquipoEdicion(int IdEquipo, string Nombre, string? Descripcion, int? IdLider, string? AmbitoCentroMando);
 
 public record MiembroEquipoNuevo(int IdEquipo, int IdUsuario, string? RolEquipo, decimal PorcentajeDedicacion);
 

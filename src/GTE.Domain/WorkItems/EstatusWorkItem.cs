@@ -47,6 +47,14 @@ public static class PermisosWorkItem
     /// <summary>Aprobar (TERMINAR) o rechazar (RECHAZAR_QA) la fase de pruebas, desde En Pruebas.</summary>
     public const string AprobarPruebas = "WI.AprobarPruebas";
 
+    /// <summary>
+    /// Aprobar o rechazar las pruebas del PROPIO elemento. Por defecto nadie puede revisar su
+    /// propio trabajo; este permiso levanta esa regla de forma acotada, para equipos de una
+    /// sola persona o cuando no hay un segundo revisor disponible. Se exige ADEMAS de
+    /// <see cref="AprobarPruebas"/>, no en su lugar.
+    /// </summary>
+    public const string AprobarPropio = "WI.AprobarPropio";
+
     /// <summary>Crear un WorkItem en un proyecto marcado tblProyecto.Administrado.</summary>
     public const string CrearEnAdministrado = "WI.CrearEnAdministrado";
 

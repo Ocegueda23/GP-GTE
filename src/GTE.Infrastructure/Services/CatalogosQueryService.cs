@@ -2,6 +2,7 @@ using GTE.Application.Catalogos.Queries;
 using GTE.Application.DTOs.Responses.Catalogos;
 using GTE.Domain.Administracion;
 using GTE.Domain.Entregas;
+using GTE.Domain.Planeacion;
 using GTE.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -17,6 +18,22 @@ public class CatalogosQueryService(FabricaContexto fabrica) : ICatalogosQuerySer
         var idsEquiposUsuario = await contexto.TblEquipoMiembro.AsNoTracking()
             .Where(m => m.IdUsuario == idUsuario && m.Activo)
             .Select(m => m.IdEquipo)
+            .ToListAsync(cancellationToken);
+
+        // Proyectos donde alguien le dio un rol acotado a ESE proyecto desde
+        // Administracion > Proyectos > Accesos (tblUsuarioRol con IdProyecto). Es la
+        // tercera forma de tener acceso a un proyecto, junto con ser su responsable o
+        // estar en su equipo, y hasta ahora el combo la ignoraba: se otorgaba el acceso
+        // y el proyecto seguia sin aparecer. Los roles globales (IdProyecto null) NO
+        // entran: darian todos los proyectos del sistema y esto es "mis proyectos".
+        // Se exige tambien que el rol este activo, igual que VerificadorPermisos: un rol
+        // dado de baja no otorga permisos, asi que tampoco deberia dar visibilidad.
+        var idsProyectosConRol = await (
+            from ur in contexto.TblUsuarioRol.AsNoTracking()
+            join r in contexto.TblRol.AsNoTracking() on ur.IdRol equals r.IdRol
+            where ur.IdUsuario == idUsuario && ur.Activo && r.Activo && ur.IdProyecto != null
+            select ur.IdProyecto!.Value)
+            .Distinct()
             .ToListAsync(cancellationToken);
 
         return new CatalogosBandejaResponse
@@ -36,20 +53,24 @@ public class CatalogosQueryService(FabricaContexto fabrica) : ICatalogosQuerySer
                 .OrderBy(p => p.Id)
                 .Select(p => new CatalogoItemResponse { Id = p.Id, Nombre = p.Nombre })
                 .ToListAsync(cancellationToken),
-            // Solo proyectos donde el usuario es responsable o pertenece al equipo asignado.
+            // Solo proyectos donde el usuario es responsable, pertenece al equipo asignado
+            // o tiene un rol dado de alta en ese proyecto (pestana Accesos).
             // Cerrados fuera: no tiene sentido crear/planear trabajo nuevo en un proyecto cerrado.
             Proyectos = await contexto.TblProyecto.AsNoTracking()
                 .Where(p => p.Activo)
                 .Where(p => p.IdEstatusProyecto != EstatusProyecto.Cerrado)
                 .Where(p => p.IdResponsable == idUsuario
-                    || (p.IdEquipo != null && idsEquiposUsuario.Contains(p.IdEquipo.Value)))
+                    || (p.IdEquipo != null && idsEquiposUsuario.Contains(p.IdEquipo.Value))
+                    || idsProyectosConRol.Contains(p.IdProyecto))
                 .OrderBy(p => p.Nombre)
                 .Select(p => new ProyectoItemResponse
                 {
                     Id = p.IdProyecto,
                     Clave = p.Clave,
                     Nombre = p.Nombre,
+                    IdCategoriaProyecto = p.IdCategoriaProyecto,
                     CategoriaProyecto = p.IdCategoriaProyectoNavigation.Nombre,
+                    IdEquipo = p.IdEquipo,
                 })
                 .ToListAsync(cancellationToken),
             Usuarios = await contexto.TblUsuario.AsNoTracking()
@@ -70,12 +91,29 @@ public class CatalogosQueryService(FabricaContexto fabrica) : ICatalogosQuerySer
             Complejidades = await contexto.TblComplejidad.AsNoTracking()
                 .Where(c => c.Activo)
                 .OrderBy(c => c.Orden)
-                .Select(c => new CatalogoItemResponse { Id = c.IdComplejidad, Nombre = c.Nombre })
+                .Select(c => new ComplejidadItemResponse
+                {
+                    Id = c.IdComplejidad,
+                    Nombre = c.Nombre,
+                    IdCategoriaProyecto = c.IdCategoriaProyecto,
+                })
                 .ToListAsync(cancellationToken),
             CategoriasTicket = await contexto.TblCategoriaTicket.AsNoTracking()
                 .Where(c => c.Activo)
                 .OrderBy(c => c.Nombre)
                 .Select(c => new CatalogoItemResponse { Id = c.IdCategoriaTicket, Nombre = c.Nombre })
+                .ToListAsync(cancellationToken),
+            // Por nivel y luego alfabetico: el combo las agrupa con el nivel como encabezado.
+            CategoriasIncidente = await contexto.TblCategoriaIncidente.AsNoTracking()
+                .Where(c => c.Activo)
+                .OrderBy(c => c.Nivel)
+                .ThenBy(c => c.Nombre)
+                .Select(c => new CategoriaIncidenteItemResponse
+                {
+                    Id = c.IdCategoriaIncidente,
+                    Nombre = c.Nombre,
+                    Nivel = c.Nivel,
+                })
                 .ToListAsync(cancellationToken),
             EstatusTicket = await contexto.TblEstatusTicket.AsNoTracking()
                 .Where(e => e.Activo)
@@ -96,6 +134,12 @@ public class CatalogosQueryService(FabricaContexto fabrica) : ICatalogosQuerySer
                 .Where(l => l.Activo == true)
                 .OrderBy(l => l.Locacion)
                 .Select(l => new CatalogoItemResponse { Id = l.IdLocacion, Nombre = (l.Locacion ?? l.Descripcion) ?? string.Empty })
+                .ToListAsync(cancellationToken),
+            // Cerrados fuera: la bandeja filtra trabajo vigente. Lo mas nuevo primero.
+            Sprints = await contexto.TblSprint.AsNoTracking()
+                .Where(s => s.Activo && s.IdEstatusSprint != EstatusSprint.Cerrado)
+                .OrderByDescending(s => s.FechaInicio)
+                .Select(s => new CatalogoItemResponse { Id = s.IdSprint, Nombre = s.Nombre })
                 .ToListAsync(cancellationToken)
         };
     }
@@ -172,6 +216,11 @@ public class CatalogosQueryService(FabricaContexto fabrica) : ICatalogosQuerySer
                 .Where(t => t.Activo)
                 .OrderBy(t => t.Orden)
                 .Select(t => new CatalogoItemResponse { Id = t.Id, Nombre = t.Nombre })
+                .ToListAsync(cancellationToken),
+            EstatusRelease = await contexto.TblEstatusRelease.AsNoTracking()
+                .Where(e => e.Activo)
+                .OrderBy(e => e.Orden)
+                .Select(e => new CatalogoItemResponse { Id = e.Id, Nombre = e.Descripcion })
                 .ToListAsync(cancellationToken)
         };
     }

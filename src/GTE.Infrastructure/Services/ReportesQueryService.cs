@@ -13,7 +13,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace GTE.Infrastructure.Services;
 
-public class ReportesQueryService(FabricaContexto fabrica) : IReportesQueryService
+public class ReportesQueryService(FabricaContexto fabrica, ICalendarioLaboral calendario) : IReportesQueryService
 {
     /// <summary>IdEstatusAusencia = Aprobada (seed del script 01, sin clase de constantes propia todavia).</summary>
     private const int EstatusAusenciaAprobada = 2;
@@ -771,4 +771,361 @@ public class ReportesQueryService(FabricaContexto fabrica) : IReportesQueryServi
 
     private static (DateTime Inicio, DateTime Fin) RangoFechas(DateOnly desde, DateOnly hasta)
         => (desde.ToDateTime(TimeOnly.MinValue), hasta.ToDateTime(TimeOnly.MaxValue));
+
+    /// <summary>
+    /// R15: detalle de work items Terminados en el rango (por FechaFin). A diferencia de R01-R03,
+    /// que agregan por persona o proyecto, este devuelve el renglon por actividad, que es lo que
+    /// se entrega como evidencia de trabajo del periodo.
+    /// </summary>
+    public async Task<ActividadesTerminadasReporteResponse> ObtenerActividadesTerminadasAsync(
+        DateOnly desde, DateOnly hasta, int? idEquipo, int? idAsignado, int? idProyecto,
+        int? idTipoWorkItem, string? folio, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
+        var (inicio, fin) = RangoFechas(desde, hasta);
+        var folioFiltro = string.IsNullOrWhiteSpace(folio) ? null : folio.Trim();
+
+        // TRAMPA EF: se unen entidades sin proyectar, se filtra y ordena por columnas reales, y
+        // se proyecta al final (mismo patron que PlaneacionQueryService.ConsultaBase).
+        // Tiempo capturado a mano, agregado por item. Va como LEFT JOIN contra el agregado (no
+        // como subconsulta por renglon) para que sean dos escaneos y no uno por fila.
+        var registrado = contexto.TblRegistroTiempo.AsNoTracking()
+            .Where(t => t.Activo)
+            .GroupBy(t => t.IdWorkItem)
+            // TRAMPA EF: Minutos va como int? a proposito. En el LEFT JOIN, SUM() devuelve NULL
+            // para los items sin registros, y leer ese NULL en un int no nullable revienta al
+            // MATERIALIZAR con "Nullable object must have a value" (la consulta traduce bien; el
+            // error aparece hasta que se leen las filas).
+            .Select(g => new { IdWorkItem = g.Key, Minutos = (int?)g.Sum(t => t.Minutos) });
+
+        var consulta =
+            from w in contexto.TblWorkItem.AsNoTracking()
+            join v in contexto.VwBandejaTrabajo.AsNoTracking() on w.IdWorkItem equals v.IdWorkItem
+            join r in registrado on w.IdWorkItem equals r.IdWorkItem into registrosItem
+            from r in registrosItem.DefaultIfEmpty()
+            where w.Activo && w.IdEstatusWorkItem == EstatusWorkItem.Terminado
+                && w.FechaFin != null && w.FechaFin >= inicio && w.FechaFin <= fin
+                && (idEquipo == null || w.IdEquipo == idEquipo)
+                && (idAsignado == null || w.IdAsignado == idAsignado)
+                && (idProyecto == null || w.IdProyecto == idProyecto)
+                && (idTipoWorkItem == null || w.IdTipoWorkItem == idTipoWorkItem)
+                && (folioFiltro == null || w.Folio.Contains(folioFiltro))
+            orderby w.FechaFin descending, w.IdWorkItem descending
+            select new
+            {
+                w.IdWorkItem, w.Folio, w.Titulo, w.Descripcion,
+                Tipo = w.IdTipoWorkItemNavigation.Nombre,
+                Proyecto = w.IdProyectoNavigation.Nombre,
+                Equipo = w.IdEquipoNavigation != null ? w.IdEquipoNavigation.Nombre : null,
+                Asignado = w.IdAsignadoNavigation != null ? w.IdAsignadoNavigation.Nombre : null,
+                IdHorarioAsignado = w.IdAsignadoNavigation != null ? w.IdAsignadoNavigation.IdHorario : null,
+                Prioridad = w.IdPrioridadNavigation.Nombre,
+                Sprint = w.IdSprintNavigation != null ? w.IdSprintNavigation.Nombre : null,
+                Release = w.IdReleaseNavigation != null ? w.IdReleaseNavigation.Version : null,
+                MinutosInvertidos = v.MinutosInvertidos ?? 0,
+                // Se prueba r.Minutos y no "r == null": EF aplana el LEFT JOIN en columnas, asi
+                // que la ausencia de registros llega como NULL en esa columna, no como un objeto
+                // nulo. Es tambien el unico dato de r que se lee, y ya es nullable.
+                MinutosRegistrados = r.Minutos ?? 0,
+                TieneRegistro = r.Minutos != null,
+                w.FechaRegistro, w.FechaInicio, w.FechaFin, w.FechaCompromiso,
+            };
+
+        var crudos = await consulta.Take(TopeRenglonesDetalle + 1).ToListAsync(cancellationToken);
+        var truncado = crudos.Count > TopeRenglonesDetalle;
+        if (truncado)
+        {
+            crudos = crudos.Take(TopeRenglonesDetalle).ToList();
+        }
+
+        // Tiempo habil: se pide en un solo lote (una carga de tramos/festivos por horario) en vez
+        // de una llamada al calendario por renglon.
+        var solicitudesResolucion = crudos
+            .Where(c => c.IdHorarioAsignado != null)
+            .Select(c => new TramoLaborableSolicitado(
+                c.IdWorkItem, c.FechaRegistro, c.FechaFin!.Value, c.IdHorarioAsignado!.Value))
+            .ToList();
+
+        var solicitudesEspera = crudos
+            .Where(c => c.IdHorarioAsignado != null && c.FechaInicio != null)
+            .Select(c => new TramoLaborableSolicitado(
+                c.IdWorkItem, c.FechaRegistro, c.FechaInicio!.Value, c.IdHorarioAsignado!.Value))
+            .ToList();
+
+        var laboralResolucion = await calendario.CalcularMinutosLaboralesLoteAsync(solicitudesResolucion, cancellationToken);
+        var laboralEspera = await calendario.CalcularMinutosLaboralesLoteAsync(solicitudesEspera, cancellationToken);
+
+        var items = crudos.Select(c => new ActividadTerminadaResponse
+        {
+            IdWorkItem = c.IdWorkItem,
+            Folio = c.Folio,
+            Tipo = c.Tipo,
+            Titulo = c.Titulo,
+            Descripcion = c.Descripcion,
+            Proyecto = c.Proyecto,
+            Equipo = c.Equipo,
+            Asignado = c.Asignado,
+            Prioridad = c.Prioridad,
+            Sprint = c.Sprint,
+            Release = c.Release,
+            MinutosInvertidos = c.MinutosInvertidos,
+            MinutosRegistrados = c.MinutosRegistrados,
+            DiferenciaMinutos = c.MinutosRegistrados - c.MinutosInvertidos,
+            FechaCreacion = c.FechaRegistro,
+            FechaInicio = c.FechaInicio,
+            FechaFin = c.FechaFin,
+            FechaCompromiso = c.FechaCompromiso,
+            DiasNaturalesResolucion = DiasNaturales(c.FechaRegistro, c.FechaFin),
+            MinutosLaboralesResolucion = laboralResolucion.TryGetValue(c.IdWorkItem, out var mr) ? mr : null,
+            DiasNaturalesEspera = DiasNaturales(c.FechaRegistro, c.FechaInicio),
+            MinutosLaboralesEspera = laboralEspera.TryGetValue(c.IdWorkItem, out var me) ? me : null,
+            // Se comparan solo las partes de FECHA. FechaCompromiso se captura a medianoche y
+            // FechaFin trae la hora real, asi que comparar los datetime completos marcaba "No"
+            // a todo lo terminado EL DIA del compromiso (a cualquier hora despues de las 00:00).
+            // Mismo bug que ya se corrigio en vwBandejaTrabajo.EsVencida (script 27 de 02_Libera).
+            EntregadoATiempo = c.FechaCompromiso == null || c.FechaFin == null
+                ? null
+                : c.FechaFin.Value.Date <= c.FechaCompromiso.Value.Date,
+        }).ToList();
+
+        var conCompromiso = items.Where(i => i.EntregadoATiempo != null).ToList();
+
+        var totales = new ActividadesTerminadasTotalesResponse
+        {
+            Items = items.Count,
+            MinutosInvertidos = items.Sum(i => i.MinutosInvertidos),
+            MinutosRegistrados = items.Sum(i => i.MinutosRegistrados),
+            DiferenciaMinutos = items.Sum(i => i.DiferenciaMinutos),
+            ItemsConRegistro = crudos.Count(c => c.TieneRegistro),
+            PromedioDiasNaturalesResolucion = PromedioDecimal(items.Select(i => i.DiasNaturalesResolucion)),
+            PromedioMinutosLaboralesResolucion = PromedioEntero(items.Select(i => i.MinutosLaboralesResolucion)),
+            PromedioDiasNaturalesEspera = PromedioDecimal(items.Select(i => i.DiasNaturalesEspera)),
+            PromedioMinutosLaboralesEspera = PromedioEntero(items.Select(i => i.MinutosLaboralesEspera)),
+            PorcentajeATiempo = conCompromiso.Count == 0
+                ? null
+                : Math.Round(conCompromiso.Count(i => i.EntregadoATiempo == true) * 100m / conCompromiso.Count, 1),
+        };
+
+        var (tickets, totalesTickets, avisosTickets) = await ObtenerTicketsTerminadosAsync(
+            contexto, inicio, fin, idEquipo, idAsignado, idProyecto, folioFiltro, cancellationToken);
+
+        var (incidentes, totalesIncidentes, avisosIncidentes) = await ObtenerIncidentesTerminadosAsync(
+            contexto, inicio, fin, idEquipo, idAsignado, idProyecto, folioFiltro, cancellationToken);
+
+        return new ActividadesTerminadasReporteResponse
+        {
+            Desde = desde, Hasta = hasta, Items = items, Totales = totales, Truncado = truncado,
+            Tickets = tickets, TotalesTickets = totalesTickets, AvisosTickets = avisosTickets,
+            Incidentes = incidentes, TotalesIncidentes = totalesIncidentes, AvisosIncidentes = avisosIncidentes,
+        };
+    }
+
+    /// <summary>
+    /// Proyeccion intermedia del reloj de estatus.
+    ///
+    /// TRAMPA EF: tiene que ser un tipo de REFERENCIA con propiedades settables, inicializado con
+    /// object initializer. No sirve un ValueTuple (en el LEFT JOIN se compara contra null y un
+    /// struct no puede serlo) ni un record posicional: EF Core NO traduce el constructor dentro
+    /// del Select de un GroupBy que luego entra a un join -- pierde el tipo, castea las llaves a
+    /// object y truena con "The LINQ expression could not be translated" en tiempo de EJECUCION,
+    /// no de compilacion. Cubierto por DiagnosticoTraduccionR15 en GTE.Api.Tests.
+    /// </summary>
+    private sealed class RelojEstatusDTO
+    {
+        public int IdRegistro { get; set; }
+
+        /// <summary>
+        /// Nullable a proposito: en el LEFT JOIN, SUM() devuelve NULL para los registros sin
+        /// historial en ese estatus, y leerlo en un int no nullable revienta al materializar.
+        /// </summary>
+        public int? Minutos { get; set; }
+    }
+
+    /// <summary>Minutos laborales acumulados en un estatus dado, desde el historial materializado.</summary>
+    private static IQueryable<RelojEstatusDTO> RelojEstatus(
+        DbContextGTE contexto, string proceso, int idEstatus)
+        => contexto.TblHistorialEstatus.AsNoTracking()
+            .Where(h => h.Proceso == proceso && h.IdEstatus == idEstatus && h.MinutosLaborales != null)
+            .GroupBy(h => h.IdRegistro)
+            .Select(g => new RelojEstatusDTO
+            {
+                IdRegistro = g.Key,
+                Minutos = g.Sum(h => h.MinutosLaborales!.Value),
+            });
+
+    /// <summary>
+    /// R15, seccion Tickets: resueltos o cerrados en el rango (por FechaResolucion). Un ticket no
+    /// tiene equipo ni proyecto, asi que filtrar por cualquiera de esos vacia la seccion en vez
+    /// de devolver algo que no honra el filtro.
+    /// </summary>
+    private static async Task<(IReadOnlyList<TicketTerminadoResponse>, TicketsTerminadosTotalesResponse, IReadOnlyList<string>)>
+        ObtenerTicketsTerminadosAsync(
+            DbContextGTE contexto, DateTime inicio, DateTime fin,
+            int? idEquipo, int? idAsignado, int? idProyecto, string? folio,
+            CancellationToken cancellationToken)
+    {
+        var avisos = new List<string>();
+        if (idEquipo != null) avisos.Add("Los tickets no se asignan a un equipo, por eso esta seccion queda vacia al filtrar por equipo.");
+        if (idProyecto != null) avisos.Add("Los tickets no pertenecen a un proyecto, por eso esta seccion queda vacia al filtrar por proyecto.");
+
+        if (avisos.Count > 0)
+        {
+            return ([], new TicketsTerminadosTotalesResponse(), avisos);
+        }
+
+        var reloj = RelojEstatus(contexto, "Ticket", EstatusTicket.EnAtencion);
+
+        var crudos = await (
+            from t in contexto.TblTicket.AsNoTracking()
+            join r in reloj on t.IdTicket equals r.IdRegistro into relojes
+            from r in relojes.DefaultIfEmpty()
+            where t.Activo
+                && (t.IdEstatusTicket == EstatusTicket.Resuelto || t.IdEstatusTicket == EstatusTicket.Cerrado)
+                && t.FechaResolucion != null && t.FechaResolucion >= inicio && t.FechaResolucion <= fin
+                && (idAsignado == null || t.IdAsignado == idAsignado)
+                && (folio == null || (t.Folio != null && t.Folio.Contains(folio)))
+            orderby t.FechaResolucion descending, t.IdTicket descending
+            select new
+            {
+                t.IdTicket, t.Folio, t.Titulo, t.Descripcion,
+                Categoria = t.IdCategoriaTicketNavigation != null ? t.IdCategoriaTicketNavigation.Nombre : null,
+                Prioridad = t.IdPrioridadNavigation.Nombre,
+                Estatus = t.IdEstatusTicketNavigation.Descripcion,
+                Solicitante = t.IdSolicitanteNavigation.Nombre,
+                Asignado = t.IdAsignadoNavigation != null ? t.IdAsignadoNavigation.Nombre : null,
+                IdHorarioAsignado = t.IdAsignadoNavigation != null ? t.IdAsignadoNavigation.IdHorario : null,
+                MinutosEnAtencion = r.Minutos ?? 0,
+                t.FechaRegistro, t.FechaPrimeraRespuesta, t.FechaResolucion, t.FechaLimiteResolucion,
+            })
+            .Take(TopeRenglonesDetalle)
+            .ToListAsync(cancellationToken);
+
+        var items = crudos.Select(c => new TicketTerminadoResponse
+        {
+            IdTicket = c.IdTicket,
+            Folio = c.Folio,
+            Categoria = c.Categoria,
+            Titulo = c.Titulo,
+            Descripcion = c.Descripcion,
+            Prioridad = c.Prioridad,
+            Estatus = c.Estatus,
+            Solicitante = c.Solicitante,
+            Asignado = c.Asignado,
+            MinutosEnAtencion = c.MinutosEnAtencion,
+            FechaCreacion = c.FechaRegistro,
+            FechaPrimeraRespuesta = c.FechaPrimeraRespuesta,
+            FechaResolucion = c.FechaResolucion,
+            DiasNaturalesEspera = DiasNaturales(c.FechaRegistro, c.FechaPrimeraRespuesta),
+            DiasNaturalesResolucion = DiasNaturales(c.FechaRegistro, c.FechaResolucion),
+            // El reloj de estatus ya viene en minutos laborales: no hay que recalcularlo.
+            MinutosLaboralesResolucion = c.MinutosEnAtencion == 0 ? null : c.MinutosEnAtencion,
+            DentroDeSla = c.FechaLimiteResolucion == null ? null : c.FechaResolucion <= c.FechaLimiteResolucion,
+        }).ToList();
+
+        var conSla = items.Where(i => i.DentroDeSla != null).ToList();
+
+        var totales = new TicketsTerminadosTotalesResponse
+        {
+            Items = items.Count,
+            MinutosEnAtencion = items.Sum(i => i.MinutosEnAtencion),
+            PromedioDiasNaturalesResolucion = PromedioDecimal(items.Select(i => i.DiasNaturalesResolucion)),
+            PorcentajeDentroDeSla = conSla.Count == 0
+                ? null
+                : Math.Round(conSla.Count(i => i.DentroDeSla == true) * 100m / conSla.Count, 1),
+        };
+
+        return (items, totales, avisos);
+    }
+
+    /// <summary>
+    /// R15, seccion Incidentes: resueltos o cerrados en el rango. Un incidente no tiene asignado
+    /// ni equipo (no se atribuye a una persona), asi que esos filtros vacian la seccion.
+    /// </summary>
+    private static async Task<(IReadOnlyList<IncidenteTerminadoResponse>, IncidentesTerminadosTotalesResponse, IReadOnlyList<string>)>
+        ObtenerIncidentesTerminadosAsync(
+            DbContextGTE contexto, DateTime inicio, DateTime fin,
+            int? idEquipo, int? idAsignado, int? idProyecto, string? folio,
+            CancellationToken cancellationToken)
+    {
+        var avisos = new List<string>();
+        if (idEquipo != null) avisos.Add("Los incidentes no se asignan a un equipo, por eso esta seccion queda vacia al filtrar por equipo.");
+        if (idAsignado != null) avisos.Add("Los incidentes no tienen persona asignada, por eso esta seccion queda vacia al filtrar por asignado.");
+
+        if (avisos.Count > 0)
+        {
+            return ([], new IncidentesTerminadosTotalesResponse(), avisos);
+        }
+
+        var reloj = RelojEstatus(contexto, "Incidente", EstatusIncidente.EnAtencion);
+
+        var crudos = await (
+            from i in contexto.TblIncidente.AsNoTracking()
+            join r in reloj on i.IdIncidente equals r.IdRegistro into relojes
+            from r in relojes.DefaultIfEmpty()
+            where i.Activo
+                && (i.IdEstatusIncidente == EstatusIncidente.Resuelto || i.IdEstatusIncidente == EstatusIncidente.Cerrado)
+                && i.FechaResolucion != null && i.FechaResolucion >= inicio && i.FechaResolucion <= fin
+                && (idProyecto == null || i.IdProyecto == idProyecto)
+                && (folio == null || (i.Folio != null && i.Folio.Contains(folio)))
+            orderby i.FechaResolucion descending, i.IdIncidente descending
+            select new
+            {
+                i.IdIncidente, i.Folio, i.Titulo, i.Descripcion, i.CausaRaiz,
+                Severidad = i.IdSeveridadNavigation.Nombre,
+                Proyecto = i.IdProyectoNavigation.Nombre,
+                Estatus = i.IdEstatusIncidenteNavigation.Descripcion,
+                MinutosEnAtencion = r.Minutos ?? 0,
+                i.MinutosIndisponibilidad,
+                i.FechaOcurrencia, i.FechaDeteccion, i.FechaResolucion,
+            })
+            .Take(TopeRenglonesDetalle)
+            .ToListAsync(cancellationToken);
+
+        var items = crudos.Select(c => new IncidenteTerminadoResponse
+        {
+            IdIncidente = c.IdIncidente,
+            Folio = c.Folio,
+            Severidad = c.Severidad,
+            Titulo = c.Titulo,
+            Descripcion = c.Descripcion,
+            Proyecto = c.Proyecto,
+            Estatus = c.Estatus,
+            CausaRaiz = c.CausaRaiz,
+            MinutosEnAtencion = c.MinutosEnAtencion,
+            MinutosIndisponibilidad = c.MinutosIndisponibilidad,
+            FechaOcurrencia = c.FechaOcurrencia,
+            FechaDeteccion = c.FechaDeteccion,
+            FechaResolucion = c.FechaResolucion,
+            DiasNaturalesDeteccion = DiasNaturales(c.FechaOcurrencia, c.FechaDeteccion),
+            DiasNaturalesResolucion = DiasNaturales(c.FechaOcurrencia, c.FechaResolucion),
+        }).ToList();
+
+        var totales = new IncidentesTerminadosTotalesResponse
+        {
+            Items = items.Count,
+            MinutosEnAtencion = items.Sum(i => i.MinutosEnAtencion),
+            MinutosIndisponibilidad = items.Sum(i => i.MinutosIndisponibilidad ?? 0),
+            PromedioDiasNaturalesResolucion = PromedioDecimal(items.Select(i => i.DiasNaturalesResolucion)),
+        };
+
+        return (items, totales, avisos);
+    }
+
+    /// <summary>Tope de renglones del detalle: evita que un rango abierto tumbe la pagina y el Excel.</summary>
+    private const int TopeRenglonesDetalle = 5000;
+
+    private static decimal? DiasNaturales(DateTime inicio, DateTime? fin)
+        => fin == null ? null : Math.Round((decimal)(fin.Value - inicio).TotalDays, 2);
+
+    private static decimal? PromedioDecimal(IEnumerable<decimal?> valores)
+    {
+        var lista = valores.Where(v => v != null).Select(v => v!.Value).ToList();
+        return lista.Count == 0 ? null : Math.Round(lista.Average(), 2);
+    }
+
+    private static int? PromedioEntero(IEnumerable<int?> valores)
+    {
+        var lista = valores.Where(v => v != null).Select(v => v!.Value).ToList();
+        return lista.Count == 0 ? null : (int)Math.Round(lista.Average());
+    }
 }

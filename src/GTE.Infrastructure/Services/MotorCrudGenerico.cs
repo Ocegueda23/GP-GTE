@@ -78,6 +78,8 @@ public class MotorCrudGenerico(FabricaContexto fabrica, IServicioCifradoColumna 
             }
         }
 
+        await AgregarEtiquetasFkAsync(catalogo, filas, conexion, cancellationToken);
+
         return new PagedResult<Dictionary<string, object?>>
         {
             Items = filas,
@@ -85,6 +87,89 @@ public class MotorCrudGenerico(FabricaContexto fabrica, IServicioCifradoColumna 
             PageSize = tamanoSeguro,
             TotalItems = totalItems
         };
+    }
+
+    /// <summary>
+    /// Sufijo de la clave extra que acompana a cada columna FK con el texto ya resuelto.
+    /// El grid pinta ese texto y deja el id crudo en la fila para editar y filtrar.
+    /// </summary>
+    public const string SufijoEtiquetaFk = "__texto";
+
+    /// <summary>
+    /// Resuelve el texto de las columnas FK de la pagina ya leida, con una consulta chica
+    /// por columna FK (los ids distintos de esa pagina, nunca mas de 500).
+    ///
+    /// POR QUE UN SEGUNDO PASO Y NO UN LEFT JOIN: meter joins al SELECT obligaria a
+    /// calificar con alias todas las columnas del WHERE y del ORDER BY que arma
+    /// ConstruirCondicionesFiltro, y ahi es donde vive el blindaje del SQL dinamico.
+    /// Dos consultas triviales cuestan menos que arriesgar esa parte.
+    /// </summary>
+    private async Task AgregarEtiquetasFkAsync(
+        ConfiguracionCatalogo catalogo,
+        List<Dictionary<string, object?>> filas,
+        DbConnection conexion,
+        CancellationToken cancellationToken)
+    {
+        if (filas.Count == 0)
+        {
+            return;
+        }
+
+        var columnasFk = catalogo.Columnas.Where(c =>
+            !string.IsNullOrWhiteSpace(c.TablaFk)
+            && !string.IsNullOrWhiteSpace(c.ColumnaClaveFk)
+            && !string.IsNullOrWhiteSpace(c.ColumnaMostrarFk));
+
+        foreach (var columna in columnasFk)
+        {
+            var ids = filas
+                .Select(f => f.TryGetValue(columna.NombreColumna, out var v) ? v : null)
+                .Where(v => v is not null)
+                .Distinct()
+                .ToList();
+            if (ids.Count == 0)
+            {
+                continue;
+            }
+
+            var parametros = ids
+                .Select((valor, i) => new SqlParameter($"@fk{i}", valor))
+                .ToList();
+
+            var claveSql = SqlIdentificadores.Citar(columna.ColumnaClaveFk!);
+            var mostrarSql = SqlIdentificadores.Citar(columna.ColumnaMostrarFk!);
+            var sql = $"SELECT {claveSql}, {mostrarSql} FROM {SqlIdentificadores.CitarTabla(columna.TablaFk!)} "
+                      + $"WHERE {claveSql} IN ({string.Join(", ", parametros.Select(p => p.ParameterName))})";
+
+            var etiquetas = new Dictionary<string, string?>();
+            await using (var comando = conexion.CreateCommand())
+            {
+                comando.CommandText = sql;
+                comando.Parameters.AddRange(parametros.ToArray());
+                await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
+                while (await lector.ReadAsync(cancellationToken))
+                {
+                    var clave = lector.IsDBNull(0) ? null : lector.GetValue(0)?.ToString();
+                    if (clave is null)
+                    {
+                        continue;
+                    }
+                    etiquetas[clave] = lector.IsDBNull(1) ? null : lector.GetValue(1)?.ToString();
+                }
+            }
+
+            foreach (var fila in filas)
+            {
+                if (!fila.TryGetValue(columna.NombreColumna, out var valor) || valor is null)
+                {
+                    continue;
+                }
+                if (etiquetas.TryGetValue(valor.ToString() ?? string.Empty, out var etiqueta))
+                {
+                    fila[columna.NombreColumna + SufijoEtiquetaFk] = etiqueta;
+                }
+            }
+        }
     }
 
     public async Task<IReadOnlyList<string>> ObtenerValoresDistintosAsync(

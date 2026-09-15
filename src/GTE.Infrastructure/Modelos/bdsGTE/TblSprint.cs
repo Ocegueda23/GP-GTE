@@ -7,7 +7,11 @@ public partial class TblSprint
 {
     public int IdSprint { get; set; }
 
-    public int IdEquipo { get; set; }
+    public int? IdEquipo { get; set; }
+
+    public string? Folio { get; set; }
+
+    public int? IdLider { get; set; }
 
     public string Nombre { get; set; } = null!;
 
@@ -29,9 +33,11 @@ public partial class TblSprint
 
     public bool Activo { get; set; }
 
-    public virtual TblEquipo IdEquipoNavigation { get; set; } = null!;
+    public virtual TblEquipo? IdEquipoNavigation { get; set; }
 
     public virtual TblEstatusSprint IdEstatusSprintNavigation { get; set; } = null!;
+
+    public virtual TblUsuario? IdLiderNavigation { get; set; }
 
     public virtual ICollection<TblCapacidadSprint> TblCapacidadSprint { get; set; } = new List<TblCapacidadSprint>();
 

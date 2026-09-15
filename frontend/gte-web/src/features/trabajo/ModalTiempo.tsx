@@ -5,6 +5,7 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
 import { formatearMinutos, obtenerTiempos, registrarTiempo } from "../../shared/api/workitems";
+import { useEsMovil } from "../../shared/hooks/useEsMovil";
 
 interface Props {
   abierto: boolean;
@@ -24,6 +25,7 @@ export function ModalTiempo({ abierto, item, alCerrar, alExito, alError }: Props
   const [descripcion, setDescripcion] = useState("");
   const [enviando, setEnviando] = useState(false);
   const clienteQuery = useQueryClient();
+  const esMovil = useEsMovil();
 
   const tiempos = useQuery({
     queryKey: ["tiempos", item.idWorkItem],
@@ -56,7 +58,7 @@ export function ModalTiempo({ abierto, item, alCerrar, alExito, alError }: Props
   const minutosValidos = Number(minutos) >= 1 && Number(minutos) <= 1440;
 
   return (
-    <Dialog open={abierto} onClose={alCerrar} fullWidth maxWidth="xs">
+    <Dialog open={abierto} onClose={alCerrar} fullWidth maxWidth="xs" fullScreen={esMovil}>
       <DialogTitle>Registrar tiempo - {item.folio}</DialogTitle>
       <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
         {tiempos.data && tiempos.data.length > 0 && (

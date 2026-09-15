@@ -35,3 +35,20 @@ public class RolUsuarioResponse
     public int? IdEquipo { get; set; }
     public string? Equipo { get; set; }
 }
+
+/// <summary>
+/// Acceso de una persona a un proyecto: es la MISMA fila de tblUsuarioRol que muestra la
+/// pantalla de usuarios, leida desde el lado del proyecto (IdProyecto con valor = ese rol
+/// solo aplica en ese proyecto). No hay una segunda tabla de permisos por proyecto.
+/// </summary>
+public class AccesoProyectoResponse
+{
+    public int IdUsuarioRol { get; set; }
+    public int IdUsuario { get; set; }
+    public string Usuario { get; set; } = string.Empty;
+    public string Dominio { get; set; } = string.Empty;
+    public int IdRol { get; set; }
+    public string Rol { get; set; } = string.Empty;
+    public DateTime FechaRegistro { get; set; }
+    public string UsuarioRegistro { get; set; } = string.Empty;
+}

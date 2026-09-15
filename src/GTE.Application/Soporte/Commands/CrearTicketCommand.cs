@@ -67,7 +67,8 @@ public class CrearTicketHandler(
         if (await permisos.TienePermisoAsync(PermisosTicket.Atender, null, cancellationToken))
         {
             await repositorio.AsignarAsync(idTicket, usuario.IdUsuario, cancellationToken);
-            await motor.EjecutarAccionAsync("Ticket", idTicket, AccionesTicket.Asignar, null, null, cancellationToken);
+            await motor.EjecutarAccionAsync(
+                "Ticket", idTicket, AccionesTicket.Asignar, null, sla?.IdHorario, cancellationToken);
             await repositorio.AplicarEfectosTransicionAsync(
                 idTicket, AccionesTicket.Asignar, cancellationToken: cancellationToken);
         }

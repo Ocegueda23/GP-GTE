@@ -19,6 +19,8 @@ public partial class TblRelease
 
     public int IdEstatusRelease { get; set; }
 
+    public int? IdLiderAsignado { get; set; }
+
     public DateOnly? FechaPlan { get; set; }
 
     public DateTime? FechaLiberacion { get; set; }
@@ -34,6 +36,8 @@ public partial class TblRelease
     public bool Activo { get; set; }
 
     public virtual TblEstatusRelease IdEstatusReleaseNavigation { get; set; } = null!;
+
+    public virtual TblUsuario? IdLiderAsignadoNavigation { get; set; }
 
     public virtual TblProyecto IdProyectoNavigation { get; set; } = null!;
 

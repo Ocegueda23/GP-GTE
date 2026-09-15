@@ -184,9 +184,17 @@ public class CambiarEstatusWorkItemHandler(
             return;
         }
 
-        if (estado.IdAsignado.HasValue && estado.IdAsignado == usuarioActual?.IdUsuario)
+        // Revisar el propio trabajo se bloquea por defecto, pero es una regla levantable con
+        // WI.AprobarPropio (equipos de una sola persona, o sin segundo revisor disponible).
+        // Por eso es ForbiddenException (403, "no permitido para ti") y no BusinessException
+        // (400, "el payload esta mal"): lo que falta es un permiso, no un dato.
+        if (estado.IdAsignado.HasValue && estado.IdAsignado == usuarioActual?.IdUsuario
+            && !await permisos.TienePermisoAsync(
+                PermisosWorkItem.AprobarPropio, estado.IdProyecto, cancellationToken))
         {
-            throw new BusinessException("No puedes aprobar ni rechazar las pruebas de tu propio elemento.");
+            throw new ForbiddenException(
+                "No puedes aprobar ni rechazar las pruebas de tu propio elemento. "
+                + "Se necesita el permiso WI.AprobarPropio para hacerlo.");
         }
 
         if (accion == AccionesWorkItem.RechazarQa)

@@ -267,6 +267,15 @@ export function MiDiaPage() {
         )}
       </Paper>
 
+      {(datos.incidentesRelevantes.length > 0 || datos.solicitudesPendientes.length > 0
+        || datos.releasesRelevantes.length > 0) && (
+        <Stack direction={{ xs: "column", lg: "row" }} spacing={2} sx={{ mb: 2 }}>
+          {datos.incidentesRelevantes.length > 0 && <TarjetaIncidentes items={datos.incidentesRelevantes} />}
+          {datos.solicitudesPendientes.length > 0 && <TarjetaSolicitudes items={datos.solicitudesPendientes} />}
+          {datos.releasesRelevantes.length > 0 && <TarjetaReleases items={datos.releasesRelevantes} />}
+        </Stack>
+      )}
+
       <Stack direction={{ xs: "column", lg: "row" }} spacing={2}>
         <ListaItems titulo="Vencidas" items={datos.vencidas} color="error" alIniciar={iniciar}
           vacio="Nada vencido. Bien ahi." />
@@ -285,13 +294,9 @@ export function MiDiaPage() {
         </Alert>
       )}
 
-      {(datos.ticketsAsignados.length > 0 || datos.incidentesRelevantes.length > 0
-        || datos.solicitudesPendientes.length > 0 || datos.releasesRelevantes.length > 0) && (
+      {datos.ticketsAsignados.length > 0 && (
         <Stack direction={{ xs: "column", lg: "row" }} spacing={2} sx={{ mt: 2 }}>
-          {datos.ticketsAsignados.length > 0 && <TarjetaTickets items={datos.ticketsAsignados} />}
-          {datos.incidentesRelevantes.length > 0 && <TarjetaIncidentes items={datos.incidentesRelevantes} />}
-          {datos.solicitudesPendientes.length > 0 && <TarjetaSolicitudes items={datos.solicitudesPendientes} />}
-          {datos.releasesRelevantes.length > 0 && <TarjetaReleases items={datos.releasesRelevantes} />}
+          <TarjetaTickets items={datos.ticketsAsignados} />
         </Stack>
       )}
 

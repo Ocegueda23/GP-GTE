@@ -105,6 +105,8 @@ export interface Equipo {
   descripcion: string | null;
   idLider: number | null;
   lider: string | null;
+  /** Bloque tecnico del Centro de Mando TI; null = solo bloque comun. */
+  ambitoCentroMando: string | null;
   totalMiembros: number;
 }
 
@@ -122,6 +124,7 @@ export interface EquipoDetalle {
   descripcion: string | null;
   idLider: number | null;
   lider: string | null;
+  ambitoCentroMando: string | null;
   miembros: MiembroEquipo[];
 }
 
@@ -133,13 +136,20 @@ export async function obtenerEquipo(idEquipo: number) {
   return obtener<EquipoDetalle>(`/api/v1/equipos/${idEquipo}`);
 }
 
-export async function crearEquipo(datos: { nombre: string; descripcion: string | null; idLider: number | null }) {
+export interface EquipoGuardar {
+  nombre: string;
+  descripcion: string | null;
+  idLider: number | null;
+  ambitoCentroMando: string | null;
+}
+
+export async function crearEquipo(datos: EquipoGuardar) {
   return enviar<EquipoDetalle>("post", "/api/v1/equipos", datos);
 }
 
 export async function actualizarEquipo(
   idEquipo: number,
-  datos: { nombre: string; descripcion: string | null; idLider: number | null },
+  datos: EquipoGuardar,
 ) {
   return enviar<EquipoDetalle>("put", `/api/v1/equipos/${idEquipo}`, datos);
 }
@@ -306,6 +316,35 @@ export async function asignarRol(idUsuario: number, datos: { idRol: number; idPr
 
 export async function retirarRol(idUsuario: number, idUsuarioRol: number) {
   return enviar<RolUsuario[]>("put", `/api/v1/usuarios/${idUsuario}/roles/${idUsuarioRol}/retirar`, {});
+}
+
+/* ---------- Accesos por proyecto ---------- */
+
+/** Fila de tblUsuarioRol acotada a un proyecto, vista desde el proyecto. */
+export interface AccesoProyecto {
+  idUsuarioRol: number;
+  idUsuario: number;
+  usuario: string;
+  dominio: string;
+  idRol: number;
+  rol: string;
+  fechaRegistro: string;
+  usuarioRegistro: string;
+}
+
+export async function obtenerAccesosProyecto(idProyecto: number) {
+  return obtener<AccesoProyecto[]>(`/api/v1/proyectos/${idProyecto}/accesos`);
+}
+
+export async function asignarAccesoProyecto(
+  idProyecto: number, datos: { idUsuario: number; idRol: number },
+) {
+  return enviar<AccesoProyecto[]>("post", `/api/v1/proyectos/${idProyecto}/accesos`, datos);
+}
+
+export async function retirarAccesoProyecto(idProyecto: number, idUsuarioRol: number) {
+  return enviar<AccesoProyecto[]>(
+    "put", `/api/v1/proyectos/${idProyecto}/accesos/${idUsuarioRol}/retirar`, {});
 }
 
 /* ---------- Horarios ---------- */

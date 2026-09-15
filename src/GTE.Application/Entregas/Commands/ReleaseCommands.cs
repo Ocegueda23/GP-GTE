@@ -286,7 +286,7 @@ public class AgregarArtefactoHandler(
             command.IdRelease, command.Datos.Nombre.Trim(), command.Datos.IdTipoArtefacto,
             command.Datos.HashSha256, command.Datos.OrdenEjecucion,
             command.Datos.IdArtefactoRollback, command.Datos.JustificacionIrreversible,
-            instrucciones), cancellationToken);
+            instrucciones, LimpiarVersion(command.Datos.VersionArtefacto)), cancellationToken);
 
         // Las imagenes pegadas en el instructivo se subieron en borrador; se adjuntan al
         // release (no al artefacto: el adjunto vive a nivel de la entrega, y sin vinculo
@@ -295,6 +295,175 @@ public class AgregarArtefactoHandler(
             "Release", command.IdRelease, ReferenciasImagenes.ObtenerGuids(instrucciones), cancellationToken);
 
         return idArtefacto;
+    }
+
+    /// <summary>
+    /// La version del artefacto es texto libre (conviven 4 digitos de aplicacion y 3 de
+    /// procedimiento almacenado), asi que solo se recorta: vacio se guarda como NULL para
+    /// que el reporte impreso no muestre una celda con espacios.
+    /// </summary>
+    internal static string? LimpiarVersion(string? version)
+    {
+        return string.IsNullOrWhiteSpace(version) ? null : version.Trim();
+    }
+}
+
+/* ---------- Edicion de artefactos ---------- */
+
+public record EditarArtefactoCommand(
+    int IdRelease, int IdArtefacto, ArtefactoEditarRequest Datos) : IRequest<Unit>;
+
+public class EditarArtefactoValidator : AbstractValidator<EditarArtefactoCommand>
+{
+    public EditarArtefactoValidator()
+    {
+        RuleFor(c => c.IdRelease).GreaterThan(0);
+        RuleFor(c => c.IdArtefacto).GreaterThan(0);
+        RuleFor(c => c.Datos.Nombre).NotEmpty().WithMessage("El nombre del artefacto es obligatorio.")
+            .MaximumLength(200);
+        RuleFor(c => c.Datos.IdTipoArtefacto).GreaterThan(0);
+        RuleFor(c => c.Datos.JustificacionIrreversible).MaximumLength(500);
+        RuleFor(c => c.Datos.VersionArtefacto).MaximumLength(50);
+    }
+}
+
+public class EditarArtefactoHandler(
+    IEntregaRepository repositorio,
+    IArchivoRepository archivos,
+    ISanitizadorHtml sanitizador,
+    IVerificadorPermisos permisos) : IRequestHandler<EditarArtefactoCommand, Unit>
+{
+    public async Task<Unit> Handle(EditarArtefactoCommand command, CancellationToken cancellationToken)
+    {
+        var release = await repositorio.ObtenerEstadoAsync(command.IdRelease, cancellationToken)
+            ?? throw new NotFoundException("Release", command.IdRelease);
+
+        await permisos.ExigirPermisoAsync(PermisosEntregas.Crear, release.IdProyecto, cancellationToken);
+
+        if (release.IdEstatus != EstatusRelease.EnPreparacion)
+        {
+            throw new BusinessException("Los artefactos solo se editan mientras el release esta En Preparacion.");
+        }
+
+        // Un artefacto no puede ser su propia reversa: quedaria cumpliendo RN-GTE-032
+        // contra si mismo y el release pasaria el gate sin rollback real.
+        if (command.Datos.IdArtefactoRollback == command.IdArtefacto)
+        {
+            throw new BusinessException("Un artefacto no puede ser su propia reversa.");
+        }
+
+        var instrucciones = InstruccionesHtml.Limpiar(
+            sanitizador, command.Datos.InstruccionesImplementacion);
+
+        var actualizado = await repositorio.EditarArtefactoAsync(new ArtefactoEditar(
+            command.IdRelease, command.IdArtefacto, command.Datos.Nombre.Trim(),
+            command.Datos.IdTipoArtefacto, command.Datos.HashSha256, command.Datos.OrdenEjecucion,
+            command.Datos.IdArtefactoRollback, command.Datos.JustificacionIrreversible,
+            instrucciones, AgregarArtefactoHandler.LimpiarVersion(command.Datos.VersionArtefacto)),
+            cancellationToken);
+
+        if (!actualizado)
+        {
+            throw new NotFoundException("Artefacto", command.IdArtefacto);
+        }
+
+        await archivos.VincularBorradoresAsync(
+            "Release", command.IdRelease, ReferenciasImagenes.ObtenerGuids(instrucciones), cancellationToken);
+
+        return Unit.Value;
+    }
+}
+
+/* ---------- Edicion de respaldos ---------- */
+
+public record EditarRespaldoCommand(
+    int IdRelease, int IdRespaldo, RespaldoEditarRequest Datos) : IRequest<Unit>;
+
+public class EditarRespaldoValidator : AbstractValidator<EditarRespaldoCommand>
+{
+    public EditarRespaldoValidator()
+    {
+        RuleFor(c => c.IdRelease).GreaterThan(0);
+        RuleFor(c => c.IdRespaldo).GreaterThan(0);
+        RuleFor(c => c.Datos.IdTipoRespaldo).GreaterThan(0);
+        RuleFor(c => c.Datos.Descripcion).NotEmpty()
+            .WithMessage("El nombre o ubicacion del respaldo es obligatorio.")
+            .MaximumLength(500);
+    }
+}
+
+public class EditarRespaldoHandler(
+    IEntregaRepository repositorio,
+    IVerificadorPermisos permisos) : IRequestHandler<EditarRespaldoCommand, Unit>
+{
+    public async Task<Unit> Handle(EditarRespaldoCommand command, CancellationToken cancellationToken)
+    {
+        var release = await repositorio.ObtenerEstadoAsync(command.IdRelease, cancellationToken)
+            ?? throw new NotFoundException("Release", command.IdRelease);
+
+        await permisos.ExigirPermisoAsync(PermisosEntregas.Crear, release.IdProyecto, cancellationToken);
+
+        if (release.IdEstatus != EstatusRelease.EnPreparacion)
+        {
+            throw new BusinessException("Los respaldos solo se editan mientras el release esta En Preparacion.");
+        }
+
+        var actualizado = await repositorio.EditarRespaldoAsync(new RespaldoEditar(
+            command.IdRelease, command.IdRespaldo, command.Datos.IdTipoRespaldo,
+            command.Datos.Descripcion.Trim()), cancellationToken);
+
+        if (!actualizado)
+        {
+            throw new NotFoundException("Respaldo", command.IdRespaldo);
+        }
+
+        return Unit.Value;
+    }
+}
+
+/* ---------- Lider asignado ---------- */
+
+public record AsignarLiderCommand(int IdRelease, int? IdLiderAsignado) : IRequest<ReleaseDetalleResponse>;
+
+public class AsignarLiderValidator : AbstractValidator<AsignarLiderCommand>
+{
+    public AsignarLiderValidator()
+    {
+        RuleFor(c => c.IdRelease).GreaterThan(0);
+        RuleFor(c => c.IdLiderAsignado).GreaterThan(0)
+            .When(c => c.IdLiderAsignado.HasValue)
+            .WithMessage("El lider asignado no es valido.");
+    }
+}
+
+/// <summary>
+/// El lider responsable de la entrega se puede cambiar en cualquier estatus salvo los
+/// terminales: si un release ya liberado o cancelado cambiara de responsable, la Solicitud
+/// de despliegue impresa dejaria de coincidir con lo que muestra el sistema.
+/// </summary>
+public class AsignarLiderHandler(
+    IEntregaRepository repositorio,
+    IEntregaQueryService consultas,
+    IVerificadorPermisos permisos) : IRequestHandler<AsignarLiderCommand, ReleaseDetalleResponse>
+{
+    public async Task<ReleaseDetalleResponse> Handle(
+        AsignarLiderCommand command, CancellationToken cancellationToken)
+    {
+        var release = await repositorio.ObtenerEstadoAsync(command.IdRelease, cancellationToken)
+            ?? throw new NotFoundException("Release", command.IdRelease);
+
+        await permisos.ExigirPermisoAsync(PermisosEntregas.Crear, release.IdProyecto, cancellationToken);
+
+        if (release.IdEstatus is EstatusRelease.Liberado or EstatusRelease.Cancelado)
+        {
+            throw new BusinessException(
+                "El lider no se puede cambiar en un release ya liberado o cancelado.");
+        }
+
+        await repositorio.AsignarLiderAsync(command.IdRelease, command.IdLiderAsignado, cancellationToken);
+
+        return await consultas.ObtenerDetalleAsync(command.IdRelease, cancellationToken)
+            ?? throw new NotFoundException("Release", command.IdRelease);
     }
 }
 

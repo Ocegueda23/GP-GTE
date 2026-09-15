@@ -22,7 +22,10 @@ public class CorregirRevisionValidator : AbstractValidator<CorregirRevisionComma
 }
 
 /// <summary>
-/// Marca un hallazgo como corregido o lo reabre.
+/// Marca un hallazgo como corregido, lo cierra como "No es un error" o lo reabre.
+/// El descarte comparte el flujo del corregido (cierra el hallazgo y deja de bloquear
+/// el cierre del WorkItem), pero exige REV.Descartar y razon escrita, y queda marcado
+/// aparte en EsFalsoPositivo para que no cuente como defecto arreglado en metricas.
 /// RN-GTE-026: reabrir un hallazgo ya corregido exige el permiso REV.Reabrir
 /// (regla heredada del GT: solo un lider puede reabrir) y motivo capturado.
 /// RN-GTE-012 (2026-08-02): marcar CORREGIDO un hallazgo de un WorkItem ajeno exige
@@ -54,7 +57,21 @@ public class CorregirRevisionHandler(
         var estadoItem = await workItems.ObtenerEstadoAsync(estado.IdWorkItem, cancellationToken)
             ?? throw new NotFoundException("WorkItem", estado.IdWorkItem);
 
-        if (command.Datos.Corregido)
+        if (command.Datos.Corregido && command.Datos.EsFalsoPositivo)
+        {
+            // Descartar es facultad del lider (mismo criterio que reabrir, RN-GTE-026):
+            // si no, quien recibe el hallazgo lo cierra declarandolo mala interpretacion
+            // del tester y nadie revisa esa decision. La razon queda por escrito porque
+            // es la unica evidencia de por que el defecto no se atendio.
+            await permisos.ExigirPermisoAsync(
+                PermisosRevision.Descartar, estadoItem.IdProyecto, cancellationToken);
+            if (string.IsNullOrWhiteSpace(command.Datos.Motivo))
+            {
+                throw new BusinessException(
+                    "Marcar un hallazgo como \"No es un error\" requiere explicar por que no lo es.");
+            }
+        }
+        else if (command.Datos.Corregido)
         {
             var usuarioActual = await proveedorUsuario.ObtenerAsync(cancellationToken);
             var esAjeno = estadoItem.IdAsignado != usuarioActual?.IdUsuario;
@@ -74,7 +91,9 @@ public class CorregirRevisionHandler(
             }
         }
 
-        await repositorio.EstablecerCorregidoAsync(command.IdRevision, command.Datos.Corregido, cancellationToken);
+        await repositorio.EstablecerCorregidoAsync(
+            command.IdRevision, command.Datos.Corregido, command.Datos.EsFalsoPositivo,
+            command.Datos.Motivo?.Trim(), cancellationToken);
 
         // El hallazgo sigue su propio ciclo de vida en el motor.
         // TERMINAR solo procede desde En Proceso: si sigue Pendiente se avanza

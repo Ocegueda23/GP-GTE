@@ -18,6 +18,12 @@ export interface Artefacto {
   idArtefactoRollback: number | null;
   nombreRollback: string | null;
   justificacionIrreversible: string | null;
+  /**
+   * Version que se libera de este artefacto EN ESTE release (el mismo objeto se libera con
+   * versiones distintas en cada entrega). Texto libre: conviven los 4 digitos de
+   * aplicaciones e instaladores y los 3 de procedimientos almacenados.
+   */
+  versionArtefacto: string | null;
   /** HTML enriquecido (formato, tablas e imagenes) con el instructivo propio del artefacto. */
   instruccionesImplementacion: string | null;
   requiereRollback: boolean;
@@ -66,6 +72,12 @@ export interface Release {
   instruccionesImplementacion: string | null;
   idEstatus: number;
   estatus: string;
+  /** Lider responsable de sacar la entrega; nulo mientras no se le asigna. */
+  idLiderAsignado: number | null;
+  liderAsignado: string | null;
+  /** Quien dio de alta el release. */
+  creadoPor: string;
+  fechaCreacion: string;
   fechaPlan: string | null;
   fechaLiberacion: string | null;
   totalItems: number;
@@ -124,9 +136,17 @@ export function colorEstatusRelease(
   }
 }
 
-export async function obtenerReleases(idProyecto?: number) {
+export interface FiltrosReleases {
+  idProyecto?: number;
+  idEstatus?: number;
+  idLiderAsignado?: number;
+}
+
+export async function obtenerReleases(filtros: FiltrosReleases = {}) {
   const params = new URLSearchParams();
-  if (idProyecto) params.set("idProyecto", String(idProyecto));
+  if (filtros.idProyecto) params.set("idProyecto", String(filtros.idProyecto));
+  if (filtros.idEstatus) params.set("idEstatus", String(filtros.idEstatus));
+  if (filtros.idLiderAsignado) params.set("idLiderAsignado", String(filtros.idLiderAsignado));
   return obtener<Release[]>("/api/v1/releases", params);
 }
 
@@ -160,22 +180,53 @@ export async function quitarContenido(idRelease: number, idWorkItem: number) {
   return { mensaje };
 }
 
-export async function agregarArtefacto(idRelease: number, datos: {
+/** Mismo payload en el alta y en la edicion: la pantalla manda el artefacto completo. */
+export interface DatosArtefacto {
   nombre: string;
   idTipoArtefacto: number;
   ordenEjecucion: number | null;
   idArtefactoRollback: number | null;
   justificacionIrreversible: string | null;
   instruccionesImplementacion: string | null;
-}) {
+  versionArtefacto: string | null;
+}
+
+export async function agregarArtefacto(idRelease: number, datos: DatosArtefacto) {
   return enviar<number>("post", `/api/v1/releases/${idRelease}/artefactos`, datos);
 }
 
-export async function agregarRespaldo(idRelease: number, datos: {
+export async function editarArtefacto(
+  idRelease: number, idArtefacto: number, datos: DatosArtefacto,
+) {
+  const { mensaje } = await enviar<object>(
+    "put", `/api/v1/releases/${idRelease}/artefactos/${idArtefacto}`, datos,
+  );
+  return { mensaje };
+}
+
+export interface DatosRespaldo {
   idTipoRespaldo: number;
   descripcion: string;
-}) {
+}
+
+export async function agregarRespaldo(idRelease: number, datos: DatosRespaldo) {
   return enviar<number>("post", `/api/v1/releases/${idRelease}/respaldos`, datos);
+}
+
+export async function editarRespaldo(
+  idRelease: number, idRespaldo: number, datos: DatosRespaldo,
+) {
+  const { mensaje } = await enviar<object>(
+    "put", `/api/v1/releases/${idRelease}/respaldos/${idRespaldo}`, datos,
+  );
+  return { mensaje };
+}
+
+/** Nulo desasigna al lider. */
+export async function asignarLider(idRelease: number, idLiderAsignado: number | null) {
+  return enviar<ReleaseDetalle>("put", `/api/v1/releases/${idRelease}/lider`, {
+    idLiderAsignado,
+  });
 }
 
 export async function quitarRespaldo(idRelease: number, idRespaldo: number) {
@@ -242,6 +293,8 @@ export interface CatalogosEntregas {
   idTipoArtefactoScriptSql: number;
   /** Tipos de respaldo previos al despliegue (base de datos, servicio, sitio, ubicacion). */
   tiposRespaldo: { id: number; nombre: string }[];
+  /** Estatus de release, para el filtro del listado. */
+  estatusRelease: { id: number; nombre: string }[];
 }
 
 /**

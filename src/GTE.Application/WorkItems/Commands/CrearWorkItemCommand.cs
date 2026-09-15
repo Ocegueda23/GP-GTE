@@ -6,6 +6,7 @@ using GTE.Domain.Administracion;
 using GTE.Domain.Exceptions;
 using GTE.Domain.Archivos;
 using GTE.Domain.Interfaces;
+using GTE.Domain.Planeacion;
 using GTE.Domain.WorkItems;
 using MediatR;
 
@@ -38,6 +39,7 @@ public class CrearWorkItemHandler(
     IVerificadorPermisos permisos,
     ISanitizadorHtml sanitizador,
     IProveedorUsuarioActual proveedorUsuario,
+    IPlaneacionRepository planeacion,
     IArchivoRepository archivos) : IRequestHandler<CrearWorkItemCommand, WorkItemResponse>
 {
     public async Task<WorkItemResponse> Handle(CrearWorkItemCommand command, CancellationToken cancellationToken)
@@ -100,6 +102,13 @@ public class CrearWorkItemHandler(
         var (minutosPresupuesto, puntosHistoria) = await CalcularPresupuestoAsync(
             repositorio, idComplejidadEfectiva, datos.IdAsignado, cancellationToken);
 
+        // El sprint es opcional en el alta (null = queda en el backlog); comprometerlo desde
+        // aqui pasa por las mismas reglas que moverlo en el detalle del sprint (RN-GTE-019).
+        if (datos.IdSprint.HasValue)
+        {
+            await ExigirSprintAbiertoAsync(planeacion, permisos, datos.IdSprint.Value, cancellationToken);
+        }
+
         var folio = await folios.GenerarAsync(proyecto.Clave, cancellationToken: cancellationToken);
 
         // El estatus inicial lo fija el backend (Pendiente); el repositorio siembra el historial
@@ -107,7 +116,8 @@ public class CrearWorkItemHandler(
             folio, datos.IdTipoWorkItem, datos.IdPadre, datos.IdProyecto, datos.IdSolicitud,
             datos.Titulo.Trim(), descripcion, datos.CriteriosAceptacion, datos.IdPrioridad,
             idComplejidadEfectiva, datos.IdAsignado, datos.IdSolicitante, puntosHistoria,
-            minutosPresupuesto, datos.FechaCompromiso, datos.IdUsuarioSolicitante), cancellationToken);
+            minutosPresupuesto, datos.FechaCompromiso, datos.IdUsuarioSolicitante,
+            datos.IdSprint), cancellationToken);
 
         // Las imagenes pegadas durante el alta se subieron en borrador (sin vinculo, porque la
         // entidad aun no tenia Id): ahora que existe, se adjuntan.
@@ -116,6 +126,26 @@ public class CrearWorkItemHandler(
 
         return await consultas.ObtenerPorIdAsync(idWorkItem, cancellationToken)
             ?? throw new NotFoundException("WorkItem", idWorkItem);
+    }
+
+    /// <summary>
+    /// RN-GTE-019: comprometer un elemento a un sprint exige el mismo permiso y valida lo
+    /// mismo que AsignarSprintHandler (unico dueno de la regla): sprint existente y no
+    /// cerrado. Compartida por el alta y la edicion del WorkItem para no tener dos versiones
+    /// de la regla segun por donde entre el cambio.
+    /// </summary>
+    internal static async Task ExigirSprintAbiertoAsync(
+        IPlaneacionRepository planeacion, IVerificadorPermisos permisos, int idSprint,
+        CancellationToken cancellationToken)
+    {
+        await permisos.ExigirPermisoAsync(PermisosPlaneacion.GestionarSprints, null, cancellationToken);
+
+        var sprint = await planeacion.ObtenerEstadoSprintAsync(idSprint, cancellationToken)
+            ?? throw new NotFoundException("Sprint", idSprint);
+        if (sprint.IdEstatus == EstatusSprint.Cerrado)
+        {
+            throw new BusinessException("No se pueden agregar elementos a un sprint cerrado.");
+        }
     }
 
     /// <summary>

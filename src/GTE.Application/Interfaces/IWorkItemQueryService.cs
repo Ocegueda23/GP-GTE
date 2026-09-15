@@ -14,7 +14,8 @@ public record FiltroBandeja(
     string? Texto = null,
     bool SoloVencidas = false,
     string? OrdenarPor = null,
-    bool OrdenDescendente = false);
+    bool OrdenDescendente = false,
+    int? IdSprint = null);   // -1 = sin sprint (Backlog)
 
 /// <summary>Contrato de LECTURA del modulo WorkItems: proyecta directo a DTOs.</summary>
 public interface IWorkItemQueryService
@@ -28,4 +29,11 @@ public interface IWorkItemQueryService
     Task<IReadOnlyList<RegistroTiempoResponse>> ObtenerTiemposAsync(int idWorkItem, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<WorkItemHijoResponse>> ObtenerHijosAsync(int idWorkItemPadre, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Vista previa del presupuesto (RN-GTE-015) para una complejidad, resuelto con el nivel
+    /// del asignado cuando hay uno. Solo lectura: no congela nada.
+    /// </summary>
+    Task<PresupuestoEstimadoResponse?> ObtenerPresupuestoEstimadoAsync(
+        int idComplejidad, int? idAsignado, CancellationToken cancellationToken = default);
 }

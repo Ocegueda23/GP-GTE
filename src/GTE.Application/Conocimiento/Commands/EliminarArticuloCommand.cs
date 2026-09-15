@@ -24,7 +24,7 @@ public class EliminarArticuloHandler(
 {
     public async Task Handle(EliminarArticuloCommand command, CancellationToken cancellationToken)
     {
-        await permisos.ExigirPermisoAsync(PermisosConocimiento.Administrar, null, cancellationToken);
+        await permisos.ExigirPermisoAsync(PermisosConocimiento.Eliminar, null, cancellationToken);
 
         var estado = await repositorio.ObtenerEstadoAsync(command.IdArticulo, cancellationToken)
             ?? throw new NotFoundException("ArticuloConocimiento", command.IdArticulo);

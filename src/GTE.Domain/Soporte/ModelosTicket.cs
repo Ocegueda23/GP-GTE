@@ -14,7 +14,12 @@ public record TicketNuevo(
     int? IdUsuarioSolicitante = null,
     int? IdLocacion = null);
 
-/// <summary>Estado minimo de un ticket para evaluar reglas.</summary>
+/// <summary>
+/// Estado minimo de un ticket para evaluar reglas. IdHorario es el del SLA del ticket: se
+/// le pasa a dbo.spCambiarEstatus para que materialice los minutos laborales de cada
+/// intervalo del historial. Sin el, MinutosLaborales queda NULL y todo tiempo derivado
+/// del historial sale en cero.
+/// </summary>
 public record EstadoTicket(
     int IdTicket,
     string? Folio,
@@ -25,7 +30,8 @@ public record EstadoTicket(
     string Titulo,
     string? Descripcion,
     int IdPrioridad,
-    bool Activo);
+    bool Activo,
+    int? IdHorario);
 
 /// <summary>SLA vigente para una prioridad, resuelto por el backend al crear el ticket.</summary>
 public record SlaVigente(int IdSla, int MinutosRespuesta, int MinutosResolucion, int IdHorario);

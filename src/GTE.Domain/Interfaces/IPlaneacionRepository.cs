@@ -5,17 +5,19 @@ namespace GTE.Domain.Interfaces;
 /// <summary>Contrato de ESCRITURA de Planeacion: sprints, backlog y tableros.</summary>
 public interface IPlaneacionRepository
 {
-    Task<int> CrearSprintAsync(SprintNuevo datos, CancellationToken cancellationToken = default);
+    Task<int> CrearSprintAsync(SprintNuevo datos, string folio, CancellationToken cancellationToken = default);
 
     Task EditarSprintAsync(int idSprint, SprintEdicion datos, CancellationToken cancellationToken = default);
 
     Task<EstadoSprint?> ObtenerEstadoSprintAsync(int idSprint, CancellationToken cancellationToken = default);
 
-    /// <summary>Sprint Activo del equipo (solo puede haber uno).</summary>
-    Task<int?> ObtenerSprintActivoAsync(int idEquipo, int idExcluido, CancellationToken cancellationToken = default);
+    Task AsignarLiderSprintAsync(int idSprint, int? idLider, CancellationToken cancellationToken = default);
 
-    /// <summary>Siguiente sprint Planeado del equipo por fecha de inicio.</summary>
-    Task<int?> ObtenerSiguienteSprintPlaneadoAsync(int idEquipo, int idSprintActual, CancellationToken cancellationToken = default);
+    /// <summary>Sprint Activo del lider (solo puede haber uno).</summary>
+    Task<int?> ObtenerSprintActivoPorLiderAsync(int idLider, int idExcluido, CancellationToken cancellationToken = default);
+
+    /// <summary>Siguiente sprint Planeado del lider por fecha de inicio.</summary>
+    Task<int?> ObtenerSiguienteSprintPlaneadoPorLiderAsync(int idLider, int idSprintActual, CancellationToken cancellationToken = default);
 
     Task AplicarEfectosTransicionSprintAsync(int idSprint, string accion, CancellationToken cancellationToken = default);
 
@@ -27,10 +29,11 @@ public interface IPlaneacionRepository
     /// <summary>Persiste el orden del backlog de una lista de elementos (drag and drop).</summary>
     Task ReordenarBacklogAsync(IReadOnlyList<int> idsEnOrden, CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<MiembroEquipo>> ObtenerMiembrosEquipoAsync(int idEquipo, CancellationToken cancellationToken = default);
+    /// <summary>Miembros de todos los equipos que encabeza el lider (TblEquipo.IdLider), sin duplicar.</summary>
+    Task<IReadOnlyList<MiembroEquipo>> ObtenerMiembrosPorLiderAsync(int idLider, CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<AusenciaAprobada>> ObtenerAusenciasAprobadasAsync(
-        int idEquipo, DateOnly desde, DateOnly hasta, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<AusenciaAprobada>> ObtenerAusenciasAprobadasPorLiderAsync(
+        int idLider, DateOnly desde, DateOnly hasta, CancellationToken cancellationToken = default);
 
     /// <summary>Columnas del tablero del equipo; las crea con el mapeo estandar si no existe.</summary>
     Task<IReadOnlyList<ColumnaTablero>> ObtenerOCrearColumnasAsync(int idEquipo, CancellationToken cancellationToken = default);

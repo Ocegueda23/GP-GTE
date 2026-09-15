@@ -9,6 +9,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link as RouterLink } from "react-router-dom";
 import { ErrorApi } from "../../shared/api/http";
 import { ComboBuscable, ComboBuscableMultiple } from "../../shared/components/ComboBuscable";
+import { TarjetaListado } from "../../shared/components/TarjetaListado";
+import { useEsMovil } from "../../shared/hooks/useEsMovil";
 import { obtenerCatalogosBandeja } from "../../shared/api/workitems";
 import { useSesion } from "../../shared/api/sesion";
 import {
@@ -46,10 +48,11 @@ export function PortalTicketsPage() {
   const [enviando, setEnviando] = useState(false);
   const [busqueda, setBusqueda] = useState("");
   // Sin filtro = abiertos (todos menos Cerrado); "Todos" (-1) sigue disponible como opcion.
-  const [filtroEstatus, setFiltroEstatus] = useState<number[]>([]);
+  const [filtroEstatus, setFiltroEstatus] = useState<number[]>([-1]);
   const clienteQuery = useQueryClient();
   const puede = useSesion((estado) => estado.puede);
   const esIngeniero = puede("TKT.Atender");
+  const esMovil = useEsMovil();
 
   const catalogos = useQuery({
     queryKey: ["catalogos-bandeja"],
@@ -67,6 +70,16 @@ export function PortalTicketsPage() {
   });
 
   const valido = titulo.trim().length > 0 && idPrioridad !== "";
+
+  const mensajeVacio = (mios.data?.length ?? 0) === 0 && filtroEstatus.length === 0 && !busqueda.trim()
+    ? "Aun no tienes tickets. Crea el primero con el boton Nuevo ticket."
+    : "No hay tickets con estos filtros.";
+
+  const alExito = (mensaje: string) => {
+    setAviso({ tipo: "success", mensaje });
+    void clienteQuery.invalidateQueries({ queryKey: ["mis-tickets"] });
+  };
+  const alError = (mensaje: string) => setAviso({ tipo: "error", mensaje });
 
   const guardar = async () => {
     if (!valido) return;
@@ -100,8 +113,9 @@ export function PortalTicketsPage() {
   };
 
   return (
-    <Box sx={{ p: 2 }}>
-      <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+    <Box sx={{ p: { xs: 1.5, sm: 2 } }}>
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={1}
+        sx={{ justifyContent: "space-between", alignItems: { xs: "stretch", sm: "center" }, mb: 2 }}>
         <Typography variant="h5" sx={{ fontWeight: 700 }}>Mis tickets</Typography>
         <Button variant="contained" startIcon={<AddIcon />} onClick={() => setModal(true)}>
           Nuevo ticket
@@ -114,7 +128,7 @@ export function PortalTicketsPage() {
 
       <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5, mb: 1.5 }}>
         <TextField size="small" placeholder="Buscar folio o titulo..." value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)} sx={{ minWidth: 260 }} />
+          onChange={(e) => setBusqueda(e.target.value)} sx={{ minWidth: { xs: "100%", sm: 260 } }} />
         <ComboBuscableMultiple
           label="Estatus"
           value={filtroEstatus}
@@ -127,51 +141,57 @@ export function PortalTicketsPage() {
             { valor: -1, etiqueta: "Todos" },
             ...ESTATUS_TICKET.map((e) => ({ valor: e.id, etiqueta: e.nombre })),
           ]}
-          sx={{ minWidth: 220 }}
+          sx={{ minWidth: { xs: "100%", sm: 220 } }}
         />
       </Box>
 
-      <Paper variant="outlined">
-        <TableContainer sx={{ overflowX: "auto" }}>
-          <Table size="small">
-            <TableHead>
-              <TableRow sx={{ "& th": { fontWeight: 700, whiteSpace: "nowrap" } }}>
-                <TableCell>Folio</TableCell>
-                <TableCell>Titulo</TableCell>
-                <TableCell>Categoria</TableCell>
-                <TableCell>Prioridad</TableCell>
-                <TableCell>Estatus</TableCell>
-                <TableCell>Asignado</TableCell>
-                <TableCell>Registrado</TableCell>
-                <TableCell>Calificacion</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {miosFiltrados.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={8}>
-                    <Typography color="text.secondary" sx={{ py: 4, textAlign: "center" }}>
-                      {(mios.data?.length ?? 0) === 0 && filtroEstatus.length === 0 && !busqueda.trim()
-                        ? "Aun no tienes tickets. Crea el primero con el boton Nuevo ticket."
-                        : "No hay tickets con estos filtros."}
-                    </Typography>
-                  </TableCell>
+      {esMovil ? (
+        <Stack spacing={1}>
+          {miosFiltrados.length === 0 && (
+            <Paper variant="outlined" sx={{ p: 3 }}>
+              <Typography color="text.secondary" sx={{ textAlign: "center" }}>{mensajeVacio}</Typography>
+            </Paper>
+          )}
+          {miosFiltrados.map((t) => (
+            <FilaTicket key={t.idTicket} ticket={t} esMovil alExito={alExito} alError={alError} />
+          ))}
+        </Stack>
+      ) : (
+        <Paper variant="outlined">
+          <TableContainer sx={{ overflowX: "auto" }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow sx={{ "& th": { fontWeight: 700, whiteSpace: "nowrap" } }}>
+                  <TableCell>Folio</TableCell>
+                  <TableCell>Titulo</TableCell>
+                  <TableCell>Categoria</TableCell>
+                  <TableCell>Prioridad</TableCell>
+                  <TableCell>Estatus</TableCell>
+                  <TableCell>Asignado</TableCell>
+                  <TableCell>Registrado</TableCell>
+                  <TableCell>Calificacion</TableCell>
                 </TableRow>
-              )}
-              {miosFiltrados.map((t) => (
-                <FilaTicket key={t.idTicket} ticket={t}
-                  alExito={(mensaje) => {
-                    setAviso({ tipo: "success", mensaje });
-                    void clienteQuery.invalidateQueries({ queryKey: ["mis-tickets"] });
-                  }}
-                  alError={(mensaje) => setAviso({ tipo: "error", mensaje })} />
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+              </TableHead>
+              <TableBody>
+                {miosFiltrados.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={8}>
+                      <Typography color="text.secondary" sx={{ py: 4, textAlign: "center" }}>
+                        {mensajeVacio}
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                )}
+                {miosFiltrados.map((t) => (
+                  <FilaTicket key={t.idTicket} ticket={t} esMovil={false} alExito={alExito} alError={alError} />
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+      )}
 
-      <Dialog open={modal} onClose={() => setModal(false)} fullWidth maxWidth="sm">
+      <Dialog open={modal} onClose={() => setModal(false)} fullWidth maxWidth="sm" fullScreen={esMovil}>
         <DialogTitle>Nuevo ticket</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
           <TextField size="small" required label="Titulo" value={titulo}
@@ -236,8 +256,10 @@ export function PortalTicketsPage() {
   );
 }
 
-function FilaTicket({ ticket, alExito, alError }: {
-  ticket: Ticket; alExito: (mensaje: string) => void; alError: (mensaje: string) => void;
+/** Fila de la tabla o tarjeta, segun el ancho: la encuesta de satisfaccion es la misma en ambas. */
+function FilaTicket({ ticket, esMovil, alExito, alError }: {
+  ticket: Ticket; esMovil: boolean;
+  alExito: (mensaje: string) => void; alError: (mensaje: string) => void;
 }) {
   const [calificando, setCalificando] = useState(false);
   const [calificacion, setCalificacion] = useState<number | null>(null);
@@ -246,6 +268,12 @@ function FilaTicket({ ticket, alExito, alError }: {
 
   const puedeCalificar = (ticket.idEstatus === ESTATUS_RESUELTO || ticket.idEstatus === ESTATUS_CERRADO)
     && ticket.calificacion === null;
+
+  const abrirEncuesta = () => {
+    setCalificando(true);
+    setCalificacion(null);
+    setComentario("");
+  };
 
   const calificar = async () => {
     if (!calificacion) return;
@@ -260,6 +288,64 @@ function FilaTicket({ ticket, alExito, alError }: {
       setEnviando(false);
     }
   };
+
+  const dialogoEncuesta = (
+    <Dialog open={calificando} onClose={() => setCalificando(false)} fullWidth maxWidth="xs" fullScreen={esMovil}>
+      <DialogTitle>Califica {ticket.folio}</DialogTitle>
+      <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
+        <Rating value={calificacion} onChange={(_, valor) => setCalificacion(valor)} size={esMovil ? "large" : "medium"} />
+        <TextField size="small" label="Comentario (opcional)" multiline minRows={2}
+          value={comentario} onChange={(e) => setComentario(e.target.value)} />
+      </DialogContent>
+      <DialogActions>
+        <Button color="error" onClick={() => setCalificando(false)}>Cancelar</Button>
+        <Button variant="contained" disabled={enviando || !calificacion} onClick={() => void calificar()}>
+          Enviar
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+
+  if (esMovil) {
+    return (
+      <>
+        <TarjetaListado
+          encabezado={(
+            <>
+              <Typography component={RouterLink} to={`/tickets/${ticket.folio}`} variant="body2"
+                sx={{ fontWeight: 700, color: "info.main" }}>
+                {ticket.folio}
+              </Typography>
+              <Chip size="small" label={ticket.estatus} color={colorEstatusTicket(ticket.idEstatus)} />
+            </>
+          )}
+          titulo={(
+            <Typography component={RouterLink} to={`/tickets/${ticket.folio}`} variant="body2"
+              sx={{ fontWeight: 600, color: "text.primary", textDecoration: "none" }}>
+              {ticket.titulo}
+            </Typography>
+          )}
+          campos={[
+            { etiqueta: "Categoria", valor: ticket.categoria ?? "-" },
+            { etiqueta: "Prioridad", valor: ticket.prioridad },
+            { etiqueta: "Asignado", valor: ticket.asignado ?? "-" },
+            { etiqueta: "Registrado", valor: formatearFecha(ticket.fechaRegistro) },
+            ...(ticket.calificacion !== null
+              ? [{
+                  etiqueta: "Calificacion",
+                  valor: <Rating value={ticket.calificacion} readOnly size="small" />,
+                  completo: true,
+                }]
+              : []),
+          ]}
+          acciones={puedeCalificar
+            ? <Button size="small" variant="outlined" onClick={abrirEncuesta}>Calificar</Button>
+            : undefined}
+        />
+        {dialogoEncuesta}
+      </>
+    );
+  }
 
   return (
     <TableRow hover>
@@ -285,26 +371,11 @@ function FilaTicket({ ticket, alExito, alError }: {
         {ticket.calificacion !== null ? (
           <Rating value={ticket.calificacion} readOnly size="small" />
         ) : puedeCalificar ? (
-          <Button size="small" onClick={() => { setCalificando(true); setCalificacion(null); setComentario(""); }}>
-            Calificar
-          </Button>
+          <Button size="small" onClick={abrirEncuesta}>Calificar</Button>
         ) : "-"}
       </TableCell>
 
-      <Dialog open={calificando} onClose={() => setCalificando(false)} fullWidth maxWidth="xs">
-        <DialogTitle>Califica {ticket.folio}</DialogTitle>
-        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
-          <Rating value={calificacion} onChange={(_, valor) => setCalificacion(valor)} />
-          <TextField size="small" label="Comentario (opcional)" multiline minRows={2}
-            value={comentario} onChange={(e) => setComentario(e.target.value)} />
-        </DialogContent>
-        <DialogActions>
-          <Button color="error" onClick={() => setCalificando(false)}>Cancelar</Button>
-          <Button variant="contained" disabled={enviando || !calificacion} onClick={() => void calificar()}>
-            Enviar
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {dialogoEncuesta}
     </TableRow>
   );
 }

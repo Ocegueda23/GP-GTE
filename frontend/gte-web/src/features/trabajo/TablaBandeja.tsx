@@ -1,12 +1,15 @@
 import type { ReactNode } from "react";
 import {
-  Badge, Box, Chip, Link, Paper, Table, TableBody, TableCell, TableContainer,
+  Badge, Box, Chip, Link, Paper, Stack, Table, TableBody, TableCell, TableContainer,
   TableHead, TablePagination, TableRow, TableSortLabel, Tooltip, Typography,
 } from "@mui/material";
 import { alpha, type Theme } from "@mui/material/styles";
 import { Link as RouterLink } from "react-router-dom";
 import RateReviewIcon from "@mui/icons-material/RateReview";
 import type { ResultadoPaginado } from "../../shared/api/http";
+import { OrdenMovil } from "../../shared/components/OrdenMovil";
+import { TarjetaListado } from "../../shared/components/TarjetaListado";
+import { useEsMovil } from "../../shared/hooks/useEsMovil";
 import {
   colorEstatus, formatearMinutos, type BandejaItem, type CatalogosBandeja, type FiltroBandeja,
 } from "../../shared/api/workitems";
@@ -21,16 +24,35 @@ interface Props {
   alError: (mensaje: string) => void;
 }
 
+/** Mismas claves que los encabezados ordenables de la tabla, para el selector de movil. */
+const COLUMNAS_ORDEN = [
+  { valor: "folio", etiqueta: "Folio" },
+  { valor: "tipo", etiqueta: "Tipo" },
+  { valor: "titulo", etiqueta: "Titulo" },
+  { valor: "proyecto", etiqueta: "Proyecto" },
+  { valor: "asignado", etiqueta: "Asignado" },
+  { valor: "estatus", etiqueta: "Estatus" },
+  { valor: "sprint", etiqueta: "Sprint" },
+  { valor: "prioridad", etiqueta: "Prioridad" },
+  { valor: "compromiso", etiqueta: "Compromiso" },
+  { valor: "invertido", etiqueta: "Invertido" },
+];
+
+/** Semantica visual heredada del GT: vencida en rojo suave, En Proceso en verde suave. */
+function tinteItem(item: BandejaItem): "error" | "success" | undefined {
+  if (item.esVencida) return "error";
+  if (item.idEstatus === 2) return "success";
+  return undefined;
+}
+
 /**
- * Semantica visual heredada del GT: vencida en rojo suave, En Proceso en verde suave.
  * Con alpha() sobre los colores del theme en vez de hex fijos, para que el tinte se vea
  * bien tanto en modo claro como oscuro (un pastel solido se rompe contra fondo oscuro).
  */
 function fondoFila(item: BandejaItem, theme: Theme): string | undefined {
-  const intensidad = theme.palette.mode === "dark" ? 0.18 : 0.08;
-  if (item.esVencida) return alpha(theme.palette.error.main, intensidad);
-  if (item.idEstatus === 2) return alpha(theme.palette.success.main, intensidad);
-  return undefined;
+  const tinte = tinteItem(item);
+  if (!tinte) return undefined;
+  return alpha(theme.palette[tinte].main, theme.palette.mode === "dark" ? 0.18 : 0.08);
 }
 
 function formatearFecha(iso: string | null): string {
@@ -68,14 +90,106 @@ function EncabezadoOrdenable({
 
 export function TablaBandeja({ datos, cargando, catalogos, alExito, alError }: Props) {
   const { filtro, cambiarPagina, establecer } = useFiltrosBandeja();
+  const esMovil = useEsMovil();
 
   const manejarOrden = (clave: string) => {
-    if (filtro.ordenarPor === clave) {
+    // Cadena vacia = el selector de movil se quedo sin columna (boton de limpiar del combo).
+    if (clave === "") {
+      establecer({ ordenarPor: null, ordenDescendente: false });
+    } else if (filtro.ordenarPor === clave) {
       establecer({ ordenarPor: clave, ordenDescendente: !filtro.ordenDescendente });
     } else {
       establecer({ ordenarPor: clave, ordenDescendente: false });
     }
   };
+
+  const vacia = !cargando && datos?.items.length === 0;
+
+  const paginacion = (
+    <TablePagination
+      component="div"
+      // En movil se esconde el "Filas por pagina": no cabe junto al conteo y los controles.
+      sx={{
+        flexShrink: 0,
+        ".MuiTablePagination-selectLabel": { display: { xs: "none", sm: "block" } },
+        ".MuiTablePagination-toolbar": { pl: { xs: 1, sm: 2 } },
+      }}
+      count={datos?.totalItems ?? 0}
+      page={(datos?.page ?? filtro.page) - 1}
+      rowsPerPage={filtro.pageSize}
+      rowsPerPageOptions={[10, 25, 50, 100]}
+      onPageChange={(_, paginaCero) => cambiarPagina(paginaCero + 1)}
+      onRowsPerPageChange={(e) => establecer({ pageSize: Number(e.target.value) })}
+      labelRowsPerPage="Filas por pagina"
+      labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count}`}
+    />
+  );
+
+  if (esMovil) {
+    return (
+      <Stack spacing={1}>
+        <OrdenMovil opciones={COLUMNAS_ORDEN} ordenarPor={filtro.ordenarPor}
+          descendente={filtro.ordenDescendente} onOrdenar={manejarOrden} />
+
+        {vacia && (
+          <Paper variant="outlined" sx={{ p: 3 }}>
+            <Typography color="text.secondary" sx={{ textAlign: "center" }}>
+              No hay elementos con los filtros actuales. Ajusta la busqueda o crea uno nuevo.
+            </Typography>
+          </Paper>
+        )}
+
+        {datos?.items.map((item) => (
+          <TarjetaListado
+            key={item.idWorkItem}
+            tinte={tinteItem(item)}
+            encabezado={(
+              <>
+                <Link component={RouterLink} to={`/wi/${item.folio}`} underline="hover" color="info"
+                  variant="body2" sx={{ fontWeight: 700 }}>
+                  {item.folio}
+                </Link>
+                <Chip size="small" label={item.estatus} color={colorEstatus(item.idEstatus)}
+                  variant={item.idEstatus === 6 ? "outlined" : "filled"} />
+                {item.sprint
+                  ? <Chip size="small" variant="outlined" label={item.folioSprint ?? item.sprint} />
+                  : <Chip size="small" label="Backlog" />}
+              </>
+            )}
+            titulo={(
+              <Link component={RouterLink} to={`/wi/${item.folio}`} underline="none"
+                variant="body2" sx={{ fontWeight: 600, color: "text.primary" }}>
+                {item.titulo}
+              </Link>
+            )}
+            campos={[
+              { etiqueta: "Tipo", valor: item.tipo },
+              { etiqueta: "Proyecto", valor: item.claveProyecto },
+              { etiqueta: "Asignado", valor: item.asignado ?? "-" },
+              { etiqueta: "Prioridad", valor: item.prioridad },
+              { etiqueta: "Complejidad", valor: item.complejidad ?? "-" },
+              { etiqueta: "Compromiso", valor: formatearFecha(item.fechaCompromiso), resaltar: item.esVencida },
+              { etiqueta: "Invertido", valor: formatearMinutos(item.minutosInvertidos) },
+            ]}
+            acciones={(
+              <>
+                {item.revisionesPendientes > 0 && (
+                  <Tooltip title={`${item.revisionesPendientes} revision(es) pendiente(s)`}>
+                    <Badge badgeContent={item.revisionesPendientes} color="warning" sx={{ mr: 1.5 }}>
+                      <RateReviewIcon fontSize="small" color="action" />
+                    </Badge>
+                  </Tooltip>
+                )}
+                <MenuAcciones item={item} catalogos={catalogos} alExito={alExito} alError={alError} />
+              </>
+            )}
+          />
+        ))}
+
+        <Paper variant="outlined">{paginacion}</Paper>
+      </Stack>
+    );
+  }
 
   return (
     <Paper variant="outlined" sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -99,7 +213,7 @@ export function TablaBandeja({ datos, cargando, catalogos, alExito, alError }: P
             </TableRow>
           </TableHead>
           <TableBody>
-            {!cargando && datos?.items.length === 0 && (
+            {vacia && (
               <TableRow>
                 <TableCell colSpan={13}>
                   <Box sx={{ py: 4, textAlign: "center" }}>
@@ -132,7 +246,7 @@ export function TablaBandeja({ datos, cargando, catalogos, alExito, alError }: P
                 </TableCell>
                 <TableCell sx={{ whiteSpace: "nowrap" }}>
                   {item.sprint
-                    ? <Chip size="small" variant="outlined" label={item.sprint} />
+                    ? <Chip size="small" variant="outlined" label={item.folioSprint ?? item.sprint} />
                     : <Chip size="small" label="Backlog" />}
                 </TableCell>
                 <TableCell>{item.prioridad}</TableCell>
@@ -158,18 +272,7 @@ export function TablaBandeja({ datos, cargando, catalogos, alExito, alError }: P
           </TableBody>
         </Table>
       </TableContainer>
-      <TablePagination
-        component="div"
-        sx={{ flexShrink: 0 }}
-        count={datos?.totalItems ?? 0}
-        page={(datos?.page ?? filtro.page) - 1}
-        rowsPerPage={filtro.pageSize}
-        rowsPerPageOptions={[10, 25, 50, 100]}
-        onPageChange={(_, paginaCero) => cambiarPagina(paginaCero + 1)}
-        onRowsPerPageChange={(e) => establecer({ pageSize: Number(e.target.value) })}
-        labelRowsPerPage="Filas por pagina"
-        labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count}`}
-      />
+      {paginacion}
     </Paper>
   );
 }

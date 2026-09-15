@@ -43,6 +43,25 @@ public class ObtenerTiemposHandler(IWorkItemQueryService consultas)
     }
 }
 
+/// <summary>
+/// Vista previa del presupuesto de la complejidad elegida (RN-GTE-015) mientras se captura
+/// o edita el elemento; el valor real lo congela el backend al guardar.
+/// </summary>
+public record ObtenerPresupuestoEstimadoQuery(int IdComplejidad, int? IdAsignado)
+    : IRequest<PresupuestoEstimadoResponse>;
+
+public class ObtenerPresupuestoEstimadoHandler(IWorkItemQueryService consultas)
+    : IRequestHandler<ObtenerPresupuestoEstimadoQuery, PresupuestoEstimadoResponse>
+{
+    public async Task<PresupuestoEstimadoResponse> Handle(
+        ObtenerPresupuestoEstimadoQuery query, CancellationToken cancellationToken)
+    {
+        return await consultas.ObtenerPresupuestoEstimadoAsync(
+                query.IdComplejidad, query.IdAsignado, cancellationToken)
+            ?? throw new NotFoundException("Complejidad", query.IdComplejidad);
+    }
+}
+
 public record ObtenerHijosQuery(int IdWorkItem) : IRequest<IReadOnlyList<WorkItemHijoResponse>>;
 
 public class ObtenerHijosHandler(IWorkItemQueryService consultas)

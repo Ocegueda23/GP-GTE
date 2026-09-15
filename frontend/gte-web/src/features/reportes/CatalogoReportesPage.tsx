@@ -1,8 +1,8 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import {
   Alert, Box, Button, Chip, LinearProgress, List, ListItemButton, ListItemText,
   Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  TextField, Typography,
+  TextField, Tooltip, Typography,
 } from "@mui/material";
 import DownloadIcon from "@mui/icons-material/Download";
 import { useQuery } from "@tanstack/react-query";
@@ -13,7 +13,8 @@ import { ComboBuscable } from "../../shared/components/ComboBuscable";
 import { EncabezadoOrdenable } from "../../shared/components/EncabezadoOrdenable";
 import { useOrdenTabla } from "../../shared/hooks/useOrdenTabla";
 import { useSesion } from "../../shared/api/sesion";
-import { obtenerCatalogosBandeja } from "../../shared/api/workitems";
+import { formatearMinutos, obtenerCatalogosBandeja } from "../../shared/api/workitems";
+import { htmlATextoPlano } from "../../shared/editor/textoPlano";
 import { useColorSerie } from "../../shared/graficas/coloresGrafica";
 import {
   descargarReporteExcel,
@@ -21,12 +22,15 @@ import {
   obtenerReporteFlujo, obtenerReporteHorasRegistradas, obtenerReporteKpisHistoricos,
   obtenerReporteProductividad, obtenerReporteRentabilidad, obtenerReporteReleases,
   obtenerReporteRetrabajo, obtenerReporteRiesgos, obtenerReporteSla, obtenerReporteSolicitantes,
-  obtenerReporteAuditoria,
+  obtenerReporteAuditoria, obtenerReporteActividadesTerminadas,
+  type TicketTerminado, type TicketsTerminadosTotales,
+  type IncidenteTerminado, type IncidentesTerminadosTotales,
 } from "../../shared/api/reportes";
 
 type ClaveReporte =
   | "productividad" | "horas" | "retrabajo" | "bugs" | "releases" | "riesgos"
-  | "solicitantes" | "costos" | "rentabilidad" | "sla" | "kpis" | "carga" | "flujo" | "auditoria";
+  | "solicitantes" | "costos" | "rentabilidad" | "sla" | "kpis" | "carga" | "flujo" | "auditoria"
+  | "actividadesTerminadas";
 
 /** Permiso 1:1 con el ExigirPermisoAsync de cada handler en GTE.Application.Reportes.Queries. */
 const REPORTES: { clave: ClaveReporte; titulo: string; permiso: string }[] = [
@@ -44,6 +48,7 @@ const REPORTES: { clave: ClaveReporte; titulo: string; permiso: string }[] = [
   { clave: "carga", titulo: "R12 - Carga de trabajo", permiso: "RPT.Ver" },
   { clave: "flujo", titulo: "R13 - Flujo (CFD)", permiso: "RPT.Ver" },
   { clave: "auditoria", titulo: "R14 - Auditoria", permiso: "RPT.Auditoria" },
+  { clave: "actividadesTerminadas", titulo: "R15 - Actividades terminadas", permiso: "RPT.Ver" },
 ];
 
 function primerDiaMes(): string {
@@ -722,6 +727,398 @@ function ReporteAuditoria() {
   );
 }
 
+/**
+ * R15: detalle renglon por renglon de lo terminado en el periodo. A diferencia de R01-R03,
+ * que agregan por persona o proyecto, este es el que se entrega como evidencia de trabajo.
+ */
+function ReporteActividadesTerminadas() {
+  const [desde, setDesde] = useState(primerDiaMes());
+  const [hasta, setHasta] = useState(hoyIso());
+  const [idEquipo, setIdEquipo] = useState<number | "">("");
+  const [idAsignado, setIdAsignado] = useState<number | "">("");
+  const [idProyecto, setIdProyecto] = useState<number | "">("");
+  const [idTipo, setIdTipo] = useState<number | "">("");
+  const [folio, setFolio] = useState("");
+  const [pagina, setPagina] = useState(0);
+  const [expandido, setExpandido] = useState<number | null>(null);
+
+  const { opcionesProyecto, opcionesEquipo } = useProyectosEquipos();
+  const catalogos = useQuery({ queryKey: ["catalogos-bandeja"], queryFn: obtenerCatalogosBandeja, staleTime: 5 * 60_000 });
+  const opcionesUsuario = useMemo(
+    () => [{ valor: "", etiqueta: "Todos" }, ...(catalogos.data?.usuarios ?? []).map((u) => ({ valor: u.id, etiqueta: u.nombre }))],
+    [catalogos.data],
+  );
+  const opcionesTipo = useMemo(
+    () => [{ valor: "", etiqueta: "Todos" }, ...(catalogos.data?.tipos ?? []).map((t) => ({ valor: t.id, etiqueta: t.nombre }))],
+    [catalogos.data],
+  );
+
+  const filtro = {
+    desde, hasta,
+    idEquipo: idEquipo === "" ? null : idEquipo,
+    idAsignado: idAsignado === "" ? null : idAsignado,
+    idProyecto: idProyecto === "" ? null : idProyecto,
+    idTipoWorkItem: idTipo === "" ? null : idTipo,
+    folio: folio.trim() === "" ? null : folio.trim(),
+  };
+
+  const consulta = useQuery({
+    queryKey: ["reporte-actividades-terminadas", filtro],
+    queryFn: () => obtenerReporteActividadesTerminadas(filtro),
+  });
+
+  const items = consulta.data?.items ?? [];
+  const totales = consulta.data?.totales;
+  const visibles = items.slice(pagina * FILAS_POR_PAGINA, (pagina + 1) * FILAS_POR_PAGINA);
+
+  function aplicarAtajo(atajo: "hoy" | "semana" | "mes" | "anio") {
+    const hoy = new Date();
+    setPagina(0);
+    if (atajo === "hoy") { setDesde(hoyIso()); setHasta(hoyIso()); return; }
+    if (atajo === "semana") { setDesde(lunesDeEstaSemana()); setHasta(hoyIso()); return; }
+    if (atajo === "mes") { setDesde(primerDiaMes()); setHasta(hoyIso()); return; }
+    setDesde(`${hoy.getFullYear()}-01-01`);
+    setHasta(hoyIso());
+  }
+
+  return (
+    <Stack spacing={2}>
+      <Stack direction="row" spacing={1.5} sx={{ flexWrap: "wrap", alignItems: "center", gap: 1 }}>
+        <BarraFechas desde={desde} hasta={hasta}
+          onDesde={(v) => { setDesde(v); setPagina(0); }} onHasta={(v) => { setHasta(v); setPagina(0); }} />
+        <Stack direction="row" spacing={0.5}>
+          <Button size="small" variant="outlined" onClick={() => aplicarAtajo("hoy")}>Hoy</Button>
+          <Button size="small" variant="outlined" onClick={() => aplicarAtajo("semana")}>Semana</Button>
+          <Button size="small" variant="outlined" onClick={() => aplicarAtajo("mes")}>Mes</Button>
+          <Button size="small" variant="outlined" onClick={() => aplicarAtajo("anio")}>Año</Button>
+        </Stack>
+        <ComboBuscable label="Equipo" value={idEquipo} onChange={(v) => { setIdEquipo(v as number | ""); setPagina(0); }}
+          sx={{ minWidth: 180 }} opciones={opcionesEquipo} />
+        <ComboBuscable label="Asignado" value={idAsignado} onChange={(v) => { setIdAsignado(v as number | ""); setPagina(0); }}
+          sx={{ minWidth: 200 }} opciones={opcionesUsuario} />
+        <ComboBuscable label="Proyecto" value={idProyecto} onChange={(v) => { setIdProyecto(v as number | ""); setPagina(0); }}
+          sx={{ minWidth: 200 }} opciones={opcionesProyecto} />
+        <ComboBuscable label="Tipo" value={idTipo} onChange={(v) => { setIdTipo(v as number | ""); setPagina(0); }}
+          sx={{ minWidth: 160 }} opciones={opcionesTipo} />
+        <TextField size="small" label="Folio" value={folio} sx={{ width: 150 }}
+          onChange={(e) => { setFolio(e.target.value); setPagina(0); }} />
+        <BotonExportar ruta="actividades-terminadas" filtro={filtro} nombreArchivo="ActividadesTerminadas.xlsx" />
+      </Stack>
+
+      {consulta.isLoading && <LinearProgress />}
+      {consulta.isError && <Alert severity="error">No se pudo cargar el reporte.</Alert>}
+      {consulta.data?.truncado && (
+        <Alert severity="warning">
+          El rango supera el tope de {TOPE_RENGLONES.toLocaleString()} actividades y la lista viene recortada.
+          Acota el rango de fechas o filtra por equipo para ver el detalle completo.
+        </Alert>
+      )}
+
+      {totales && (
+        <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
+          <Chip size="small" label={`Actividades: ${totales.items}`} />
+          <Chip size="small" label={`En proceso: ${formatearMinutos(totales.minutosInvertidos)}`} />
+          <Chip size="small" label={`Registrado: ${formatearMinutos(totales.minutosRegistrados)}`} />
+          <Chip size="small" color={totales.diferenciaMinutos < 0 ? "error" : "default"}
+            label={`Diferencia: ${formatearDiferencia(totales.diferenciaMinutos)}`} />
+          <Chip size="small"
+            label={`Con tiempo capturado: ${totales.itemsConRegistro} de ${totales.items}`} />
+          <Chip size="small" label={`Resolucion prom.: ${totales.promedioDiasNaturalesResolucion ?? "-"} d nat. / ${formatearMinutos(totales.promedioMinutosLaboralesResolucion)} habiles`} />
+          <Chip size="small" label={`Espera prom.: ${totales.promedioDiasNaturalesEspera ?? "-"} d nat. / ${formatearMinutos(totales.promedioMinutosLaboralesEspera)} habiles`} />
+          {totales.porcentajeATiempo !== null && <Chip size="small" label={`A tiempo: ${totales.porcentajeATiempo}%`} />}
+        </Stack>
+      )}
+
+      {consulta.data && (
+        <TableContainer component={Paper} variant="outlined">
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Folio</TableCell>
+                <TableCell>Tipo</TableCell>
+                <TableCell>Titulo</TableCell>
+                <TableCell>Asignado</TableCell>
+                <TableCell>Equipo</TableCell>
+                <Tooltip title="Tiempo habil que la tarea estuvo en estatus En Proceso">
+                  <TableCell align="right">En proceso</TableCell>
+                </Tooltip>
+                <Tooltip title="Tiempo que la persona capturo a mano en registros de tiempo">
+                  <TableCell align="right">Registrado</TableCell>
+                </Tooltip>
+                <Tooltip title="Registrado menos en proceso. Negativo = se capturo de menos">
+                  <TableCell align="right">Dif.</TableCell>
+                </Tooltip>
+                <TableCell>Inicio</TableCell>
+                <TableCell>Fin</TableCell>
+                <TableCell>Compromiso</TableCell>
+                <TableCell align="right">Espera</TableCell>
+                <TableCell align="right">Resolucion</TableCell>
+                <TableCell align="center">A tiempo</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {visibles.map((a) => (
+                <Fragment key={a.idWorkItem}>
+                  <TableRow hover sx={{ cursor: "pointer" }}
+                    onClick={() => setExpandido(expandido === a.idWorkItem ? null : a.idWorkItem)}>
+                    <TableCell>{a.folio}</TableCell>
+                    <TableCell>{a.tipo}</TableCell>
+                    <TableCell sx={{ maxWidth: 320 }}>{a.titulo}</TableCell>
+                    <TableCell>{a.asignado ?? "-"}</TableCell>
+                    <TableCell>{a.equipo ?? "-"}</TableCell>
+                    <TableCell align="right">{formatearMinutos(a.minutosInvertidos)}</TableCell>
+                    <TableCell align="right"
+                      sx={{ color: a.minutosRegistrados === 0 ? "text.disabled" : undefined }}>
+                      {formatearMinutos(a.minutosRegistrados)}
+                    </TableCell>
+                    <TableCell align="right" sx={{ color: colorDiferencia(a.diferenciaMinutos) }}>
+                      {formatearDiferencia(a.diferenciaMinutos)}
+                    </TableCell>
+                    <TableCell>{a.fechaInicio ? new Date(a.fechaInicio).toLocaleDateString() : "-"}</TableCell>
+                    <TableCell>{a.fechaFin ? new Date(a.fechaFin).toLocaleDateString() : "-"}</TableCell>
+                    <TableCell sx={{ color: a.entregadoATiempo === false ? "error.main" : undefined }}>
+                      {a.fechaCompromiso ? new Date(a.fechaCompromiso).toLocaleDateString() : "-"}
+                    </TableCell>
+                    <TableCell align="right">{formatearDuracion(a.diasNaturalesEspera, a.minutosLaboralesEspera)}</TableCell>
+                    <TableCell align="right">{formatearDuracion(a.diasNaturalesResolucion, a.minutosLaboralesResolucion)}</TableCell>
+                    <TableCell align="center">
+                      {a.entregadoATiempo === null
+                        ? "-"
+                        : <Chip size="small" color={a.entregadoATiempo ? "success" : "error"}
+                            label={a.entregadoATiempo ? "Si" : "No"} />}
+                    </TableCell>
+                  </TableRow>
+                  {expandido === a.idWorkItem && (
+                    <TableRow>
+                      <TableCell colSpan={14} sx={{ bgcolor: "action.hover" }}>
+                        <Stack spacing={0.5}>
+                          <Typography variant="body2">
+                            <b>Proyecto:</b> {a.proyecto} &nbsp;·&nbsp; <b>Prioridad:</b> {a.prioridad}
+                            &nbsp;·&nbsp; <b>Sprint:</b> {a.sprint ?? "-"} &nbsp;·&nbsp; <b>Release:</b> {a.release ?? "-"}
+                          </Typography>
+                          <Typography variant="body2">
+                            <b>Creada:</b> {new Date(a.fechaCreacion).toLocaleString()}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "pre-wrap" }}>
+                            {a.descripcion ? htmlATextoPlano(a.descripcion) : "Sin descripcion."}
+                          </Typography>
+                        </Stack>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </Fragment>
+              ))}
+              {items.length === 0 && (
+                <TableRow><TableCell colSpan={14}>
+                  <Typography color="text.secondary">Sin actividades terminadas con esos filtros.</Typography>
+                </TableCell></TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+
+      {items.length > FILAS_POR_PAGINA && (
+        <Stack direction="row" spacing={1}>
+          <Button size="small" disabled={pagina === 0} onClick={() => setPagina((p) => p - 1)}>Anterior</Button>
+          <Typography variant="body2" sx={{ alignSelf: "center" }}>
+            Pagina {pagina + 1} de {Math.ceil(items.length / FILAS_POR_PAGINA)}
+          </Typography>
+          <Button size="small" disabled={(pagina + 1) * FILAS_POR_PAGINA >= items.length}
+            onClick={() => setPagina((p) => p + 1)}>Siguiente</Button>
+        </Stack>
+      )}
+
+      {consulta.data && (
+        <SeccionTickets tickets={consulta.data.tickets} totales={consulta.data.totalesTickets}
+          avisos={consulta.data.avisosTickets} />
+      )}
+      {consulta.data && (
+        <SeccionIncidentes incidentes={consulta.data.incidentes} totales={consulta.data.totalesIncidentes}
+          avisos={consulta.data.avisosIncidentes} />
+      )}
+    </Stack>
+  );
+}
+
+/** Encabezado comun de las secciones de soporte/operacion del R15. */
+function TituloSeccion({ texto, chips, avisos }: {
+  texto: string; chips: string[]; avisos: string[];
+}) {
+  return (
+    <Stack spacing={1} sx={{ mt: 1 }}>
+      <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{texto}</Typography>
+      {avisos.map((aviso) => <Alert key={aviso} severity="info">{aviso}</Alert>)}
+      {avisos.length === 0 && (
+        <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
+          {chips.map((chip) => <Chip key={chip} size="small" label={chip} />)}
+        </Stack>
+      )}
+    </Stack>
+  );
+}
+
+function SeccionTickets({ tickets, totales, avisos }: {
+  tickets: TicketTerminado[]; totales: TicketsTerminadosTotales; avisos: string[];
+}) {
+  return (
+    <>
+      <TituloSeccion texto="Tickets resueltos o cerrados" avisos={avisos}
+        chips={[
+          `Tickets: ${totales.items}`,
+          `En atencion: ${formatearMinutos(totales.minutosEnAtencion)}`,
+          `Resolucion prom.: ${totales.promedioDiasNaturalesResolucion ?? "-"} d nat.`,
+          ...(totales.porcentajeDentroDeSla !== null ? [`Dentro de SLA: ${totales.porcentajeDentroDeSla}%`] : []),
+        ]} />
+      {avisos.length === 0 && (
+        <TableContainer component={Paper} variant="outlined">
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Folio</TableCell>
+                <TableCell>Categoria</TableCell>
+                <TableCell>Titulo</TableCell>
+                <TableCell>Solicitante</TableCell>
+                <TableCell>Asignado</TableCell>
+                <TableCell align="right">En atencion</TableCell>
+                <TableCell>Resolucion</TableCell>
+                <TableCell align="right">Espera</TableCell>
+                <TableCell align="right">Total</TableCell>
+                <TableCell align="center">SLA</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {tickets.map((t) => (
+                <TableRow key={t.idTicket} hover>
+                  <TableCell>{t.folio ?? "-"}</TableCell>
+                  <TableCell>{t.categoria ?? "-"}</TableCell>
+                  <TableCell sx={{ maxWidth: 320 }}>{t.titulo}</TableCell>
+                  <TableCell>{t.solicitante}</TableCell>
+                  <TableCell>{t.asignado ?? "-"}</TableCell>
+                  <TableCell align="right">{formatearMinutos(t.minutosEnAtencion)}</TableCell>
+                  <TableCell>{t.fechaResolucion ? new Date(t.fechaResolucion).toLocaleDateString() : "-"}</TableCell>
+                  <TableCell align="right">{t.diasNaturalesEspera ?? "-"}</TableCell>
+                  <TableCell align="right">{t.diasNaturalesResolucion ?? "-"}</TableCell>
+                  <TableCell align="center">
+                    {t.dentroDeSla === null
+                      ? "-"
+                      : <Chip size="small" color={t.dentroDeSla ? "success" : "error"}
+                          label={t.dentroDeSla ? "Si" : "No"} />}
+                  </TableCell>
+                </TableRow>
+              ))}
+              {tickets.length === 0 && (
+                <TableRow><TableCell colSpan={10}>
+                  <Typography color="text.secondary">Sin tickets resueltos con esos filtros.</Typography>
+                </TableCell></TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+    </>
+  );
+}
+
+function SeccionIncidentes({ incidentes, totales, avisos }: {
+  incidentes: IncidenteTerminado[]; totales: IncidentesTerminadosTotales; avisos: string[];
+}) {
+  return (
+    <>
+      <TituloSeccion texto="Incidentes resueltos o cerrados" avisos={avisos}
+        chips={[
+          `Incidentes: ${totales.items}`,
+          `En atencion: ${formatearMinutos(totales.minutosEnAtencion)}`,
+          `Indisponibilidad: ${formatearMinutos(totales.minutosIndisponibilidad)}`,
+          `Resolucion prom.: ${totales.promedioDiasNaturalesResolucion ?? "-"} d nat.`,
+        ]} />
+      {avisos.length === 0 && (
+        <TableContainer component={Paper} variant="outlined">
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Folio</TableCell>
+                <TableCell>Severidad</TableCell>
+                <TableCell>Titulo</TableCell>
+                <TableCell>Proyecto</TableCell>
+                <TableCell align="right">En atencion</TableCell>
+                <TableCell align="right">Indisponible</TableCell>
+                <TableCell>Ocurrencia</TableCell>
+                <TableCell>Resolucion</TableCell>
+                <TableCell align="right">Deteccion</TableCell>
+                <TableCell align="right">Total</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {incidentes.map((i) => (
+                <TableRow key={i.idIncidente} hover>
+                  <TableCell>{i.folio ?? "-"}</TableCell>
+                  <TableCell>{i.severidad}</TableCell>
+                  <TableCell sx={{ maxWidth: 320 }}>{i.titulo}</TableCell>
+                  <TableCell>{i.proyecto}</TableCell>
+                  <TableCell align="right">{formatearMinutos(i.minutosEnAtencion)}</TableCell>
+                  <TableCell align="right">{formatearMinutos(i.minutosIndisponibilidad)}</TableCell>
+                  <TableCell>{new Date(i.fechaOcurrencia).toLocaleDateString()}</TableCell>
+                  <TableCell>{i.fechaResolucion ? new Date(i.fechaResolucion).toLocaleDateString() : "-"}</TableCell>
+                  <TableCell align="right">{i.diasNaturalesDeteccion ?? "-"}</TableCell>
+                  <TableCell align="right">{i.diasNaturalesResolucion ?? "-"}</TableCell>
+                </TableRow>
+              ))}
+              {incidentes.length === 0 && (
+                <TableRow><TableCell colSpan={10}>
+                  <Typography color="text.secondary">Sin incidentes resueltos con esos filtros.</Typography>
+                </TableCell></TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+    </>
+  );
+}
+
+const FILAS_POR_PAGINA = 50;
+
+/** Espejo de ReportesQueryService.TopeRenglonesDetalle: solo para el texto de la alerta. */
+const TOPE_RENGLONES = 5000;
+
+/**
+ * Lunes de la semana en curso. Se toma el lunes (no el domingo) porque el atajo sirve para
+ * ver la semana laboral, y getDay() devuelve 0 en domingo: ese caso retrocede 6 dias, no 0.
+ */
+function lunesDeEstaSemana(): string {
+  const hoy = new Date();
+  const diaSemana = hoy.getDay();
+  const diasAlLunes = diaSemana === 0 ? 6 : diaSemana - 1;
+  const lunes = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - diasAlLunes);
+  const mes = String(lunes.getMonth() + 1).padStart(2, "0");
+  const dia = String(lunes.getDate()).padStart(2, "0");
+  return `${lunes.getFullYear()}-${mes}-${dia}`;
+}
+
+/** La diferencia se lee mejor con signo: "+2h" o "-45m". */
+function formatearDiferencia(minutos: number): string {
+  if (minutos === 0) return "0";
+  return `${minutos > 0 ? "+" : "-"}${formatearMinutos(Math.abs(minutos))}`;
+}
+
+/**
+ * Solo se pinta en rojo el caso accionable: se registro MENOS tiempo del que la tarea estuvo
+ * En Proceso, que casi siempre significa captura faltante. Registrar de mas es raro pero no
+ * es un error (trabajo hecho sin mover el estatus), asi que va neutro.
+ */
+function colorDiferencia(minutos: number): string | undefined {
+  if (minutos < 0) return "error.main";
+  return minutos > 0 ? "info.main" : undefined;
+}
+
+/** "3.5 d / 12h habiles"; el tiempo habil falta cuando el asignado no tiene horario configurado. */
+function formatearDuracion(diasNaturales: number | null, minutosLaborales: number | null): string {
+  if (diasNaturales === null) return "-";
+  const natural = `${diasNaturales} d`;
+  return minutosLaborales === null ? natural : `${natural} / ${formatearMinutos(minutosLaborales)}`;
+}
+
 export function CatalogoReportesPage() {
   const { puede } = useSesion();
   const disponibles = REPORTES.filter((r) => puede(r.permiso));
@@ -770,6 +1167,7 @@ export function CatalogoReportesPage() {
         {reporteActivo === "carga" && <ReporteCarga />}
         {reporteActivo === "flujo" && <ReporteFlujo />}
         {reporteActivo === "auditoria" && <ReporteAuditoria />}
+        {reporteActivo === "actividadesTerminadas" && <ReporteActividadesTerminadas />}
       </Box>
     </Box>
   );

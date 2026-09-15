@@ -23,6 +23,10 @@ public partial class TblRevision
 
     public DateTime? FechaCorreccion { get; set; }
 
+    public bool EsFalsoPositivo { get; set; }
+
+    public string? MotivoDescarte { get; set; }
+
     public DateTime FechaRegistro { get; set; }
 
     public string UsuarioRegistro { get; set; } = null!;

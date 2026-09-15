@@ -15,7 +15,6 @@ public class CrearSprintValidator : AbstractValidator<CrearSprintCommand>
 {
     public CrearSprintValidator()
     {
-        RuleFor(c => c.Datos.IdEquipo).GreaterThan(0).WithMessage("El equipo es obligatorio.");
         RuleFor(c => c.Datos.Nombre).NotEmpty().WithMessage("El nombre del sprint es obligatorio.")
             .MaximumLength(100);
         RuleFor(c => c.Datos.Objetivo).MaximumLength(500);
@@ -27,18 +26,58 @@ public class CrearSprintValidator : AbstractValidator<CrearSprintCommand>
 public class CrearSprintHandler(
     IPlaneacionRepository repositorio,
     IPlaneacionQueryService consultas,
+    IGeneradorFolios folios,
     IVerificadorPermisos permisos) : IRequestHandler<CrearSprintCommand, SprintResponse>
 {
     public async Task<SprintResponse> Handle(CrearSprintCommand command, CancellationToken cancellationToken)
     {
         await permisos.ExigirPermisoAsync(PermisosPlaneacion.GestionarSprints, null, cancellationToken);
 
+        var folio = await folios.GenerarAsync("SPR", 4, cancellationToken);
+
         var idSprint = await repositorio.CrearSprintAsync(new SprintNuevo(
-            command.Datos.IdEquipo, command.Datos.Nombre.Trim(), command.Datos.Objetivo,
-            command.Datos.FechaInicio, command.Datos.FechaFin), cancellationToken);
+            command.Datos.Nombre.Trim(), command.Datos.Objetivo,
+            command.Datos.FechaInicio, command.Datos.FechaFin, command.Datos.IdLider), folio, cancellationToken);
 
         return await consultas.ObtenerSprintAsync(idSprint, cancellationToken)
             ?? throw new NotFoundException("Sprint", idSprint);
+    }
+}
+
+public record AsignarLiderSprintCommand(int IdSprint, int? IdLider) : IRequest<SprintResponse>;
+
+public class AsignarLiderSprintValidator : AbstractValidator<AsignarLiderSprintCommand>
+{
+    public AsignarLiderSprintValidator()
+    {
+        RuleFor(c => c.IdSprint).GreaterThan(0);
+        RuleFor(c => c.IdLider).GreaterThan(0)
+            .When(c => c.IdLider.HasValue)
+            .WithMessage("El lider asignado no es valido.");
+    }
+}
+
+/// <summary>Reasignar el lider responsable del sprint. Un sprint Cerrado no se puede tocar.</summary>
+public class AsignarLiderSprintHandler(
+    IPlaneacionRepository repositorio,
+    IPlaneacionQueryService consultas,
+    IVerificadorPermisos permisos) : IRequestHandler<AsignarLiderSprintCommand, SprintResponse>
+{
+    public async Task<SprintResponse> Handle(
+        AsignarLiderSprintCommand command, CancellationToken cancellationToken)
+    {
+        await permisos.ExigirPermisoAsync(PermisosPlaneacion.ModificarSprint, null, cancellationToken);
+
+        var estado = await repositorio.ObtenerEstadoSprintAsync(command.IdSprint, cancellationToken)
+            ?? throw new NotFoundException("Sprint", command.IdSprint);
+
+        if (estado.IdEstatus == EstatusSprint.Cerrado)
+            throw new BusinessException("Un sprint cerrado no puede modificarse.");
+
+        await repositorio.AsignarLiderSprintAsync(command.IdSprint, command.IdLider, cancellationToken);
+
+        return await consultas.ObtenerSprintAsync(command.IdSprint, cancellationToken)
+            ?? throw new NotFoundException("Sprint", command.IdSprint);
     }
 }
 
@@ -96,7 +135,7 @@ public class CambiarEstatusSprintValidator : AbstractValidator<CambiarEstatusSpr
 
 /// <summary>
 /// ACTIVAR y CERRAR del sprint.
-/// Regla: solo un sprint Activo por equipo (409 accionable si ya hay otro).
+/// Regla: solo un sprint Activo por lider (409 accionable si ya hay otro).
 /// RN-GTE-018: al cerrar, los elementos abiertos se reubican en el backlog o en
 /// el siguiente sprint planeado, segun lo que pida quien cierra.
 /// </summary>
@@ -119,13 +158,18 @@ public class CambiarEstatusSprintHandler(
 
         if (command.Accion == AccionesSprint.Activar)
         {
-            var otroActivo = await repositorio.ObtenerSprintActivoAsync(
-                estado.IdEquipo, command.IdSprint, cancellationToken);
+            if (!estado.IdLider.HasValue)
+            {
+                throw new BusinessException("El sprint necesita un lider asignado antes de activarse.");
+            }
+
+            var otroActivo = await repositorio.ObtenerSprintActivoPorLiderAsync(
+                estado.IdLider.Value, command.IdSprint, cancellationToken);
             if (otroActivo.HasValue)
             {
                 var activo = await consultas.ObtenerSprintAsync(otroActivo.Value, cancellationToken);
                 throw new ConflictException(
-                    $"El equipo ya tiene un sprint activo ({activo?.Nombre}). Cierralo antes de activar otro.",
+                    $"El lider ya tiene un sprint activo ({activo?.Nombre}). Cierralo antes de activar otro.",
                     new { idSprintActivo = otroActivo.Value, nombre = activo?.Nombre });
             }
         }
@@ -136,8 +180,11 @@ public class CambiarEstatusSprintHandler(
             var destino = ResolverDestino(command.DestinoItemsAbiertos);
             if (destino == Domain.Planeacion.DestinoItemsAbiertos.SiguienteSprint)
             {
-                idSprintDestino = await repositorio.ObtenerSiguienteSprintPlaneadoAsync(
-                    estado.IdEquipo, command.IdSprint, cancellationToken)
+                var siguientePlaneado = estado.IdLider.HasValue
+                    ? await repositorio.ObtenerSiguienteSprintPlaneadoPorLiderAsync(
+                        estado.IdLider.Value, command.IdSprint, cancellationToken)
+                    : null;
+                idSprintDestino = siguientePlaneado
                     ?? throw new BusinessException(
                         "No hay un sprint planeado al que mover los elementos abiertos. Crealo primero o envialos al backlog.");
             }

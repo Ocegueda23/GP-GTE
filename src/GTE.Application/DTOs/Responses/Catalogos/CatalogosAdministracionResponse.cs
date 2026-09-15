@@ -31,4 +31,10 @@ public class CatalogosEntregasResponse
 
     /// <summary>Tipos de respaldo previos al despliegue (base de datos, servicio, sitio...).</summary>
     public List<CatalogoItemResponse> TiposRespaldo { get; set; } = [];
+
+    /// <summary>
+    /// Estatus de release para el filtro del listado. Viene del catalogo real y no de una
+    /// lista escrita en el front, que se desincronizaria del orden de dbo.tblEstatusRelease.
+    /// </summary>
+    public List<CatalogoItemResponse> EstatusRelease { get; set; } = [];
 }

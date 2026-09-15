@@ -18,12 +18,23 @@ public class PlaneacionController(IMediator mediator) : ControllerBase
 
     [HttpGet("sprints")]
     public async Task<ActionResult<ApiResponse<IReadOnlyList<SprintResponse>>>> ObtenerSprints(
-        [FromQuery] int? idEquipo = null,
+        [FromQuery] int? idSprint = null,
+        [FromQuery] int? idEstatus = null,
+        [FromQuery] int? idLider = null,
         [FromQuery] bool soloAbiertos = true,
         CancellationToken cancellationToken = default)
     {
-        var resultado = await mediator.Send(new ObtenerSprintsQuery(idEquipo, soloAbiertos), cancellationToken);
+        var resultado = await mediator.Send(
+            new ObtenerSprintsQuery(idSprint, idEstatus, idLider, soloAbiertos), cancellationToken);
         return Ok(ApiResponse<IReadOnlyList<SprintResponse>>.Exito(resultado));
+    }
+
+    [HttpGet("sprints/{id:int}")]
+    public async Task<ActionResult<ApiResponse<SprintResponse>>> ObtenerSprint(
+        int id, CancellationToken cancellationToken)
+    {
+        var resultado = await mediator.Send(new ObtenerSprintQuery(id), cancellationToken);
+        return Ok(ApiResponse<SprintResponse>.Exito(resultado));
     }
 
     [HttpPost("sprints")]
@@ -32,6 +43,15 @@ public class PlaneacionController(IMediator mediator) : ControllerBase
     {
         var resultado = await mediator.Send(new CrearSprintCommand(request), cancellationToken);
         return Ok(ApiResponse<SprintResponse>.Exito(resultado, $"Sprint {resultado.Nombre} creado."));
+    }
+
+    /// <summary>Reasignar el lider responsable del sprint.</summary>
+    [HttpPut("sprints/{id:int}/lider")]
+    public async Task<ActionResult<ApiResponse<SprintResponse>>> AsignarLiderSprint(
+        int id, [FromBody] AsignarLiderSprintRequest request, CancellationToken cancellationToken)
+    {
+        var resultado = await mediator.Send(new AsignarLiderSprintCommand(id, request.IdLider), cancellationToken);
+        return Ok(ApiResponse<SprintResponse>.Exito(resultado, "Lider actualizado."));
     }
 
     /// <summary>Editar nombre/objetivo/fechas. Un sprint Cerrado no se puede modificar.</summary>
@@ -117,12 +137,15 @@ public class PlaneacionController(IMediator mediator) : ControllerBase
 
     /* ---------- Tablero kanban ---------- */
 
-    /// <summary>Sin idEquipo: vista consolidada de todos los equipos y usuarios a la vez.</summary>
+    /// <summary>
+    /// Sin idEquipo: vista consolidada de todos los equipos y usuarios a la vez.
+    /// Sin idAsignado: sin filtro de persona (el front manda por default al usuario firmado).
+    /// </summary>
     [HttpGet("tablero")]
     public async Task<ActionResult<ApiResponse<TableroResponse>>> ObtenerTablero(
-        [FromQuery] int? idEquipo, CancellationToken cancellationToken)
+        [FromQuery] int? idEquipo, [FromQuery] int? idAsignado, CancellationToken cancellationToken)
     {
-        var resultado = await mediator.Send(new ObtenerTableroQuery(idEquipo), cancellationToken);
+        var resultado = await mediator.Send(new ObtenerTableroQuery(idEquipo, idAsignado), cancellationToken);
         return Ok(ApiResponse<TableroResponse>.Exito(resultado));
     }
 

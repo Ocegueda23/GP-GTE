@@ -6,7 +6,8 @@ using MediatR;
 
 namespace GTE.Application.Planeacion.Queries;
 
-public record ObtenerSprintsQuery(int? IdEquipo, bool SoloAbiertos) : IRequest<IReadOnlyList<SprintResponse>>;
+public record ObtenerSprintsQuery(
+    int? IdSprint, int? IdEstatus, int? IdLider, bool SoloAbiertos) : IRequest<IReadOnlyList<SprintResponse>>;
 
 public class ObtenerSprintsHandler(IPlaneacionQueryService consultas)
     : IRequestHandler<ObtenerSprintsQuery, IReadOnlyList<SprintResponse>>
@@ -14,7 +15,20 @@ public class ObtenerSprintsHandler(IPlaneacionQueryService consultas)
     public async Task<IReadOnlyList<SprintResponse>> Handle(
         ObtenerSprintsQuery query, CancellationToken cancellationToken)
     {
-        return await consultas.ObtenerSprintsAsync(query.IdEquipo, query.SoloAbiertos, cancellationToken);
+        return await consultas.ObtenerSprintsAsync(
+            query.IdSprint, query.IdEstatus, query.IdLider, query.SoloAbiertos, cancellationToken);
+    }
+}
+
+public record ObtenerSprintQuery(int IdSprint) : IRequest<SprintResponse>;
+
+public class ObtenerSprintHandler(IPlaneacionQueryService consultas)
+    : IRequestHandler<ObtenerSprintQuery, SprintResponse>
+{
+    public async Task<SprintResponse> Handle(ObtenerSprintQuery query, CancellationToken cancellationToken)
+    {
+        return await consultas.ObtenerSprintAsync(query.IdSprint, cancellationToken)
+            ?? throw new NotFoundException("Sprint", query.IdSprint);
     }
 }
 
@@ -51,8 +65,8 @@ public class ObtenerItemsSprintHandler(IPlaneacionQueryService consultas)
     }
 }
 
-/// <summary>IdEquipo null = vista consolidada de todos los equipos.</summary>
-public record ObtenerTableroQuery(int? IdEquipo) : IRequest<TableroResponse>;
+/// <summary>IdEquipo null = vista consolidada de todos los equipos; IdAsignado null = todas las personas.</summary>
+public record ObtenerTableroQuery(int? IdEquipo, int? IdAsignado) : IRequest<TableroResponse>;
 
 public class ObtenerTableroHandler(
     IPlaneacionQueryService consultas,
@@ -67,7 +81,7 @@ public class ObtenerTableroHandler(
             // estandar directo, sin nada que aprovisionar.
             await repositorio.ObtenerOCrearColumnasAsync(query.IdEquipo.Value, cancellationToken);
         }
-        return await consultas.ObtenerTableroAsync(query.IdEquipo, cancellationToken);
+        return await consultas.ObtenerTableroAsync(query.IdEquipo, query.IdAsignado, cancellationToken);
     }
 }
 
@@ -103,9 +117,14 @@ public class ObtenerCapacidadSprintHandler(
         var sprint = await repositorio.ObtenerEstadoSprintAsync(query.IdSprint, cancellationToken)
             ?? throw new NotFoundException("Sprint", query.IdSprint);
 
-        var miembros = await repositorio.ObtenerMiembrosEquipoAsync(sprint.IdEquipo, cancellationToken);
-        var ausencias = await repositorio.ObtenerAusenciasAprobadasAsync(
-            sprint.IdEquipo, sprint.FechaInicio, sprint.FechaFin, cancellationToken);
+        if (!sprint.IdLider.HasValue)
+        {
+            return new CapacidadSprintResponse { IdSprint = query.IdSprint };
+        }
+
+        var miembros = await repositorio.ObtenerMiembrosPorLiderAsync(sprint.IdLider.Value, cancellationToken);
+        var ausencias = await repositorio.ObtenerAusenciasAprobadasPorLiderAsync(
+            sprint.IdLider.Value, sprint.FechaInicio, sprint.FechaFin, cancellationToken);
 
         var personas = new List<CapacidadPersonaResponse>();
         foreach (var miembro in miembros)

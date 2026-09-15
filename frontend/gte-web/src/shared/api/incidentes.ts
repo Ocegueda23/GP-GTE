@@ -11,12 +11,19 @@ export interface Incidente {
   proyecto: string;
   idSeveridad: number;
   severidad: string;
+  /** Nulos en los incidentes registrados antes de que existiera el catalogo. */
+  idCategoriaIncidente: number | null;
+  categoriaIncidente: string | null;
   idEstatus: number;
   estatus: string;
   fechaOcurrencia: string;
   fechaDeteccion: string | null;
   fechaResolucion: string | null;
   minutosIndisponibilidad: number | null;
+  /** Tiempo de atencion medido por el sistema: minutos de reloj corrido En Atencion. */
+  minutosAtencion: number | null;
+  /** true mientras el incidente siga En Atencion: minutosAtencion sigue creciendo. */
+  atencionEnCurso: boolean;
   causaRaiz: string | null;
   idWorkItemCorrectivo: number | null;
   folioWorkItemCorrectivo: string | null;
@@ -28,6 +35,7 @@ export interface Incidente {
 export interface NuevoIncidente {
   idProyecto: number;
   idSeveridad: number;
+  idCategoriaIncidente: number;
   titulo: string;
   descripcion: string | null;
   fechaOcurrencia: string;
@@ -35,6 +43,7 @@ export interface NuevoIncidente {
 }
 
 export interface ActualizarIncidente {
+  idCategoriaIncidente: number;
   titulo: string;
   descripcion: string | null;
   causaRaiz: string | null;
@@ -45,7 +54,7 @@ export interface ActualizarIncidente {
 export interface FiltroBandejaIncidentes {
   page: number;
   pageSize: number;
-  estatus: number[]; // vacio = abiertos (todos menos Cerrado); [-1] = todos
+  estatus: number[]; // vacio = abiertos (todos menos Cerrado); [-1] = todos (default de la UI)
   idSeveridad: number | null;
   idProyecto: number | null;
   texto: string;
@@ -56,7 +65,7 @@ export interface FiltroBandejaIncidentes {
 export const filtroBandejaIncidentesInicial: FiltroBandejaIncidentes = {
   page: 1,
   pageSize: 25,
-  estatus: [],
+  estatus: [-1],
   idSeveridad: null,
   idProyecto: null,
   texto: "",
@@ -127,6 +136,17 @@ export async function obtenerReleasesParaVincular(idProyecto: number) {
   params.set("idProyecto", String(idProyecto));
   params.set("soloAbiertos", "false");
   return obtener<Release[]>("/api/v1/releases", params);
+}
+
+/**
+ * Opciones del combo de Categoria, agrupadas por el nivel que atiende cada una
+ * ('Soporte N1-N2' / 'Desarrollo'). El backend ya las manda ordenadas por nivel, que es
+ * lo que necesita el groupBy de ComboBuscable para insertar los encabezados.
+ */
+export function opcionesCategoriaIncidente(
+  categorias: { id: number; nombre: string; nivel: string }[],
+) {
+  return categorias.map((c) => ({ valor: c.id, etiqueta: c.nombre, grupo: c.nivel }));
 }
 
 /** Colores de chip por estatus de incidente (contrato de IDs, ver EstatusIncidente.cs). */

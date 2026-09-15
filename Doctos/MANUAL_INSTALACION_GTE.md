@@ -86,102 +86,78 @@ Copiar la carpeta publicada completa al servidor de destino (por ejemplo a
 
 ## 4. Paso 3: configurar y instalar como Windows Service
 
-En el servidor de destino, con una consola como administrador:
+**`tools/GTE.Instalador`** (proyecto WinForms del repositorio) reemplaza a los antiguos
+`configurar-servicio-completo`/`configurar-variable-servicio`/`configurar-almacen-archivos`
+(`.bat`/`.ps1`) y a `generar-clave-jwt.bat`: una sola ventana para crear el servicio y
+leer, crear o modificar sus cuatro variables de entorno, en vez de recordar el orden de
+parametros de varios scripts de consola.
+
+Publicarlo desde la maquina de desarrollo y copiar el resultado al servidor de destino
+(junto con lo publicado de `GTE.WebApi`, o aparte):
+
+```bash
+dotnet publish tools\GTE.Instalador -c Release -r win-x64 --self-contained false -o publicado\GTE.Instalador
+```
+
+En el servidor, correr `GTE.Instalador.exe` -- el propio ejecutable pide elevacion (UAC),
+no hace falta abrir una consola de Administrador a mano (el manifest trae
+`requireAdministrator`; sin eso, escribir en
+`HKLM\SYSTEM\CurrentControlSet\Services\...` falla).
+
+**Crear el servicio** (solo la primera vez, si todavia no existe): en la seccion
+"Servicio de Windows", dejar el nombre por default `GTE`, escribir la ruta del ejecutable
+publicado (ej. `C:\Servicios\GTE\GTE.WebApi.exe`) y dar clic en "Crear servicio".
+Equivale a:
 
 ```bash
 sc create GTE binPath= "C:\Servicios\GTE\GTE.WebApi.exe" start=auto DisplayName= "GTE - Gestor Tecnologico Empresarial"
 ```
 
-Importante: dejar el espacio despues de `binPath=`, `start=` y `DisplayName=` (sintaxis de
-`sc.exe`, falla en silencio si se pega el `=` al valor). Sin `obj=`, el servicio corre
-como `LocalSystem` -- no hace falta una cuenta de Windows dedicada, porque la identidad
-que usa la API para conectar a `bdsGTE` es el login de SQL Server del Paso 1.3, no la
-cuenta del servicio de Windows.
+Sin `obj=`, el servicio corre como `LocalSystem` -- no hace falta una cuenta de Windows
+dedicada, porque la identidad que usa la API para conectar a `bdsGTE` es el login de SQL
+Server del Paso 1.3, no la cuenta del servicio de Windows.
 
-Definir las variables de entorno del servicio -- **todo lo sensible va aqui, nunca en
-`appsettings.json`**. Copiar las herramientas del repositorio al servidor (junto con lo
-publicado, o aparte) y correr como Administrador.
+**Configurar las variables de entorno** -- **todo lo sensible va aqui, nunca en
+`appsettings.json`** -- en la seccion "Configuracion de la aplicacion" (clic en "Cargar
+configuracion" primero si el servicio ya tenia algo puesto, para no perderlo al guardar):
 
-**Opcion recomendada -- las cuatro variables de una vez, con reinicio del servicio
-incluido** (`configurar-servicio-completo.bat`/`.ps1`):
-
-```bash
-configurar-servicio-completo.bat NOMBRE_SERVIDOR_SQL LA-CONTRASENA-DEL-PASO-1.3 C:\GTE\Archivos
-```
-
-Registra `ASPNETCORE_ENVIRONMENT=Production`, arma y registra
-`ConnectionStrings__bdsGTE` (con usuario `svc_gte` por default), genera y registra una
-`Jwt__ClaveFirma` nueva (y la copia al portapapeles), registra `AlmacenArchivos__Ruta`
-(creando la carpeta y comprobando que se puede escribir en ella antes de tocar nada), y
-reinicia el servicio al final -- avisa si no quedo en estado `Running`. Nombre de servicio
-y usuario de SQL son parametros opcionales (`configurar-servicio-completo.bat SERVIDOR
-PASSWORD RUTA_ALMACEN [NOMBRE_SERVICIO] [USUARIO_SQL]`, default `GTE`/`svc_gte`).
-
-Las cuatro son obligatorias porque sin cualquiera de ellas el sistema no funciona: sin las
-tres primeras el servicio no arranca o no conecta, y sin la cuarta arranca pero **ninguna
-subida de archivos funciona** (ver el porque unos parrafos mas abajo).
-
-> **El orden de los parametros cambio**: `RUTA_ALMACEN` es el TERCERO. Antes el tercero era
-> `NOMBRE_SERVICIO`, que ahora es el cuarto. El script frena si el tercer argumento no
-> parece una ruta, para que una llamada con el orden viejo no pase inadvertida.
-
-**Almacen de archivos** (`configurar-almacen-archivos.bat`/`.ps1`), que es la variable mas
-facil de olvidar y la unica que rompe una funcion completa del sistema si queda mal:
-
-```bash
-configurar-almacen-archivos.bat C:\GTE\Archivos
-configurar-almacen-archivos.bat \\servidor\GTE\Archivos
-```
-
-A diferencia de las herramientas de arriba, este ademas **crea la carpeta, comprueba que se
-puede escribir en ella y reinicia el servicio**. Si la ruta no sirve (unidad que no existe
-en el servidor, permisos), aborta sin tocar el registro y dice por que. Para un share de red
-solo avisa: la sonda correria con TU cuenta, no con la del servicio.
-
-**Opcion variable por variable** (`configurar-variable-servicio.bat`/`.ps1` +
-`generar-clave-jwt.bat`/`.ps1`), util para tocar solo una sin reiniciar el servicio o sin
-regenerar la clave JWT:
-
-```bash
-configurar-variable-servicio.bat GTE ASPNETCORE_ENVIRONMENT Production
-configurar-variable-servicio.bat GTE ConnectionStrings__bdsGTE "Server=NOMBRE_SERVIDOR_SQL;Database=bdsGTE;User Id=svc_gte;Password=LA-CONTRASENA-DEL-PASO-1.3;TrustServerCertificate=True;Application Name=GTE.WebApi"
-generar-clave-jwt.bat GTE
-```
-
-Cada uno agrega/reemplaza SOLO su propia variable -- lee lo que ya haya en el registro
-del servicio y conserva el resto (no hay que preocuparse por el orden, ni por pisar lo
-que ya se puso). Con esta opcion, reiniciar el servicio a mano despues (`sc stop GTE` /
-`sc start GTE`).
-
-**Cuidado si corres cualquiera de estas herramientas desde una consola de PowerShell**
-(no `CMD`): si algun valor tiene un `$` (tipico en contrasenas), usa comillas SIMPLES en
-PowerShell, no dobles -- PowerShell interpola `$algo` como variable dentro de comillas
-dobles y lo puede dejar vacio SIN ningun error visible. Desde `CMD` (`cmd.exe` clasico)
-esto no aplica.
-
-Notas sobre estas variables:
-
-- `ASPNETCORE_ENVIRONMENT=Production`: obligatoria -- sin ella, la API no toma el puerto
-  de `appsettings.Production.json` y ademas exige `Jwt:ClaveFirma` (ver siguiente punto),
-  asi que un olvido se nota de inmediato al arrancar, no queda "abierta" por accidente.
-- `Jwt__ClaveFirma`: **obligatoria** fuera de Development (32+ caracteres). La API no
-  arranca sin ella. `generar-clave-jwt.bat` la genera aleatoria, la copia al portapapeles
-  (guardarla tambien en el gestor de contrasenas del equipo) y la escribe en el servicio --
-  generar una clave **distinta por cada ambiente**, nunca reusar la misma.
-- `ConnectionStrings__bdsGTE`: `User Id`/`Password` son el login de SQL Server
-  `svc_gte` creado en el Paso 1.3 (autenticacion de SQL Server, no de Windows -- ver
-  requisito del modo mixto en la seccion 1). Usar la misma contrasena que se puso en el
-  script de ese paso, guardada en el gestor de contrasenas del equipo.
-- `AlmacenArchivos__Ruta`: **fijarla siempre**, en la misma lista del primer `reg add`
-  (ej. `AlmacenArchivos__Ruta=\\servidor\GTE\Archivos` para un share de red, o
-  `AlmacenArchivos__Ruta=C:\GTE\Archivos` para una carpeta local del servidor). El valor
-  que trae `appsettings.json` es `D:\GTE\Archivos`, que es la ruta de la maquina de
-  desarrollo: si el servidor destino no tiene unidad `D:`, TODA subida de archivos falla
-  con `INTERNAL_ERROR` (imagenes pegadas en descripciones y comentarios, adjuntos de
-  WorkItem, base de conocimiento, fotos de perfil). Se comprueba en el Paso 4 con
-  `/api/v1/version/almacen`.
+- **ASPNETCORE_ENVIRONMENT**: `Production`. Obligatoria -- sin ella, la API no toma el
+  puerto de `appsettings.Production.json` y ademas exige `Jwt:ClaveFirma` (ver abajo), asi
+  que un olvido se nota de inmediato al arrancar, no queda "abierta" por accidente.
+- **Servidor SQL / Usuario SQL / Password SQL**: el login `svc_gte` (o el que se haya
+  usado) creado en el Paso 1.3 -- autenticacion de SQL Server, no de Windows (ver
+  requisito del modo mixto en la seccion 1). La herramienta arma
+  `ConnectionStrings__bdsGTE` a partir de estos tres campos; "Probar conexion" abre y
+  cierra una conexion de prueba antes de guardar, para detectar un dato mal escrito ahi
+  mismo en vez de hasta que el servicio intente arrancar.
+- **Clave de firma JWT**: **obligatoria** fuera de Development (32+ caracteres). La API no
+  arranca sin ella. "Generar nueva" crea una aleatoria (64 bytes) y "Copiar" la manda al
+  portapapeles para guardarla tambien en el gestor de contrasenas del equipo -- generar
+  una clave **distinta por cada ambiente**, nunca reusar la misma.
+- **Ruta de almacen de archivos**: **fijarla siempre**. El valor que trae
+  `appsettings.json` es `D:\GTE\Archivos`, la ruta de la maquina de desarrollo: si el
+  servidor destino no tiene unidad `D:`, TODA subida de archivos falla con
+  `INTERNAL_ERROR` (imagenes pegadas en descripciones y comentarios, adjuntos de
+  WorkItem, base de conocimiento, fotos de perfil). "Crear y probar escritura" crea la
+  carpeta si no existe y comprueba que se puede escribir en ella antes de guardar (para
+  un share de red solo avisa: la sonda corre con la cuenta de quien usa la herramienta,
+  no con la del servicio -- confirmar a mano que el servicio tenga permiso ahi). Se
+  vuelve a comprobar en el Paso 4 con `/api/v1/version/almacen`.
 - Si por alguna razon el SPA necesitara llamar a la API desde OTRO origen (no deberia,
-  quedan en el mismo proceso/puerto), se agregaria `Cors__Origenes__0=https://...`.
+  quedan en el mismo proceso/puerto), se agregaria a mano `Cors__Origenes__0=https://...`
+  con `reg add` (la herramienta no cubre variables fuera de estas cuatro, y las conserva
+  tal cual si ya estaban puestas).
+
+Con "Reiniciar el servicio al guardar" marcado (default), **Guardar y aplicar** escribe
+las cuatro variables en el registro del servicio y lo reinicia -- las variables de
+entorno de un Windows Service solo se cargan cuando el proceso arranca, asi que sin
+reiniciar el cambio no aplica.
+
+**Cuidado si se edita alguna de estas variables a mano** (`reg add`, PowerShell) en vez de
+con la herramienta, desde una consola de PowerShell (no `CMD`): si algun valor tiene un
+`$` (tipico en contrasenas), usa comillas SIMPLES, no dobles -- PowerShell interpola
+`$algo` como variable dentro de comillas dobles y lo puede dejar vacio SIN ningun error
+visible. Desde `CMD` clasico esto no aplica.
 
 Revisar tambien `appsettings.Production.json` (puerto donde va a escuchar Kestrel):
 
@@ -191,13 +167,10 @@ Revisar tambien `appsettings.Production.json` (puerto donde va a escuchar Kestre
 
 Cambiar `5090` si ese puerto ya esta en uso en el servidor destino.
 
-Iniciar el servicio:
-
-```bash
-sc start GTE
-```
-
-Verificar que quedo corriendo (`STATE : 4 RUNNING`):
+Los botones Iniciar / Detener / Reiniciar de la seccion "Servicio de Windows" cubren el
+resto del ciclo de vida sin salir de la herramienta (equivalen a `sc start GTE` /
+`sc stop GTE` / reiniciar); el estado se refresca solo despues de cada accion. Verificar
+que quedo corriendo tambien se puede a mano:
 
 ```bash
 sc query GTE

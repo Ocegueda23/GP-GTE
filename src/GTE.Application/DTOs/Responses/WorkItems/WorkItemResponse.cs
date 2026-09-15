@@ -12,6 +12,7 @@ public class WorkItemResponse
     public int IdProyecto { get; set; }
     public string ClaveProyecto { get; set; } = string.Empty;
     public string Proyecto { get; set; } = string.Empty;
+    public int IdCategoriaProyecto { get; set; }
     public bool EsMantenimiento { get; set; }
     public int IdEstatus { get; set; }
     public string Estatus { get; set; } = string.Empty;
@@ -25,6 +26,7 @@ public class WorkItemResponse
     public string? UsuarioSolicitante { get; set; }
     public int? IdSprint { get; set; }
     public string? Sprint { get; set; }
+    public string? FolioSprint { get; set; }
     public decimal? PuntosHistoria { get; set; }
     public int? MinutosPresupuesto { get; set; }
     public int? MinutosInvertidos { get; set; }
@@ -34,4 +36,13 @@ public class WorkItemResponse
     public DateTime FechaRegistro { get; set; }
     public bool EsVencida { get; set; }
     public int RevisionesPendientes { get; set; }
+
+    /// <summary>
+    /// Tarea padre cuando este elemento es una subtarea; nulo si es de primer nivel.
+    /// El folio y el titulo vienen resueltos para que la pantalla pinte el enlace sin
+    /// tener que pedir el detalle del padre aparte.
+    /// </summary>
+    public int? IdPadre { get; set; }
+    public string? FolioPadre { get; set; }
+    public string? TituloPadre { get; set; }
 }

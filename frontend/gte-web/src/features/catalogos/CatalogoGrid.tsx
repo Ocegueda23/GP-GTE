@@ -24,8 +24,19 @@ function esTipoFecha(tipoSql: string) {
   return TIPOS_FECHA.has(tipoSql.toLowerCase());
 }
 
-function formatearValor(valor: unknown, columna: ColumnaConfig): string {
+/**
+ * Sufijo de la clave que el backend agrega a cada columna FK con el texto ya resuelto
+ * (ver MotorCrudGenerico.SufijoEtiquetaFk). Si viene, el grid pinta el nombre en vez del
+ * id; el id crudo sigue en la fila para editar y filtrar.
+ */
+const SUFIJO_ETIQUETA_FK = "__texto";
+
+function formatearValor(valor: unknown, columna: ColumnaConfig, fila?: Registro): string {
   if (columna.esCifrado) return "•••••";
+  const etiquetaFk = fila?.[columna.nombreColumna + SUFIJO_ETIQUETA_FK];
+  if (etiquetaFk !== null && etiquetaFk !== undefined && etiquetaFk !== "") {
+    return String(etiquetaFk);
+  }
   if (valor === null || valor === undefined) return "";
   if (columna.tipoSql.toLowerCase() === "bit") return valor ? "Si" : "No";
   if (esTipoFecha(columna.tipoSql)) {
@@ -245,7 +256,7 @@ export function CatalogoGrid({ config, onCrear, onEditar, puedeEliminar }: Props
                   const revelado = revelados[llave];
                   return (
                     <TableCell key={c.nombreColumna}>
-                      {c.esCifrado && revelado !== undefined ? (revelado ?? "") : formatearValor(fila[c.nombreColumna], c)}
+                      {c.esCifrado && revelado !== undefined ? (revelado ?? "") : formatearValor(fila[c.nombreColumna], c, fila)}
                       {c.esCifrado && puedeDescifrar && revelado === undefined && fila[c.nombreColumna] !== null && (
                         <IconButton size="small" onClick={() => void revelar(indice, fila, c)}>
                           <VisibilityOutlinedIcon fontSize="inherit" />

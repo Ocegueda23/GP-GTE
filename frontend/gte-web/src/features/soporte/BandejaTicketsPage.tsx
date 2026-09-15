@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import {
   Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent,
   DialogTitle, IconButton, Menu, MenuItem, Paper,
-  Snackbar, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  Snackbar, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   TextField, Tooltip, Typography,
 } from "@mui/material";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
@@ -13,7 +13,10 @@ import { Link as RouterLink } from "react-router-dom";
 import { ErrorApi } from "../../shared/api/http";
 import { ComboBuscable, ComboBuscableMultiple } from "../../shared/components/ComboBuscable";
 import { EncabezadoOrdenable } from "../../shared/components/EncabezadoOrdenable";
-import { obtenerCatalogosBandeja, type AccionDisponible, type CatalogosBandeja } from "../../shared/api/workitems";
+import { OrdenMovil } from "../../shared/components/OrdenMovil";
+import { TarjetaListado } from "../../shared/components/TarjetaListado";
+import { useEsMovil } from "../../shared/hooks/useEsMovil";
+import { formatearMinutos, obtenerCatalogosBandeja, type AccionDisponible, type CatalogosBandeja } from "../../shared/api/workitems";
 import { useSesion } from "../../shared/api/sesion";
 import {
   cambiarEstatusTicket, colorEstatusTicket, escalarTicket, filtroBandejaTicketsInicial,
@@ -22,9 +25,35 @@ import {
 
 const ESTATUS_CERRADO = 6;
 
+/** Mismas claves que los encabezados ordenables de la tabla, para el selector de movil. */
+const COLUMNAS_ORDEN = [
+  { valor: "folio", etiqueta: "Folio" },
+  { valor: "titulo", etiqueta: "Titulo" },
+  { valor: "solicitante", etiqueta: "Solicitante" },
+  { valor: "categoria", etiqueta: "Categoria" },
+  { valor: "prioridad", etiqueta: "Prioridad" },
+  { valor: "estatus", etiqueta: "Estatus" },
+  { valor: "asignado", etiqueta: "Asignado" },
+];
+
 function formatearFecha(iso: string | null): string {
   if (!iso) return "-";
   return new Date(iso).toLocaleString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+function estaVencido(ticket: Ticket): boolean {
+  return ticket.fechaLimiteResolucion !== null
+    && new Date(ticket.fechaLimiteResolucion) < new Date()
+    && ticket.fechaResolucion === null;
+}
+
+/** Corre en vivo mientras el ticket este En Atencion; el reloj sale del historial de
+    estatus, no de los minutos que se capturan al resolver. */
+function tiempoAtencion(ticket: Ticket): string {
+  if (ticket.minutosAtencion === null) return "-";
+  return ticket.atencionEnCurso
+    ? `${formatearMinutos(ticket.minutosAtencion)} (en curso)`
+    : formatearMinutos(ticket.minutosAtencion);
 }
 
 /** P15 - Mesa de ayuda: bandeja de agentes (permiso TKT.Atender). */
@@ -32,15 +61,18 @@ export function BandejaTicketsPage() {
   const [texto, setTexto] = useState("");
   // Sin filtro = abiertos (todos menos Cerrado), igual que la Bandeja de trabajo;
   // "Todos" (-1) sigue disponible como opcion explicita en el combo de abajo.
-  const [estatus, setEstatus] = useState<number[]>([]);
+  const [estatus, setEstatus] = useState<number[]>([-1]);
   const [idAsignado, setIdAsignado] = useState<number | null>(null);
   const [ordenarPor, setOrdenarPor] = useState<string | null>(null);
   const [ordenDescendente, setOrdenDescendente] = useState(false);
   const [aviso, setAviso] = useState<{ tipo: "success" | "error"; mensaje: string } | null>(null);
   const clienteQuery = useQueryClient();
   const sesion = useSesion((estado) => estado.sesion);
+  const esMovil = useEsMovil();
 
   const manejarOrden = (clave: string) => {
+    // Cadena vacia = el selector de movil se quedo sin columna (boton de limpiar del combo).
+    if (clave === "") { setOrdenarPor(null); setOrdenDescendente(false); return; }
     if (ordenarPor === clave) setOrdenDescendente((d) => !d);
     else { setOrdenarPor(clave); setOrdenDescendente(false); }
   };
@@ -67,14 +99,25 @@ export function BandejaTicketsPage() {
   });
 
   const refrescar = () => clienteQuery.invalidateQueries({ queryKey: ["bandeja-tickets"] });
+  const items = bandeja.data?.items ?? [];
+  const sinResultados = bandeja.data !== undefined && items.length === 0;
+
+  const menuAcciones = (t: Ticket) => (
+    <MenuAccionesTicket
+      ticket={t}
+      catalogos={catalogos.data}
+      alExito={(mensaje) => { setAviso({ tipo: "success", mensaje }); void refrescar(); }}
+      alError={(mensaje) => setAviso({ tipo: "error", mensaje })}
+    />
+  );
 
   return (
-    <Box sx={{ p: 2 }}>
+    <Box sx={{ p: { xs: 1.5, sm: 2 } }}>
       <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>Mesa de ayuda</Typography>
 
       <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5, mb: 2 }}>
         <TextField size="small" label="Buscar folio, titulo o solicitante" value={texto}
-          onChange={(e) => setTexto(e.target.value)} sx={{ minWidth: 300 }} />
+          onChange={(e) => setTexto(e.target.value)} sx={{ minWidth: { xs: "100%", sm: 300 } }} />
 
         <ComboBuscableMultiple
           label="Estatus"
@@ -89,7 +132,7 @@ export function BandejaTicketsPage() {
             { valor: -1, etiqueta: "Todos" },
             ...(catalogos.data?.estatusTicket ?? []).map((c) => ({ valor: c.id, etiqueta: c.nombre })),
           ]}
-          sx={{ minWidth: 200 }}
+          sx={{ minWidth: { xs: "100%", sm: 200 } }}
         />
 
         <ComboBuscable
@@ -100,87 +143,135 @@ export function BandejaTicketsPage() {
             { valor: "", etiqueta: "Todos" },
             ...(catalogos.data?.usuarios ?? []).map((u) => ({ valor: u.id, etiqueta: u.nombre })),
           ]}
-          sx={{ minWidth: 180 }}
+          sx={{ minWidth: { xs: "100%", sm: 180 } }}
         />
+
+        {/* En movil la tabla se cambia por tarjetas y no quedan encabezados donde ordenar. */}
+        {esMovil && (
+          <OrdenMovil opciones={COLUMNAS_ORDEN} ordenarPor={ordenarPor}
+            descendente={ordenDescendente} onOrdenar={manejarOrden} />
+        )}
       </Box>
 
       {bandeja.isError && (
         <Alert severity="error" sx={{ mb: 2 }}>{(bandeja.error as Error).message}</Alert>
       )}
 
-      <Paper variant="outlined">
-        <TableContainer sx={{ overflowX: "auto" }}>
-          <Table size="small">
-            <TableHead>
-              <TableRow sx={{ "& th": { fontWeight: 700, whiteSpace: "nowrap" } }}>
-                <EncabezadoOrdenable clave="folio" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Folio</EncabezadoOrdenable>
-                <EncabezadoOrdenable clave="titulo" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Titulo</EncabezadoOrdenable>
-                <EncabezadoOrdenable clave="solicitante" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Solicitante</EncabezadoOrdenable>
-                <EncabezadoOrdenable clave="categoria" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Categoria</EncabezadoOrdenable>
-                <EncabezadoOrdenable clave="prioridad" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Prioridad</EncabezadoOrdenable>
-                <EncabezadoOrdenable clave="estatus" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Estatus</EncabezadoOrdenable>
-                <EncabezadoOrdenable clave="asignado" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Asignado</EncabezadoOrdenable>
-                <TableCell>Limite resolucion</TableCell>
-                <TableCell align="center">Acciones</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {bandeja.data?.items.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={9}>
-                    <Typography color="text.secondary" sx={{ py: 4, textAlign: "center" }}>
-                      No hay tickets con estos filtros.
+      {esMovil ? (
+        <Stack spacing={1}>
+          {sinResultados && (
+            <Paper variant="outlined" sx={{ p: 3 }}>
+              <Typography color="text.secondary" sx={{ textAlign: "center" }}>
+                No hay tickets con estos filtros.
+              </Typography>
+            </Paper>
+          )}
+          {items.map((t) => {
+            const vencido = estaVencido(t);
+            return (
+              <TarjetaListado
+                key={t.idTicket}
+                tinte={vencido ? "error" : undefined}
+                encabezado={(
+                  <>
+                    <Typography component={RouterLink} to={`/tickets/${t.folio}`} variant="body2"
+                      sx={{ fontWeight: 700, color: "info.main" }}>
+                      {t.folio}
                     </Typography>
-                  </TableCell>
+                    <Chip size="small" label={t.estatus} color={colorEstatusTicket(t.idEstatus)} />
+                  </>
+                )}
+                titulo={(
+                  <Typography component={RouterLink} to={`/tickets/${t.folio}`} variant="body2"
+                    sx={{ fontWeight: 600, color: "text.primary", textDecoration: "none" }}>
+                    {t.titulo}
+                  </Typography>
+                )}
+                campos={[
+                  { etiqueta: "Solicitante", valor: t.solicitante },
+                  { etiqueta: "Asignado", valor: t.asignado ?? "-" },
+                  { etiqueta: "Prioridad", valor: t.prioridad },
+                  { etiqueta: "Categoria", valor: t.categoria ?? "-" },
+                  { etiqueta: "Limite resolucion", valor: formatearFecha(t.fechaLimiteResolucion), resaltar: vencido },
+                  { etiqueta: "Tiempo atencion", valor: tiempoAtencion(t) },
+                ]}
+                acciones={menuAcciones(t)}
+              />
+            );
+          })}
+        </Stack>
+      ) : (
+        <Paper variant="outlined">
+          <TableContainer sx={{ overflowX: "auto" }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow sx={{ "& th": { fontWeight: 700, whiteSpace: "nowrap" } }}>
+                  <EncabezadoOrdenable clave="folio" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Folio</EncabezadoOrdenable>
+                  <EncabezadoOrdenable clave="titulo" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Titulo</EncabezadoOrdenable>
+                  <EncabezadoOrdenable clave="solicitante" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Solicitante</EncabezadoOrdenable>
+                  <EncabezadoOrdenable clave="categoria" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Categoria</EncabezadoOrdenable>
+                  <EncabezadoOrdenable clave="prioridad" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Prioridad</EncabezadoOrdenable>
+                  <EncabezadoOrdenable clave="estatus" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Estatus</EncabezadoOrdenable>
+                  <EncabezadoOrdenable clave="asignado" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Asignado</EncabezadoOrdenable>
+                  <TableCell>Limite resolucion</TableCell>
+                  <TableCell align="right">Tiempo atencion</TableCell>
+                  <TableCell align="center">Acciones</TableCell>
                 </TableRow>
-              )}
-              {bandeja.data?.items.map((t) => {
-                const vencido = t.fechaLimiteResolucion !== null
-                  && new Date(t.fechaLimiteResolucion) < new Date()
-                  && t.fechaResolucion === null;
-                return (
-                  <TableRow key={t.idTicket} hover
-                    sx={(theme) => ({
-                      backgroundColor: vencido
-                        ? alpha(theme.palette.error.main, theme.palette.mode === "dark" ? 0.18 : 0.08)
-                        : undefined,
-                    })}>
-                    <TableCell sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>
-                      <Typography component={RouterLink} to={`/tickets/${t.folio}`} variant="body2"
-                        sx={{ fontWeight: 600, color: "info.main" }}>
-                        {t.folio}
+              </TableHead>
+              <TableBody>
+                {sinResultados && (
+                  <TableRow>
+                    <TableCell colSpan={10}>
+                      <Typography color="text.secondary" sx={{ py: 4, textAlign: "center" }}>
+                        No hay tickets con estos filtros.
                       </Typography>
                     </TableCell>
-                    <TableCell sx={{ maxWidth: 280 }}>
-                      <Tooltip title={t.descripcion ?? ""}>
-                        <Typography noWrap variant="body2">{t.titulo}</Typography>
-                      </Tooltip>
-                    </TableCell>
-                    <TableCell sx={{ whiteSpace: "nowrap" }}>{t.solicitante}</TableCell>
-                    <TableCell>{t.categoria ?? "-"}</TableCell>
-                    <TableCell>{t.prioridad}</TableCell>
-                    <TableCell>
-                      <Chip size="small" label={t.estatus} color={colorEstatusTicket(t.idEstatus)} />
-                    </TableCell>
-                    <TableCell>{t.asignado ?? "-"}</TableCell>
-                    <TableCell sx={{ whiteSpace: "nowrap", color: vencido ? "error.main" : undefined }}>
-                      {formatearFecha(t.fechaLimiteResolucion)}
-                    </TableCell>
-                    <TableCell align="center">
-                      <MenuAccionesTicket
-                        ticket={t}
-                        catalogos={catalogos.data}
-                        alExito={(mensaje) => { setAviso({ tipo: "success", mensaje }); void refrescar(); }}
-                        alError={(mensaje) => setAviso({ tipo: "error", mensaje })}
-                      />
-                    </TableCell>
                   </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+                )}
+                {items.map((t) => {
+                  const vencido = estaVencido(t);
+                  return (
+                    <TableRow key={t.idTicket} hover
+                      sx={(theme) => ({
+                        backgroundColor: vencido
+                          ? alpha(theme.palette.error.main, theme.palette.mode === "dark" ? 0.18 : 0.08)
+                          : undefined,
+                      })}>
+                      <TableCell sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>
+                        <Typography component={RouterLink} to={`/tickets/${t.folio}`} variant="body2"
+                          sx={{ fontWeight: 600, color: "info.main" }}>
+                          {t.folio}
+                        </Typography>
+                      </TableCell>
+                      <TableCell sx={{ maxWidth: 280 }}>
+                        <Tooltip title={t.descripcion ?? ""}>
+                          <Typography noWrap variant="body2">{t.titulo}</Typography>
+                        </Tooltip>
+                      </TableCell>
+                      <TableCell sx={{ whiteSpace: "nowrap" }}>{t.solicitante}</TableCell>
+                      <TableCell>{t.categoria ?? "-"}</TableCell>
+                      <TableCell>{t.prioridad}</TableCell>
+                      <TableCell>
+                        <Chip size="small" label={t.estatus} color={colorEstatusTicket(t.idEstatus)} />
+                      </TableCell>
+                      <TableCell>{t.asignado ?? "-"}</TableCell>
+                      <TableCell sx={{ whiteSpace: "nowrap", color: vencido ? "error.main" : undefined }}>
+                        {formatearFecha(t.fechaLimiteResolucion)}
+                      </TableCell>
+                      <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                        {tiempoAtencion(t)}
+                      </TableCell>
+                      <TableCell align="center">
+                        {menuAcciones(t)}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+      )}
 
       <Snackbar open={aviso !== null} autoHideDuration={6000} onClose={() => setAviso(null)}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>
@@ -215,6 +306,11 @@ function MenuAccionesTicket({ ticket, catalogos, alExito, alError }: PropsAccion
   const [idProyecto, setIdProyecto] = useState<number | "">("");
   const [idAsignadoEscalar, setIdAsignadoEscalar] = useState<number | "">("");
   const [fechaCompromiso, setFechaCompromiso] = useState("");
+  const esMovil = useEsMovil();
+  // En la tarjeta de movil los iconos de accion se llevan a 44 px, el area tocable
+  // minima: "small" los deja en 30 y ni "medium" con un icono chico pasa de 35.
+  const tamanoIcono = esMovil ? "medium" : "small";
+  const areaTactil = esMovil ? { width: 44, height: 44 } : undefined;
 
   const abrirMenu = async (evento: React.MouseEvent<HTMLElement>) => {
     setAncla(evento.currentTarget);
@@ -294,12 +390,12 @@ function MenuAccionesTicket({ ticket, catalogos, alExito, alError }: PropsAccion
 
   return (
     <>
-      <IconButton size="small" onClick={abrirMenu} aria-label={`Acciones de ${ticket.folio}`}>
+      <IconButton size={tamanoIcono} sx={areaTactil} onClick={abrirMenu} aria-label={`Acciones de ${ticket.folio}`}>
         {cargando ? <CircularProgress size={18} /> : <MoreVertIcon fontSize="small" />}
       </IconButton>
       {puedeEscalar && (
         <Tooltip title="Escalar a elemento de trabajo">
-          <IconButton size="small" onClick={() => { setIdProyecto(""); setIdAsignadoEscalar(""); setFechaCompromiso(""); setDialogoEscalar(true); }}>
+          <IconButton size={tamanoIcono} sx={areaTactil} onClick={() => { setIdProyecto(""); setIdAsignadoEscalar(""); setFechaCompromiso(""); setDialogoEscalar(true); }}>
             <UpgradeIcon fontSize="small" />
           </IconButton>
         </Tooltip>
@@ -314,7 +410,7 @@ function MenuAccionesTicket({ ticket, catalogos, alExito, alError }: PropsAccion
         ))}
       </Menu>
 
-      <Dialog open={accionConMotivo !== null} onClose={() => setAccionConMotivo(null)} fullWidth>
+      <Dialog open={accionConMotivo !== null} onClose={() => setAccionConMotivo(null)} fullWidth fullScreen={esMovil}>
         <DialogTitle>{accionConMotivo?.etiqueta} - {ticket.folio}</DialogTitle>
         <DialogContent>
           <TextField autoFocus fullWidth multiline minRows={2} margin="dense"
@@ -330,7 +426,7 @@ function MenuAccionesTicket({ ticket, catalogos, alExito, alError }: PropsAccion
         </DialogActions>
       </Dialog>
 
-      <Dialog open={dialogoAsignar} onClose={() => setDialogoAsignar(false)} fullWidth maxWidth="xs">
+      <Dialog open={dialogoAsignar} onClose={() => setDialogoAsignar(false)} fullWidth maxWidth="xs" fullScreen={esMovil}>
         <DialogTitle>Asignar {ticket.folio}</DialogTitle>
         <DialogContent sx={{ pt: "12px !important" }}>
           <ComboBuscable
@@ -350,7 +446,7 @@ function MenuAccionesTicket({ ticket, catalogos, alExito, alError }: PropsAccion
         </DialogActions>
       </Dialog>
 
-      <Dialog open={dialogoResolver} onClose={() => setDialogoResolver(false)} fullWidth maxWidth="sm">
+      <Dialog open={dialogoResolver} onClose={() => setDialogoResolver(false)} fullWidth maxWidth="sm" fullScreen={esMovil}>
         <DialogTitle>Resolver {ticket.folio}</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
           <TextField autoFocus fullWidth multiline minRows={3} label="Solucion (obligatorio)"
@@ -370,7 +466,7 @@ function MenuAccionesTicket({ ticket, catalogos, alExito, alError }: PropsAccion
         </DialogActions>
       </Dialog>
 
-      <Dialog open={dialogoEscalar} onClose={() => setDialogoEscalar(false)} fullWidth maxWidth="xs">
+      <Dialog open={dialogoEscalar} onClose={() => setDialogoEscalar(false)} fullWidth maxWidth="xs" fullScreen={esMovil}>
         <DialogTitle>Escalar {ticket.folio} a elemento de trabajo</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
           <ComboBuscable

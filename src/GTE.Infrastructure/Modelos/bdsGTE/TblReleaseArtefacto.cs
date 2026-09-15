@@ -13,6 +13,8 @@ public partial class TblReleaseArtefacto
 
     public int? OrdenEjecucion { get; set; }
 
+    public string? VersionArtefacto { get; set; }
+
     public int? IdArtefactoRollback { get; set; }
 
     public string? JustificacionIrreversible { get; set; }
@@ -22,6 +24,10 @@ public partial class TblReleaseArtefacto
     public DateTime FechaRegistro { get; set; }
 
     public string UsuarioRegistro { get; set; } = null!;
+
+    public string? UsuarioMovto { get; set; }
+
+    public DateTime? FechaMovto { get; set; }
 
     public bool Activo { get; set; }
 

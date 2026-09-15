@@ -9,7 +9,8 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
 import { ComboBuscable } from "../../shared/components/ComboBuscable";
-import { obtenerCatalogosBandeja, type AccionDisponible } from "../../shared/api/workitems";
+import { useEsMovil } from "../../shared/hooks/useEsMovil";
+import { formatearMinutos, obtenerCatalogosBandeja, type AccionDisponible } from "../../shared/api/workitems";
 import { useSesion } from "../../shared/api/sesion";
 import {
   cambiarEstatusTicket, colorEstatusTicket, escalarTicket, obtenerAccionesTicket,
@@ -25,11 +26,18 @@ function formatearFecha(iso: string | null): string {
   return new Date(iso).toLocaleString("es-MX", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
+/** En movil la etiqueta va arriba del valor: lado a lado en 360 px el valor se parte a la mitad. */
 function Campo({ etiqueta, valor, resaltar }: { etiqueta: string; valor: string; resaltar?: boolean }) {
   return (
-    <Box sx={{ display: "flex", justifyContent: "space-between", gap: 2, py: 0.5 }}>
+    <Box sx={{
+      display: "flex", flexDirection: { xs: "column", sm: "row" },
+      justifyContent: "space-between", gap: { xs: 0, sm: 2 }, py: 0.5,
+    }}>
       <Typography variant="body2" color="text.secondary">{etiqueta}</Typography>
-      <Typography variant="body2" sx={{ fontWeight: 600, color: resaltar ? "error.main" : undefined }}>
+      <Typography variant="body2" sx={{
+        fontWeight: 600, color: resaltar ? "error.main" : undefined,
+        textAlign: { xs: "left", sm: "right" }, wordBreak: "break-word",
+      }}>
         {valor}
       </Typography>
     </Box>
@@ -88,7 +96,7 @@ export function DetalleTicketPage() {
   const rutaOrigen = puede("TKT.Atender") ? "/soporte" : "/tickets";
 
   return (
-    <Box sx={{ p: 2, maxWidth: 800 }}>
+    <Box sx={{ p: { xs: 1.5, sm: 2 }, maxWidth: 800 }}>
       <Link component={RouterLink} to={rutaOrigen} underline="hover"
         sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, mb: 1 }}>
         <ArrowBackIcon fontSize="small" /> Volver
@@ -97,7 +105,7 @@ export function DetalleTicketPage() {
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
         <Stack direction={{ xs: "column", md: "row" }} spacing={1} sx={{ justifyContent: "space-between", mb: 1 }}>
           <Box>
-            <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+            <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", flexWrap: "wrap" }}>
               <Typography variant="h6" sx={{ fontWeight: 700 }}>{ticket.folio}</Typography>
               <Chip size="small" label={ticket.estatus} color={colorEstatusTicket(ticket.idEstatus)} />
             </Stack>
@@ -151,8 +159,14 @@ export function DetalleTicketPage() {
             && new Date(ticket.fechaLimiteResolucion) < new Date()} />
         <Campo etiqueta="Resolucion" valor={formatearFecha(ticket.fechaResolucion)} />
         <Campo etiqueta="Registrado" valor={formatearFecha(ticket.fechaRegistro)} />
+        {/* Dos tiempos distintos a proposito: el de atencion lo mide el sistema del
+            historial de estatus (corre en vivo mientras el ticket este En Atencion), y el
+            de solucion es lo que el ingeniero declara haber invertido al resolver. */}
+        <Campo
+          etiqueta={ticket.atencionEnCurso ? "Tiempo de atencion (en curso)" : "Tiempo de atencion"}
+          valor={formatearMinutos(ticket.minutosAtencion)} />
         {ticket.minutosSolucion !== null && (
-          <Campo etiqueta="Tiempo de solucion" valor={`${ticket.minutosSolucion} min`} />
+          <Campo etiqueta="Tiempo de solucion declarado" valor={`${ticket.minutosSolucion} min`} />
         )}
         {ticket.solucion && (
           <Box sx={{ pt: 1 }}>
@@ -170,7 +184,7 @@ export function DetalleTicketPage() {
         )}
       </Paper>
 
-      <Paper variant="outlined" sx={{ p: 2 }}>
+      <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
         <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Satisfaccion</Typography>
         {ticket.calificacion !== null ? (
           <Stack spacing={0.5}>
@@ -214,6 +228,7 @@ function BotonesAccionesTicket({ idTicket, folio, acciones, alExito, alError }: 
   const [solucion, setSolucion] = useState("");
   const [minutosSolucion, setMinutosSolucion] = useState<number | "">("");
   const [enviando, setEnviando] = useState(false);
+  const esMovil = useEsMovil();
   const catalogos = useQuery({ queryKey: ["catalogos-bandeja"], queryFn: obtenerCatalogosBandeja, staleTime: 5 * 60_000 });
 
   const ejecutar = async (
@@ -240,11 +255,14 @@ function BotonesAccionesTicket({ idTicket, folio, acciones, alExito, alError }: 
 
   return (
     <>
-      <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
+      {/* En movil los botones se reparten el ancho: con pocas acciones quedan grandes
+          y faciles de tocar, y con muchas se acomodan en varios renglones. */}
+      <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1 }}>
         {acciones.map((accion) => (
-          <Button key={accion.accion} size="small"
+          <Button key={accion.accion} size={esMovil ? "medium" : "small"}
             variant={accion.esAccionPrincipal ? "contained" : "outlined"}
             disabled={enviando}
+            sx={{ flexGrow: { xs: 1, sm: 0 } }}
             onClick={() => {
               if (accion.accion === "ASIGNAR") { setIdAsignado(""); setDialogoAsignar(true); }
               else if (accion.accion === "RESOLVER") { setSolucion(""); setMinutosSolucion(""); setDialogoResolver(true); }
@@ -256,7 +274,7 @@ function BotonesAccionesTicket({ idTicket, folio, acciones, alExito, alError }: 
         ))}
       </Stack>
 
-      <Dialog open={accionConMotivo !== null} onClose={() => setAccionConMotivo(null)} fullWidth>
+      <Dialog open={accionConMotivo !== null} onClose={() => setAccionConMotivo(null)} fullWidth fullScreen={esMovil}>
         <DialogTitle>{accionConMotivo?.etiqueta} - {folio}</DialogTitle>
         <DialogContent>
           <TextField autoFocus fullWidth multiline minRows={2} margin="dense"
@@ -271,7 +289,7 @@ function BotonesAccionesTicket({ idTicket, folio, acciones, alExito, alError }: 
         </DialogActions>
       </Dialog>
 
-      <Dialog open={dialogoAsignar} onClose={() => setDialogoAsignar(false)} fullWidth maxWidth="xs">
+      <Dialog open={dialogoAsignar} onClose={() => setDialogoAsignar(false)} fullWidth maxWidth="xs" fullScreen={esMovil}>
         <DialogTitle>Asignar {folio}</DialogTitle>
         <DialogContent sx={{ pt: "12px !important" }}>
           <ComboBuscable
@@ -291,7 +309,7 @@ function BotonesAccionesTicket({ idTicket, folio, acciones, alExito, alError }: 
         </DialogActions>
       </Dialog>
 
-      <Dialog open={dialogoResolver} onClose={() => setDialogoResolver(false)} fullWidth maxWidth="sm">
+      <Dialog open={dialogoResolver} onClose={() => setDialogoResolver(false)} fullWidth maxWidth="sm" fullScreen={esMovil}>
         <DialogTitle>Resolver {folio}</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
           <TextField autoFocus fullWidth multiline minRows={3} label="Solucion (obligatorio)"
@@ -325,6 +343,7 @@ function BotonEscalar({ idTicket, folio, proyectos, usuarios, alExito, alError }
   const [idAsignado, setIdAsignado] = useState<number | "">("");
   const [fechaCompromiso, setFechaCompromiso] = useState("");
   const [enviando, setEnviando] = useState(false);
+  const esMovil = useEsMovil();
 
   const escalar = async () => {
     if (idProyecto === "") return;
@@ -346,11 +365,12 @@ function BotonEscalar({ idTicket, folio, proyectos, usuarios, alExito, alError }
 
   return (
     <>
-      <Button size="small" sx={{ mt: 1 }} onClick={() => { setIdProyecto(""); setIdAsignado(""); setFechaCompromiso(""); setAbierto(true); }}>
+      <Button size={esMovil ? "medium" : "small"} sx={{ mt: 1, width: { xs: "100%", sm: "auto" } }}
+        onClick={() => { setIdProyecto(""); setIdAsignado(""); setFechaCompromiso(""); setAbierto(true); }}>
         Escalar a elemento de trabajo
       </Button>
 
-      <Dialog open={abierto} onClose={() => setAbierto(false)} fullWidth maxWidth="xs">
+      <Dialog open={abierto} onClose={() => setAbierto(false)} fullWidth maxWidth="xs" fullScreen={esMovil}>
         <DialogTitle>Escalar {folio}</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
           <ComboBuscable
@@ -389,6 +409,7 @@ function FormularioEncuesta({ idTicket, alExito, alError }: {
   const [calificacion, setCalificacion] = useState<number | null>(null);
   const [comentario, setComentario] = useState("");
   const [enviando, setEnviando] = useState(false);
+  const esMovil = useEsMovil();
 
   const calificar = async () => {
     if (!calificacion) return;
@@ -405,10 +426,13 @@ function FormularioEncuesta({ idTicket, alExito, alError }: {
 
   return (
     <Stack spacing={1} sx={{ maxWidth: 400 }}>
-      <Rating value={calificacion} onChange={(_, valor) => setCalificacion(valor)} />
+      {/* Estrellas grandes en movil: son el control que mas se toca de esta pantalla. */}
+      <Rating value={calificacion} onChange={(_, valor) => setCalificacion(valor)}
+        size={esMovil ? "large" : "medium"} />
       <TextField size="small" label="Comentario (opcional)" multiline minRows={2}
         value={comentario} onChange={(e) => setComentario(e.target.value)} />
-      <Button variant="contained" size="small" sx={{ alignSelf: "flex-start" }}
+      <Button variant="contained" size={esMovil ? "medium" : "small"}
+        sx={{ alignSelf: { xs: "stretch", sm: "flex-start" } }}
         disabled={enviando || !calificacion} onClick={() => void calificar()}>
         Enviar calificacion
       </Button>

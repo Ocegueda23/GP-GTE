@@ -5,6 +5,7 @@ public record IncidenteNuevo(
     string Folio,
     int IdProyecto,
     int IdSeveridad,
+    int IdCategoriaIncidente,
     string Titulo,
     string? Descripcion,
     DateTime FechaOcurrencia,
@@ -12,6 +13,7 @@ public record IncidenteNuevo(
 
 /// <summary>Datos editables de un incidente fuera del flujo de estatus.</summary>
 public record IncidenteActualizacion(
+    int IdCategoriaIncidente,
     string Titulo,
     string? Descripcion,
     string? CausaRaiz,

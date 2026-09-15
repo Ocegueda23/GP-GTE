@@ -277,6 +277,89 @@ public class ReportesController(IMediator mediator, IExportadorExcel exportador)
         return Ok(ApiResponse<GTE.Application.Common.PagedResult<AuditoriaItemResponse>>.Exito(resultado));
     }
 
+    // ---------- R15 Detalle de actividades terminadas ----------
+    [HttpGet("actividades-terminadas")]
+    public async Task<ActionResult<ApiResponse<ActividadesTerminadasReporteResponse>>> ObtenerActividadesTerminadas(
+        [FromQuery] DateOnly desde, [FromQuery] DateOnly hasta, [FromQuery] int? idEquipo,
+        [FromQuery] int? idAsignado, [FromQuery] int? idProyecto, [FromQuery] int? idTipoWorkItem,
+        [FromQuery] string? folio, CancellationToken cancellationToken)
+    {
+        var resultado = await mediator.Send(
+            new ObtenerActividadesTerminadasQuery(desde, hasta, idEquipo, idAsignado, idProyecto, idTipoWorkItem, folio),
+            cancellationToken);
+        return Ok(ApiResponse<ActividadesTerminadasReporteResponse>.Exito(resultado));
+    }
+
+    [HttpGet("actividades-terminadas/exportar")]
+    public async Task<IActionResult> ExportarActividadesTerminadas(
+        [FromQuery] DateOnly desde, [FromQuery] DateOnly hasta, [FromQuery] int? idEquipo,
+        [FromQuery] int? idAsignado, [FromQuery] int? idProyecto, [FromQuery] int? idTipoWorkItem,
+        [FromQuery] string? folio, CancellationToken cancellationToken)
+    {
+        var r = await mediator.Send(
+            new ObtenerActividadesTerminadasQuery(desde, hasta, idEquipo, idAsignado, idProyecto, idTipoWorkItem, folio),
+            cancellationToken);
+
+        var encabezados = new[]
+        {
+            "Folio", "Tipo", "Titulo", "Descripcion", "Proyecto", "Equipo", "Asignado", "Prioridad",
+            "Sprint", "Release", "Horas en proceso", "Horas registradas", "Diferencia (horas)",
+            "Fecha creacion", "Fecha inicio", "Fecha fin",
+            "Fecha compromiso", "Espera (dias naturales)", "Espera (horas habiles)",
+            "Resolucion (dias naturales)", "Resolucion (horas habiles)", "Entregado a tiempo",
+        };
+
+        var filas = r.Items.Select(i => (IReadOnlyList<object?>)
+        [
+            i.Folio, i.Tipo, i.Titulo, i.Descripcion, i.Proyecto, i.Equipo, i.Asignado, i.Prioridad,
+            i.Sprint, i.Release, AHoras(i.MinutosInvertidos), AHoras(i.MinutosRegistrados),
+            AHoras(i.DiferenciaMinutos), i.FechaCreacion, i.FechaInicio, i.FechaFin,
+            i.FechaCompromiso, i.DiasNaturalesEspera, AHoras(i.MinutosLaboralesEspera),
+            i.DiasNaturalesResolucion, AHoras(i.MinutosLaboralesResolucion),
+            i.EntregadoATiempo == null ? "-" : i.EntregadoATiempo.Value ? "Si" : "No",
+        ]).ToList();
+
+        // Las tres secciones van en una sola hoja, separadas por un renglon de titulo: el
+        // exportador genera un libro de una hoja y el reporte se lee como un solo documento.
+        if (r.Tickets.Count > 0)
+        {
+            filas.Add([]);
+            filas.Add(["TICKETS RESUELTOS O CERRADOS"]);
+            filas.Add(["Folio", "Categoria", "Titulo", "Solicitante", "Asignado", "Prioridad", "Estatus",
+                "Horas en atencion", "Fecha creacion", "Primera respuesta", "Fecha resolucion",
+                "Espera (dias naturales)", "Resolucion (dias naturales)", "Dentro de SLA"]);
+            filas.AddRange(r.Tickets.Select(t => (IReadOnlyList<object?>)
+            [
+                t.Folio, t.Categoria, t.Titulo, t.Solicitante, t.Asignado, t.Prioridad, t.Estatus,
+                AHoras(t.MinutosEnAtencion), t.FechaCreacion, t.FechaPrimeraRespuesta, t.FechaResolucion,
+                t.DiasNaturalesEspera, t.DiasNaturalesResolucion,
+                t.DentroDeSla == null ? "-" : t.DentroDeSla.Value ? "Si" : "No",
+            ]));
+        }
+
+        if (r.Incidentes.Count > 0)
+        {
+            filas.Add([]);
+            filas.Add(["INCIDENTES RESUELTOS O CERRADOS"]);
+            filas.Add(["Folio", "Severidad", "Titulo", "Proyecto", "Estatus", "Causa raiz",
+                "Horas en atencion", "Horas de indisponibilidad", "Fecha ocurrencia", "Fecha deteccion",
+                "Fecha resolucion", "Deteccion (dias naturales)", "Resolucion (dias naturales)"]);
+            filas.AddRange(r.Incidentes.Select(i => (IReadOnlyList<object?>)
+            [
+                i.Folio, i.Severidad, i.Titulo, i.Proyecto, i.Estatus, i.CausaRaiz,
+                AHoras(i.MinutosEnAtencion), AHoras(i.MinutosIndisponibilidad),
+                i.FechaOcurrencia, i.FechaDeteccion, i.FechaResolucion,
+                i.DiasNaturalesDeteccion, i.DiasNaturalesResolucion,
+            ]));
+        }
+
+        return ArchivoExcel("ActividadesTerminadas", encabezados, filas);
+    }
+
+    /// <summary>Los minutos se exportan como horas decimales para que Excel pueda sumarlas.</summary>
+    private static decimal? AHoras(int? minutos)
+        => minutos == null ? null : Math.Round(minutos.Value / 60m, 2);
+
     private FileContentResult ArchivoExcel(string nombre, IReadOnlyList<string> encabezados, IReadOnlyList<IReadOnlyList<object?>> filas)
     {
         var contenido = exportador.GenerarLibro(nombre, encabezados, filas);

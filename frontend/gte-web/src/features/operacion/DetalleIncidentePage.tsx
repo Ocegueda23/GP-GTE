@@ -10,11 +10,12 @@ import EditIcon from "@mui/icons-material/Edit";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
 import { ComboBuscable } from "../../shared/components/ComboBuscable";
-import { obtenerCatalogosBandeja, type AccionDisponible } from "../../shared/api/workitems";
+import { useEsMovil } from "../../shared/hooks/useEsMovil";
+import { formatearMinutos, obtenerCatalogosBandeja, type AccionDisponible } from "../../shared/api/workitems";
 import {
   actualizarIncidente, cambiarEstatusIncidente, cambiarSeveridadIncidente, colorEstatusIncidente,
   colorSeveridad, obtenerAccionesIncidente, obtenerIncidentePorFolio, obtenerReleasesParaVincular,
-  vincularCorrectivo, vincularReleaseCausante,
+  opcionesCategoriaIncidente, vincularCorrectivo, vincularReleaseCausante,
 } from "../../shared/api/incidentes";
 
 function formatearFecha(iso: string | null): string {
@@ -22,11 +23,20 @@ function formatearFecha(iso: string | null): string {
   return new Date(iso).toLocaleString("es-MX", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
+/** En movil la etiqueta va arriba del valor: lado a lado en 360 px el valor se parte a la mitad. */
 function Campo({ etiqueta, valor }: { etiqueta: string; valor: string }) {
   return (
-    <Box sx={{ display: "flex", justifyContent: "space-between", gap: 2, py: 0.5 }}>
+    <Box sx={{
+      display: "flex", flexDirection: { xs: "column", sm: "row" },
+      justifyContent: "space-between", gap: { xs: 0, sm: 2 }, py: 0.5,
+    }}>
       <Typography variant="body2" color="text.secondary">{etiqueta}</Typography>
-      <Typography variant="body2" sx={{ fontWeight: 600, maxWidth: "60%", textAlign: "right" }}>{valor}</Typography>
+      <Typography variant="body2" sx={{
+        fontWeight: 600, maxWidth: { xs: "100%", sm: "60%" },
+        textAlign: { xs: "left", sm: "right" }, wordBreak: "break-word",
+      }}>
+        {valor}
+      </Typography>
     </Box>
   );
 }
@@ -74,14 +84,14 @@ export function DetalleIncidentePage() {
   }
 
   return (
-    <Box sx={{ p: 2, maxWidth: 800 }}>
+    <Box sx={{ p: { xs: 1.5, sm: 2 }, maxWidth: 800 }}>
       <Link component={RouterLink} to="/operacion/incidentes" underline="hover"
         sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, mb: 1 }}>
         <ArrowBackIcon fontSize="small" /> Bandeja de incidentes
       </Link>
 
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", mb: 1 }}>
+        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", flexWrap: "wrap", mb: 1 }}>
           <Typography variant="h6" sx={{ fontWeight: 700 }}>{incidente.folio}</Typography>
           <Chip size="small" label={incidente.estatus} color={colorEstatusIncidente(incidente.idEstatus)} />
           <Chip size="small" label={incidente.severidad} color={colorSeveridad(incidente.idSeveridad)} />
@@ -101,8 +111,8 @@ export function DetalleIncidentePage() {
           alError={(mensaje) => setAviso({ tipo: "error", mensaje })}
         />
 
-        <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", mt: 1 }}>
-          <BotonEditar incidente={incidente}
+        <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1, mt: 1 }}>
+          <BotonEditar incidente={incidente} categorias={catalogos.data?.categoriasIncidente ?? []}
             alExito={(mensaje) => { setAviso({ tipo: "success", mensaje }); void refrescarTodo(); }}
             alError={(mensaje) => setAviso({ tipo: "error", mensaje })} />
           <BotonSeveridad idIncidente={incidente.idIncidente} folio={incidente.folio ?? ""}
@@ -124,10 +134,20 @@ export function DetalleIncidentePage() {
 
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Campo etiqueta="Proyecto" valor={incidente.proyecto} />
+        <Campo etiqueta="Categoria" valor={incidente.categoriaIncidente ?? "sin capturar"} />
         <Campo etiqueta="Fecha de ocurrencia" valor={formatearFecha(incidente.fechaOcurrencia)} />
         <Campo etiqueta="Fecha de deteccion" valor={formatearFecha(incidente.fechaDeteccion)} />
         <Campo etiqueta="Fecha de resolucion" valor={formatearFecha(incidente.fechaResolucion)} />
-        <Campo etiqueta="Minutos de indisponibilidad" valor={incidente.minutosIndisponibilidad?.toString() ?? "-"} />
+        {/* El tiempo de atencion lo mide el sistema del historial de estatus y corre en
+            vivo mientras el incidente siga En Atencion; la indisponibilidad se sigue
+            capturando a mano porque la caida no empata con el estatus del incidente. */}
+        <Campo
+          etiqueta={incidente.atencionEnCurso ? "Tiempo de atencion (en curso)" : "Tiempo de atencion"}
+          valor={formatearMinutos(incidente.minutosAtencion)} />
+        <Campo etiqueta="Minutos de indisponibilidad"
+          valor={incidente.minutosIndisponibilidad === null
+            ? "sin capturar"
+            : `${incidente.minutosIndisponibilidad} min`} />
         <Campo etiqueta="Causa raiz" valor={incidente.causaRaiz ?? "-"} />
         {incidente.folioWorkItemCorrectivo ? (
           <Box sx={{ display: "flex", justifyContent: "space-between", gap: 2, py: 0.5 }}>
@@ -158,6 +178,7 @@ function BotonesAccionesIncidente({ idIncidente, folio, acciones, alExito, alErr
   const [accionConMotivo, setAccionConMotivo] = useState<AccionDisponible | null>(null);
   const [motivo, setMotivo] = useState("");
   const [enviando, setEnviando] = useState(false);
+  const esMovil = useEsMovil();
 
   const ejecutar = async (accion: string, motivoCapturado?: string) => {
     setEnviando(true);
@@ -175,17 +196,21 @@ function BotonesAccionesIncidente({ idIncidente, folio, acciones, alExito, alErr
 
   return (
     <>
-      <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
+      {/* En movil los botones se reparten el ancho: con pocas acciones quedan grandes
+          y faciles de tocar, y con muchas se acomodan en varios renglones. */}
+      <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1 }}>
         {acciones.map((accion) => (
-          <Button key={accion.accion} size="small" variant={accion.esAccionPrincipal ? "contained" : "outlined"}
+          <Button key={accion.accion} size={esMovil ? "medium" : "small"}
+            variant={accion.esAccionPrincipal ? "contained" : "outlined"}
             disabled={enviando}
+            sx={{ flexGrow: { xs: 1, sm: 0 } }}
             onClick={() => accion.requiereMotivo ? setAccionConMotivo(accion) : void ejecutar(accion.accion)}>
             {accion.etiqueta}
           </Button>
         ))}
       </Stack>
 
-      <Dialog open={accionConMotivo !== null} onClose={() => setAccionConMotivo(null)} fullWidth>
+      <Dialog open={accionConMotivo !== null} onClose={() => setAccionConMotivo(null)} fullWidth fullScreen={esMovil}>
         <DialogTitle>{accionConMotivo?.etiqueta} - {folio}</DialogTitle>
         <DialogContent>
           <TextField autoFocus fullWidth multiline minRows={2} margin="dense"
@@ -203,8 +228,13 @@ function BotonesAccionesIncidente({ idIncidente, folio, acciones, alExito, alErr
   );
 }
 
-function BotonEditar({ incidente, alExito, alError }: {
-  incidente: { idIncidente: number; titulo: string; descripcion: string | null; causaRaiz: string | null; minutosIndisponibilidad: number | null };
+function BotonEditar({ incidente, categorias, alExito, alError }: {
+  incidente: {
+    idIncidente: number; titulo: string; descripcion: string | null; causaRaiz: string | null;
+    minutosIndisponibilidad: number | null; idCategoriaIncidente: number | null;
+    fechaDeteccion: string | null;
+  };
+  categorias: { id: number; nombre: string; nivel: string }[];
   alExito: (mensaje: string) => void; alError: (mensaje: string) => void;
 }) {
   const [abierto, setAbierto] = useState(false);
@@ -212,26 +242,32 @@ function BotonEditar({ incidente, alExito, alError }: {
   const [descripcion, setDescripcion] = useState(incidente.descripcion ?? "");
   const [causaRaiz, setCausaRaiz] = useState(incidente.causaRaiz ?? "");
   const [minutos, setMinutos] = useState(incidente.minutosIndisponibilidad?.toString() ?? "");
+  const [idCategoria, setIdCategoria] = useState<number | "">(incidente.idCategoriaIncidente ?? "");
   const [enviando, setEnviando] = useState(false);
+  const esMovil = useEsMovil();
 
   const abrir = () => {
     setTitulo(incidente.titulo);
     setDescripcion(incidente.descripcion ?? "");
     setCausaRaiz(incidente.causaRaiz ?? "");
     setMinutos(incidente.minutosIndisponibilidad?.toString() ?? "");
+    setIdCategoria(incidente.idCategoriaIncidente ?? "");
     setAbierto(true);
   };
 
   const guardar = async () => {
-    if (titulo.trim().length === 0) return;
+    if (titulo.trim().length === 0 || idCategoria === "") return;
     setEnviando(true);
     try {
       const { mensaje } = await actualizarIncidente(incidente.idIncidente, {
+        idCategoriaIncidente: idCategoria as number,
         titulo: titulo.trim(),
         descripcion: descripcion.trim() || null,
         causaRaiz: causaRaiz.trim() || null,
         minutosIndisponibilidad: minutos.trim() ? Number(minutos) : null,
-        fechaDeteccion: null,
+        // Este dialogo no edita la fecha de deteccion: se reenvia la que ya tiene el
+        // incidente. Mandar null la borraba en cada edicion.
+        fechaDeteccion: incidente.fechaDeteccion,
       });
       alExito(mensaje);
       setAbierto(false);
@@ -244,10 +280,17 @@ function BotonEditar({ incidente, alExito, alError }: {
 
   return (
     <>
-      <Button size="small" startIcon={<EditIcon fontSize="small" />} onClick={abrir}>Editar</Button>
-      <Dialog open={abierto} onClose={() => setAbierto(false)} fullWidth maxWidth="sm">
+      <Button size={esMovil ? "medium" : "small"} startIcon={<EditIcon fontSize="small" />} onClick={abrir}>Editar</Button>
+      <Dialog open={abierto} onClose={() => setAbierto(false)} fullWidth maxWidth="sm" fullScreen={esMovil}>
         <DialogTitle>Editar incidente</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
+          <ComboBuscable
+            label="Categoria"
+            required
+            value={idCategoria}
+            onChange={(v) => setIdCategoria(v as number | "")}
+            opciones={opcionesCategoriaIncidente(categorias)}
+          />
           <TextField size="small" required label="Titulo" value={titulo}
             onChange={(e) => setTitulo(e.target.value)} slotProps={{ htmlInput: { maxLength: 200 } }} />
           <TextField size="small" label="Descripcion" multiline minRows={2} value={descripcion}
@@ -259,7 +302,8 @@ function BotonEditar({ incidente, alExito, alError }: {
         </DialogContent>
         <DialogActions>
           <Button color="error" onClick={() => setAbierto(false)}>Cancelar</Button>
-          <Button variant="contained" disabled={enviando || titulo.trim().length === 0} onClick={() => void guardar()}>
+          <Button variant="contained" disabled={enviando || titulo.trim().length === 0 || idCategoria === ""}
+            onClick={() => void guardar()}>
             Guardar
           </Button>
         </DialogActions>
@@ -277,6 +321,7 @@ function BotonSeveridad({ idIncidente, folio, idSeveridadActual, severidades, al
   const [idSeveridad, setIdSeveridad] = useState<number | "">(idSeveridadActual);
   const [motivo, setMotivo] = useState("");
   const [enviando, setEnviando] = useState(false);
+  const esMovil = useEsMovil();
 
   const cambiar = async () => {
     if (idSeveridad === "" || motivo.trim().length === 0) return;
@@ -294,10 +339,10 @@ function BotonSeveridad({ idIncidente, folio, idSeveridadActual, severidades, al
 
   return (
     <>
-      <Button size="small" onClick={() => { setIdSeveridad(idSeveridadActual); setMotivo(""); setAbierto(true); }}>
+      <Button size={esMovil ? "medium" : "small"} onClick={() => { setIdSeveridad(idSeveridadActual); setMotivo(""); setAbierto(true); }}>
         Cambiar severidad
       </Button>
-      <Dialog open={abierto} onClose={() => setAbierto(false)} fullWidth maxWidth="xs">
+      <Dialog open={abierto} onClose={() => setAbierto(false)} fullWidth maxWidth="xs" fullScreen={esMovil}>
         <DialogTitle>Cambiar severidad de {folio}</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
           <ComboBuscable
@@ -332,6 +377,7 @@ function BotonCorrectivo({ idIncidente, folio, prioridades, usuarios, alExito, a
   const [idAsignado, setIdAsignado] = useState<number | "">("");
   const [fechaCompromiso, setFechaCompromiso] = useState("");
   const [enviando, setEnviando] = useState(false);
+  const esMovil = useEsMovil();
 
   const vincular = async () => {
     if (idPrioridad === "") return;
@@ -353,10 +399,10 @@ function BotonCorrectivo({ idIncidente, folio, prioridades, usuarios, alExito, a
 
   return (
     <>
-      <Button size="small" onClick={() => { setIdPrioridad(""); setIdAsignado(""); setFechaCompromiso(""); setAbierto(true); }}>
+      <Button size={esMovil ? "medium" : "small"} onClick={() => { setIdPrioridad(""); setIdAsignado(""); setFechaCompromiso(""); setAbierto(true); }}>
         Vincular correctivo
       </Button>
-      <Dialog open={abierto} onClose={() => setAbierto(false)} fullWidth maxWidth="xs">
+      <Dialog open={abierto} onClose={() => setAbierto(false)} fullWidth maxWidth="xs" fullScreen={esMovil}>
         <DialogTitle>Vincular correctivo a {folio}</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
           <ComboBuscable
@@ -397,6 +443,7 @@ function BotonReleaseCausante({ idIncidente, folio, releases, alExito, alError }
   const [abierto, setAbierto] = useState(false);
   const [idRelease, setIdRelease] = useState<number | "">("");
   const [enviando, setEnviando] = useState(false);
+  const esMovil = useEsMovil();
 
   const vincular = async () => {
     if (idRelease === "") return;
@@ -414,8 +461,8 @@ function BotonReleaseCausante({ idIncidente, folio, releases, alExito, alError }
 
   return (
     <>
-      <Button size="small" onClick={() => { setIdRelease(""); setAbierto(true); }}>Vincular release causante</Button>
-      <Dialog open={abierto} onClose={() => setAbierto(false)} fullWidth maxWidth="xs">
+      <Button size={esMovil ? "medium" : "small"} onClick={() => { setIdRelease(""); setAbierto(true); }}>Vincular release causante</Button>
+      <Dialog open={abierto} onClose={() => setAbierto(false)} fullWidth maxWidth="xs" fullScreen={esMovil}>
         <DialogTitle>Vincular release causante a {folio}</DialogTitle>
         <DialogContent sx={{ pt: "12px !important" }}>
           <ComboBuscable

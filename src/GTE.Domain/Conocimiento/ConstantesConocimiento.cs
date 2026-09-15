@@ -8,6 +8,13 @@ public static class PermisosConocimiento
     /// P23 esta marcada como "Todos" en el Documento Maestro (seccion 5.1).
     /// </summary>
     public const string Administrar = "CON.Administrar";
+
+    /// <summary>
+    /// Dar de baja articulos. Separado de Administrar a proposito: un articulo es memoria
+    /// acumulada del equipo y su baja no se deshace desde la interfaz, asi que redactar
+    /// no deberia alcanzar para borrar lo que escribieron los demas.
+    /// </summary>
+    public const string Eliminar = "CON.Eliminar";
 }
 
 /// <summary>Reglas y contratos del modulo Base de conocimiento.</summary>

@@ -16,6 +16,12 @@ public class RevisionCorregirRequest
     /// <summary>true = marcar corregido; false = reabrir (exige permiso REV.Reabrir).</summary>
     public bool Corregido { get; set; } = true;
 
-    /// <summary>Motivo obligatorio al reabrir.</summary>
+    /// <summary>Motivo obligatorio al reabrir y al descartar.</summary>
     public string? Motivo { get; set; }
+
+    /// <summary>
+    /// true = el hallazgo se cierra como "No es un error" en vez de como corregido.
+    /// Exige REV.Descartar y motivo capturado. Solo aplica junto con Corregido = true.
+    /// </summary>
+    public bool EsFalsoPositivo { get; set; }
 }

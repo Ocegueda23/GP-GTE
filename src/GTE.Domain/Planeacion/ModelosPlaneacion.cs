@@ -1,11 +1,11 @@
 namespace GTE.Domain.Planeacion;
 
 public record SprintNuevo(
-    int IdEquipo,
     string Nombre,
     string? Objetivo,
     DateOnly FechaInicio,
-    DateOnly FechaFin);
+    DateOnly FechaFin,
+    int? IdLider);
 
 public record SprintEdicion(
     string Nombre,
@@ -15,7 +15,7 @@ public record SprintEdicion(
 
 public record EstadoSprint(
     int IdSprint,
-    int IdEquipo,
+    int? IdLider,
     string Nombre,
     int IdEstatus,
     DateOnly FechaInicio,
@@ -45,6 +45,8 @@ public record ColumnaTablero(
 /// verdad: lo usa PlaneacionRepository para aprovisionar el tablero de un equipo nuevo y
 /// PlaneacionQueryService para la vista consolidada "todos los equipos" (que no tiene un
 /// TblTablero propio del que leer columnas).
+/// Suspendido va entre Correccion y Terminado: no es una etapa del flujo, es el apartado
+/// donde se ven los elementos detenidos (sin columna propia desaparecian del tablero).
 /// </summary>
 public static class ColumnasTableroEstandar
 {
@@ -54,6 +56,7 @@ public static class ColumnasTableroEstandar
         ("En proceso", WorkItems.EstatusWorkItem.EnProceso,  2, 5),
         ("En pruebas", WorkItems.EstatusWorkItem.EnPruebas,  3, 5),
         ("Correccion", WorkItems.EstatusWorkItem.Correccion, 4, null),
-        ("Terminado",  WorkItems.EstatusWorkItem.Terminado,  5, null)
+        ("Suspendido", WorkItems.EstatusWorkItem.Suspendido, 5, null),
+        ("Terminado",  WorkItems.EstatusWorkItem.Terminado,  6, null)
     ];
 }

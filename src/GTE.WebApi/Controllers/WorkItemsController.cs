@@ -32,12 +32,30 @@ public class WorkItemsController(IMediator mediator) : ControllerBase
         [FromQuery] bool soloVencidas = false,
         [FromQuery] string? ordenarPor = null,
         [FromQuery] bool ordenDescendente = false,
+        [FromQuery] int? idSprint = null,
         CancellationToken cancellationToken = default)
     {
         var filtro = new FiltroBandeja(
-            page, pageSize, estatus, idProyecto, idAsignado, idTipo, texto, soloVencidas, ordenarPor, ordenDescendente);
+            page, pageSize, estatus, idProyecto, idAsignado, idTipo, texto, soloVencidas, ordenarPor, ordenDescendente,
+            idSprint);
         var resultado = await mediator.Send(new ObtenerBandejaQuery(filtro), cancellationToken);
         return Ok(ApiResponse<PagedResult<BandejaItemResponse>>.Exito(resultado));
+    }
+
+    /// <summary>
+    /// Presupuesto que quedaria congelado con esa complejidad (y el nivel del asignado, si
+    /// se indica). Solo vista previa para las pantallas de alta/edicion: el valor real lo
+    /// calcula el backend al guardar (RN-GTE-015).
+    /// </summary>
+    [HttpGet("presupuesto")]
+    public async Task<ActionResult<ApiResponse<PresupuestoEstimadoResponse>>> ObtenerPresupuesto(
+        [FromQuery] int idComplejidad,
+        [FromQuery] int? idAsignado,
+        CancellationToken cancellationToken)
+    {
+        var resultado = await mediator.Send(
+            new ObtenerPresupuestoEstimadoQuery(idComplejidad, idAsignado), cancellationToken);
+        return Ok(ApiResponse<PresupuestoEstimadoResponse>.Exito(resultado));
     }
 
     [HttpGet("{folio}")]

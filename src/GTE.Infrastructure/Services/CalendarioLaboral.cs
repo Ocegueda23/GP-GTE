@@ -79,4 +79,54 @@ public class CalendarioLaboral(FabricaContexto fabrica) : ICalendarioLaboral
 
         return (tramos, festivos.ToHashSet());
     }
+
+    /// <summary>
+    /// Version por lotes: una sola conexion, y por cada horario distinto una sola carga de
+    /// tramos y festivos. El calculo se hace con CalculadoraCalendario (dominio), cuyo contrato
+    /// se verifica con los mismos vectores de prueba que dbo.fnMinutosLaborales.
+    /// </summary>
+    public async Task<IReadOnlyDictionary<int, int>> CalcularMinutosLaboralesLoteAsync(
+        IReadOnlyList<TramoLaborableSolicitado> solicitudes,
+        CancellationToken cancellationToken = default)
+    {
+        var resultado = new Dictionary<int, int>();
+        if (solicitudes.Count == 0)
+        {
+            return resultado;
+        }
+
+        await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
+
+        foreach (var grupo in solicitudes.GroupBy(s => s.IdHorario))
+        {
+            var tramos = await contexto.TblHorarioTramo.AsNoTracking()
+                .Where(t => t.IdHorario == grupo.Key)
+                .Select(t => new TramoHorario(t.DiaSemana, t.HoraInicio, t.HoraFin))
+                .ToListAsync(cancellationToken);
+
+            if (tramos.Count == 0)
+            {
+                continue;
+            }
+
+            var desde = DateOnly.FromDateTime(grupo.Min(s => s.Inicio));
+            var hasta = DateOnly.FromDateTime(grupo.Max(s => s.Fin));
+
+            var festivos = (await contexto.TblDiaFestivo.AsNoTracking()
+                .Where(f => f.Activo
+                            && (f.IdHorario == null || f.IdHorario == grupo.Key)
+                            && f.Fecha >= desde && f.Fecha <= hasta)
+                .Select(f => f.Fecha)
+                .ToListAsync(cancellationToken))
+                .ToHashSet();
+
+            foreach (var solicitud in grupo)
+            {
+                resultado[solicitud.Clave] = CalculadoraCalendario.CalcularMinutosLaborales(
+                    solicitud.Inicio, solicitud.Fin, tramos, festivos);
+            }
+        }
+
+        return resultado;
+    }
 }

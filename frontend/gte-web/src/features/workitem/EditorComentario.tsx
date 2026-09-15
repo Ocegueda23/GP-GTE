@@ -193,6 +193,14 @@ export function EditorComentario({
       <Box sx={{
         border: "1px solid", borderColor: "divider", borderRadius: 1, p: 1, minHeight: 80,
         "& .editor-comentario": { outline: "none" },
+        // Los <p> del editor traian el margen vertical por default del navegador (1em
+        // arriba y abajo), asi que dos renglones de un comentario se veian separados por
+        // un espacio en blanco enorme. Se aprieta el interlineado y solo se deja aire
+        // entre parrafos, no alrededor de cada uno.
+        "& .editor-comentario p": { margin: 0, lineHeight: 1.45 },
+        "& .editor-comentario p + p": { marginTop: "0.4em" },
+        "& .editor-comentario ul, & .editor-comentario ol": { margin: "0.2em 0", paddingLeft: "1.4em" },
+        "& .editor-comentario li p": { margin: 0 },
         "& .editor-comentario p.is-editor-empty:first-of-type::before": {
           content: "attr(data-placeholder)", color: "text.disabled", float: "left", height: 0, pointerEvents: "none",
         },
