@@ -17,6 +17,10 @@ public partial class TblReleaseRespaldo
 
     public string UsuarioRegistro { get; set; } = null!;
 
+    public string? UsuarioMovto { get; set; }
+
+    public DateTime? FechaMovto { get; set; }
+
     public bool Activo { get; set; }
 
     public virtual TblRelease IdReleaseNavigation { get; set; } = null!;

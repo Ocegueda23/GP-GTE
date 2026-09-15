@@ -1,10 +1,12 @@
 import { useState } from "react";
 import {
   Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
-  Grid, LinearProgress, Paper, Snackbar, Stack, Table, TableBody,
-  TableCell, TableContainer, TableHead, TableRow, TextField, Typography,
+  Grid, IconButton, LinearProgress, Paper, Snackbar, Stack, Table, TableBody,
+  TableCell, TableContainer, TableHead, TableRow, TextField, Tooltip, Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlineOutlined";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
 import { ComboBuscable } from "../../shared/components/ComboBuscable";
@@ -245,8 +247,16 @@ function SeccionTarifas({ tarifas, niveles, puedeGestionar, alExito, alError }: 
                 <TableCell>{t.vigenciaDesde}</TableCell>
                 {puedeGestionar && (
                   <TableCell align="right">
-                    <Button size="small" onClick={() => abrirEditar(t)}>Editar</Button>
-                    <Button size="small" color="error" onClick={() => void retirar(t.idTarifaNivel)}>Retirar</Button>
+                    <Tooltip title="Editar tarifa">
+                      <IconButton size="small" onClick={() => abrirEditar(t)}>
+                        <EditOutlinedIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Retirar tarifa">
+                      <IconButton size="small" color="error" onClick={() => void retirar(t.idTarifaNivel)}>
+                        <DeleteOutlineIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
                   </TableCell>
                 )}
               </TableRow>
@@ -363,8 +373,16 @@ function SeccionPresupuesto({ idProyecto, anio, presupuestos, puedeGestionar, al
                 <TableCell align="right">{p.horasAutorizadas}</TableCell>
                 {puedeGestionar && (
                   <TableCell align="right">
-                    <Button size="small" onClick={() => abrirEditar(p)}>Editar</Button>
-                    <Button size="small" color="error" onClick={() => void retirar(p.idPresupuestoProyecto)}>Retirar</Button>
+                    <Tooltip title="Editar presupuesto">
+                      <IconButton size="small" onClick={() => abrirEditar(p)}>
+                        <EditOutlinedIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Retirar presupuesto">
+                      <IconButton size="small" color="error" onClick={() => void retirar(p.idPresupuestoProyecto)}>
+                        <DeleteOutlineIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
                   </TableCell>
                 )}
               </TableRow>

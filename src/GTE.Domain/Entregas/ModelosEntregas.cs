@@ -18,7 +18,25 @@ public record ArtefactoNuevo(
     int? OrdenEjecucion,
     int? IdArtefactoRollback,
     string? JustificacionIrreversible,
-    string? InstruccionesImplementacion);
+    string? InstruccionesImplementacion,
+    string? VersionArtefacto);
+
+/// <summary>
+/// Cambios a un artefacto ya registrado en el release. Solo se admite mientras el release
+/// sigue En Preparacion: despues la Solicitud de despliegue ya se mando a firmar y el
+/// contenido de la entrega queda congelado.
+/// </summary>
+public record ArtefactoEditar(
+    int IdRelease,
+    int IdArtefacto,
+    string Nombre,
+    int IdTipoArtefacto,
+    string? HashSha256,
+    int? OrdenEjecucion,
+    int? IdArtefactoRollback,
+    string? JustificacionIrreversible,
+    string? InstruccionesImplementacion,
+    string? VersionArtefacto);
 
 /// <summary>Artefacto del release con su pareja de rollback, para validar RN-GTE-032.</summary>
 public record ArtefactoRelease(
@@ -29,7 +47,8 @@ public record ArtefactoRelease(
     int? OrdenEjecucion,
     int? IdArtefactoRollback,
     string? JustificacionIrreversible,
-    string? InstruccionesImplementacion);
+    string? InstruccionesImplementacion,
+    string? VersionArtefacto);
 
 /// <summary>
 /// Respaldo que se tiene que tomar antes de desplegar: la base de datos, el servicio, el
@@ -37,6 +56,9 @@ public record ArtefactoRelease(
 /// gate de aprobacion exige al menos uno (ver ValidarListoParaAprobacionAsync).
 /// </summary>
 public record RespaldoNuevo(int IdRelease, int IdTipoRespaldo, string Descripcion);
+
+/// <summary>Cambios a un respaldo ya registrado; igual que los artefactos, solo En Preparacion.</summary>
+public record RespaldoEditar(int IdRelease, int IdReleaseRespaldo, int IdTipoRespaldo, string Descripcion);
 
 public record RespaldoRelease(
     int IdReleaseRespaldo,

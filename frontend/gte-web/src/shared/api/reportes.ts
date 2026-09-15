@@ -358,3 +358,130 @@ export async function obtenerReporteAuditoria(filtro: {
 }) {
   return obtener<ResultadoPaginado<AuditoriaItem>>("/api/v1/reportes/auditoria", armarParams(filtro));
 }
+
+// ---------- R15 Detalle de actividades terminadas ----------
+export interface ActividadTerminada {
+  idWorkItem: number;
+  folio: string;
+  tipo: string;
+  titulo: string;
+  descripcion: string | null;
+  proyecto: string;
+  equipo: string | null;
+  asignado: string | null;
+  prioridad: string;
+  sprint: string | null;
+  release: string | null;
+  /** Reloj del estatus: minutos habiles en En Proceso (no lo que la persona capturo). */
+  minutosInvertidos: number;
+  /** Reloj declarado: lo capturado a mano en registros de tiempo. */
+  minutosRegistrados: number;
+  /** Registrado menos en proceso. Negativo = se capturo de menos. */
+  diferenciaMinutos: number;
+  fechaCreacion: string;
+  fechaInicio: string | null;
+  fechaFin: string | null;
+  fechaCompromiso: string | null;
+  diasNaturalesResolucion: number | null;
+  minutosLaboralesResolucion: number | null;
+  diasNaturalesEspera: number | null;
+  minutosLaboralesEspera: number | null;
+  entregadoATiempo: boolean | null;
+}
+
+export interface ActividadesTerminadasTotales {
+  items: number;
+  minutosInvertidos: number;
+  minutosRegistrados: number;
+  diferenciaMinutos: number;
+  /** Cuantos items del periodo traen al menos un registro de tiempo capturado. */
+  itemsConRegistro: number;
+  promedioDiasNaturalesResolucion: number | null;
+  promedioMinutosLaboralesResolucion: number | null;
+  promedioDiasNaturalesEspera: number | null;
+  promedioMinutosLaboralesEspera: number | null;
+  porcentajeATiempo: number | null;
+}
+
+export interface TicketTerminado {
+  idTicket: number;
+  folio: string | null;
+  categoria: string | null;
+  titulo: string;
+  descripcion: string | null;
+  prioridad: string;
+  estatus: string;
+  solicitante: string;
+  asignado: string | null;
+  minutosEnAtencion: number;
+  fechaCreacion: string;
+  fechaPrimeraRespuesta: string | null;
+  fechaResolucion: string | null;
+  diasNaturalesEspera: number | null;
+  diasNaturalesResolucion: number | null;
+  minutosLaboralesResolucion: number | null;
+  dentroDeSla: boolean | null;
+}
+
+export interface IncidenteTerminado {
+  idIncidente: number;
+  folio: string | null;
+  severidad: string;
+  titulo: string;
+  descripcion: string | null;
+  proyecto: string;
+  estatus: string;
+  causaRaiz: string | null;
+  minutosEnAtencion: number;
+  /** Indisponibilidad del servicio: es impacto, no esfuerzo. */
+  minutosIndisponibilidad: number | null;
+  fechaOcurrencia: string;
+  fechaDeteccion: string | null;
+  fechaResolucion: string | null;
+  diasNaturalesDeteccion: number | null;
+  diasNaturalesResolucion: number | null;
+}
+
+export interface TicketsTerminadosTotales {
+  items: number;
+  minutosEnAtencion: number;
+  promedioDiasNaturalesResolucion: number | null;
+  porcentajeDentroDeSla: number | null;
+}
+
+export interface IncidentesTerminadosTotales {
+  items: number;
+  minutosEnAtencion: number;
+  minutosIndisponibilidad: number;
+  promedioDiasNaturalesResolucion: number | null;
+}
+
+export interface ActividadesTerminadasReporte {
+  desde: string;
+  hasta: string;
+  items: ActividadTerminada[];
+  totales: ActividadesTerminadasTotales;
+  truncado: boolean;
+  tickets: TicketTerminado[];
+  totalesTickets: TicketsTerminadosTotales;
+  incidentes: IncidenteTerminado[];
+  totalesIncidentes: IncidentesTerminadosTotales;
+  /** Filtros que esa sección no puede honrar (equipo/proyecto/asignado según la entidad). */
+  avisosTickets: string[];
+  avisosIncidentes: string[];
+}
+
+export interface FiltroActividadesTerminadas {
+  desde: string;
+  hasta: string;
+  idEquipo: number | null;
+  idAsignado: number | null;
+  idProyecto: number | null;
+  idTipoWorkItem: number | null;
+  folio: string | null;
+}
+
+export async function obtenerReporteActividadesTerminadas(filtro: FiltroActividadesTerminadas) {
+  return obtener<ActividadesTerminadasReporte>(
+    "/api/v1/reportes/actividades-terminadas", armarParams({ ...filtro }));
+}

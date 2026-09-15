@@ -55,7 +55,8 @@ public class TicketRepository(FabricaContexto fabrica, AuditContext auditoria)
             .Where(t => t.IdTicket == idTicket)
             .Select(t => new EstadoTicket(
                 t.IdTicket, t.Folio, t.IdEstatusTicket, t.IdSolicitante, t.IdAsignado,
-                t.IdWorkItemDerivado, t.Titulo, t.Descripcion, t.IdPrioridad, t.Activo))
+                t.IdWorkItemDerivado, t.Titulo, t.Descripcion, t.IdPrioridad, t.Activo,
+                t.IdSlaNavigation != null ? (int?)t.IdSlaNavigation.IdHorario : null))
             .FirstOrDefaultAsync(cancellationToken);
     }
 

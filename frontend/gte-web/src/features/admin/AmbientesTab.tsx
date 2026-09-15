@@ -1,10 +1,11 @@
 import { useState } from "react";
 import {
   Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle,
-  LinearProgress, Paper, Snackbar, Stack, Table, TableBody,
-  TableCell, TableHead, TableRow, TextField, Typography,
+  IconButton, LinearProgress, Paper, Snackbar, Stack, Table, TableBody,
+  TableCell, TableHead, TableRow, TextField, Tooltip, Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
 import { ComboBuscable } from "../../shared/components/ComboBuscable";
@@ -118,7 +119,11 @@ export function AmbientesTab() {
                 <TableCell>{a.baseDatos ?? "-"}</TableCell>
                 <TableCell>{a.responsable ?? "-"}</TableCell>
                 <TableCell>
-                  <Button size="small" color="error" onClick={() => void retirar(a.idAmbiente)}>Retirar</Button>
+                  <Tooltip title="Retirar ambiente">
+                    <IconButton size="small" color="error" onClick={() => void retirar(a.idAmbiente)}>
+                      <DeleteOutlineIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
                 </TableCell>
               </TableRow>
             ))}

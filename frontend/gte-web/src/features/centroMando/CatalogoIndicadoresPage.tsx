@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Alert, Box, Button, Checkbox, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
-  FormControlLabel, LinearProgress, Paper, Stack, Table, TableBody, TableCell,
-  TableContainer, TableHead, TableRow, TextField, Typography,
+  FormControlLabel, IconButton, LinearProgress, Paper, Stack, Table, TableBody, TableCell,
+  TableContainer, TableHead, TableRow, TextField, Tooltip, Typography,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
@@ -261,9 +261,11 @@ export function CatalogoIndicadoresPage() {
                         label={indicador.activo ? "Activo" : "Baja"} />
                     </TableCell>
                     <TableCell align="right">
-                      <Button size="small" startIcon={<EditIcon />} onClick={() => setEnEdicion(indicador)}>
-                        Editar
-                      </Button>
+                      <Tooltip title="Editar indicador">
+                        <IconButton size="small" onClick={() => setEnEdicion(indicador)}>
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
                     </TableCell>
                   </TableRow>
                 ))}

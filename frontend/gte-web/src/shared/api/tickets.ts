@@ -20,6 +20,10 @@ export interface Ticket {
   fechaResolucion: string | null;
   solucion: string | null;
   minutosSolucion: number | null;
+  /** Tiempo de atencion medido por el sistema: minutos laborables En Atencion. Null si no ha iniciado. */
+  minutosAtencion: number | null;
+  /** true mientras el ticket siga En Atencion: minutosAtencion sigue creciendo. */
+  atencionEnCurso: boolean;
   usuarioSolicitante: string | null;
   locacion: string | null;
   idWorkItemDerivado: number | null;
@@ -41,7 +45,7 @@ export interface NuevoTicket {
 export interface FiltroBandejaTickets {
   page: number;
   pageSize: number;
-  estatus: number[]; // vacio = abiertos (todos menos Cerrado); [-1] = todos
+  estatus: number[]; // vacio = abiertos (todos menos Cerrado); [-1] = todos (default de la UI)
   texto: string;
   idAsignado: number | null;
   ordenarPor: string | null;
@@ -51,7 +55,7 @@ export interface FiltroBandejaTickets {
 export const filtroBandejaTicketsInicial: FiltroBandejaTickets = {
   page: 1,
   pageSize: 25,
-  estatus: [],
+  estatus: [-1],
   texto: "",
   idAsignado: null,
   ordenarPor: null,

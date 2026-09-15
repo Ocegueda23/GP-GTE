@@ -4,8 +4,13 @@ namespace GTE.Application.Interfaces;
 
 public interface IEntregaQueryService
 {
+    /// <summary>
+    /// Listado de releases con los filtros de la bandeja (proyecto, estatus y lider
+    /// asignado). Un idEstatus explicito manda sobre soloAbiertos.
+    /// </summary>
     Task<IReadOnlyList<ReleaseResponse>> ObtenerReleasesAsync(
-        int? idProyecto, bool soloAbiertos, CancellationToken cancellationToken = default);
+        int? idProyecto, bool soloAbiertos, int? idEstatus = null, int? idLiderAsignado = null,
+        CancellationToken cancellationToken = default);
 
     Task<ReleaseDetalleResponse?> ObtenerDetalleAsync(int idRelease, CancellationToken cancellationToken = default);
 

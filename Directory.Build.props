@@ -12,9 +12,15 @@
     De aqui la toman los tres consumidores: el ensamblado de la API (y con el
     GET /api/v1/version), el bundle del frontend (publicar.bat la pasa como
     VITE_VERSION) y el instalador.
+
+    Las notas de lo que se libera en cada version NO van aqui: publicar.bat lee este
+    archivo como XML, y lo rompe cualquier texto suelto fuera de las etiquetas o un
+    comentario que contenga dos guiones seguidos (que es como se escriben las
+    vinetas). Van en Doctos/NOTAS-VERSION.md, que es lo que la aplicacion le muestra
+    al usuario.
   -->
   <PropertyGroup>
-    <Version>1.17.0.0</Version>
+    <Version>1.25.0.0</Version>
   </PropertyGroup>
 
 </Project>

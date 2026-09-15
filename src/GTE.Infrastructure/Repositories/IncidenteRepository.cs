@@ -19,6 +19,7 @@ public class IncidenteRepository(FabricaContexto fabrica, AuditContext auditoria
             Folio = datos.Folio,
             IdProyecto = datos.IdProyecto,
             IdSeveridad = datos.IdSeveridad,
+            IdCategoriaIncidente = datos.IdCategoriaIncidente,
             IdEstatusIncidente = EstatusIncidente.Detectado,   // el estatus inicial lo fija el backend
             Titulo = datos.Titulo,
             Descripcion = datos.Descripcion,
@@ -78,6 +79,7 @@ public class IncidenteRepository(FabricaContexto fabrica, AuditContext auditoria
             .FirstOrDefaultAsync(i => i.IdIncidente == idIncidente, cancellationToken)
             ?? throw new InvalidOperationException($"Incidente {idIncidente} no existe.");
 
+        entidad.IdCategoriaIncidente = datos.IdCategoriaIncidente;
         entidad.Titulo = datos.Titulo;
         entidad.Descripcion = datos.Descripcion;
         entidad.CausaRaiz = datos.CausaRaiz;

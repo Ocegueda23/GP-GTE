@@ -88,14 +88,14 @@ export function PanelComentarios({ idWorkItem, idTicket, alError }: Props) {
       && dominioActual.toLowerCase() === comentario.usuarioRegistro.toLowerCase();
 
     return (
-      <Box sx={{ ml: esRespuesta ? 3 : 0, py: 1, borderTop: "1px solid", borderColor: "divider" }}>
+      <Box sx={{ ml: esRespuesta ? 3 : 0, py: 0.5, borderTop: "1px solid", borderColor: "divider" }}>
         <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "flex-start" }}>
           <Box sx={{ minWidth: 0 }}>
             <Typography variant="caption" sx={{ fontWeight: 700 }}>{comentario.autor}</Typography>
             <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
               {formatearFecha(comentario.fechaRegistro)}
             </Typography>
-            <Box sx={{ mt: 0.5 }}>
+            <Box sx={{ mt: 0.25 }}>
               {/* El HTML ya viene sanitizado por el backend (ISanitizadorHtml); nunca se confia en HTML sin sanear. */}
               <ContenidoEnriquecido html={comentario.contenido} />
             </Box>

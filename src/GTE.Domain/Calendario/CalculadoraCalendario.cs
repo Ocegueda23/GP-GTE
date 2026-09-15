@@ -9,6 +9,13 @@ namespace GTE.Domain.Calendario;
 public record TramoHorario(byte DiaSemana, TimeOnly HoraInicio, TimeOnly HoraFin);
 
 /// <summary>
+/// Un intervalo a medir contra un horario. Existe para poder pedir muchos de golpe
+/// (ICalendarioLaboral.CalcularMinutosLaboralesLoteAsync) sin una ida a la base por cada
+/// renglon de una bandeja.
+/// </summary>
+public record RangoLaboral(DateTime Inicio, DateTime Fin, int IdHorario);
+
+/// <summary>
 /// Logica pura de calendario laboral (sin EF). Implementa el MISMO contrato que
 /// dbo.fnMinutosLaborales; el paquete de pruebas comparte los vectores validados
 /// contra SQL para garantizar paridad entre ambos motores.

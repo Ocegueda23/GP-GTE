@@ -9,4 +9,7 @@ public class WorkItemActualizarRequest
     public int? IdComplejidad { get; set; }
     public int? IdAsignado { get; set; }
     public DateTime? FechaCompromiso { get; set; }
+
+    /// <summary>Sprint al que se compromete el elemento; null = queda en el backlog.</summary>
+    public int? IdSprint { get; set; }
 }

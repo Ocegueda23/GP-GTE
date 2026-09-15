@@ -6,6 +6,7 @@ import {
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import { useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
+import { useEsMovil } from "../../shared/hooks/useEsMovil";
 import { useSesion } from "../../shared/api/sesion";
 import {
   cambiarEstatus, obtenerAcciones, obtenerWorkItem,
@@ -48,6 +49,7 @@ export function MenuAcciones({ item, catalogos, alExito, alError }: Props) {
   const clienteQuery = useQueryClient();
   const sesion = useSesion((estado) => estado.sesion);
   const puede = useSesion((estado) => estado.puede);
+  const esMovil = useEsMovil();
 
   // RN-GTE-012: solo el propio asignado modifica un elemento; sin asignar tambien
   // cuenta como ajeno (decision del equipo 2026-08-02). El backend revalida igual.
@@ -125,7 +127,14 @@ export function MenuAcciones({ item, catalogos, alExito, alError }: Props) {
 
   return (
     <>
-      <IconButton size="small" onClick={abrirMenu} aria-label={`Acciones de ${item.folio}`}>
+      {/* En la tarjeta de movil el icono se lleva a 44 px, el area tocable minima:
+          "small" lo deja en 30 y ni "medium" con un icono chico pasa de 35. */}
+      <IconButton
+        size={esMovil ? "medium" : "small"}
+        sx={esMovil ? { width: 44, height: 44 } : undefined}
+        onClick={abrirMenu}
+        aria-label={`Acciones de ${item.folio}`}
+      >
         {cargando || cargandoCopia ? <CircularProgress size={18} /> : <MoreVertIcon fontSize="small" />}
       </IconButton>
 
@@ -158,7 +167,7 @@ export function MenuAcciones({ item, catalogos, alExito, alError }: Props) {
         )}
       </Menu>
 
-      <Dialog open={accionConMotivo !== null} onClose={() => setAccionConMotivo(null)} fullWidth>
+      <Dialog open={accionConMotivo !== null} onClose={() => setAccionConMotivo(null)} fullWidth fullScreen={esMovil}>
         <DialogTitle>{accionConMotivo?.etiqueta} - {item.folio}</DialogTitle>
         <DialogContent>
           <TextField

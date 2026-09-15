@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using GTE.Domain.Operacion;
+using GTE.Domain.WorkItems;
 using GTE.Infrastructure.Modelos.bdsGTE;
 using GTE.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -388,7 +390,11 @@ public class WorkItemsApiTests(WebApplicationFactory<Program> fabricaApp)
 
             // Cualquiera puede REPORTAR el hallazgo (rol de revisor, sin gate a proposito)
             var respuestaHallazgo = await clienteOtro.PostAsJsonAsync(
-                $"/api/v1/workitems/{idItem}/revisiones", new { comentarios = "Hallazgo E2E" });
+                // S3 (no bloqueante) a proposito: esta prueba mide PERMISOS, no la reapertura
+                // por severidad. IdSeveridad es obligatorio desde que la severidad decide que
+                // hallazgo bloquea (RN-GTE-027).
+                $"/api/v1/workitems/{idItem}/revisiones",
+                new { comentarios = "Hallazgo E2E", idSeveridad = Severidad.S3Media });
             respuestaHallazgo.EnsureSuccessStatusCode();
             var hallazgo = await respuestaHallazgo.Content.ReadFromJsonAsync<Envelope<JsonElement>>(OpcionesJson);
             var idRevision = hallazgo!.Response.GetProperty("idRevision").GetInt32();
@@ -490,7 +496,9 @@ public class WorkItemsApiTests(WebApplicationFactory<Program> fabricaApp)
 
             var respuestaAutoaprobacion = await clienteQa.PutAsJsonAsync(
                 $"/api/v1/workitems/{idItemA}/estatus", new { accion = "TERMINAR" });
-            Assert.Equal(HttpStatusCode.BadRequest, respuestaAutoaprobacion.StatusCode);
+            // 403 y no 400: desde WI.AprobarPropio (2026-08-28) la autoaprobacion es una regla
+            // levantable por permiso, asi que lo que falta es acceso, no un dato del payload.
+            Assert.Equal(HttpStatusCode.Forbidden, respuestaAutoaprobacion.StatusCode);
 
             // B. Permiso: un Desarrollador sin WI.AprobarPruebas no puede aprobar ni su propio item
             var itemB = await CrearItemAsync(clienteDev, idProyecto, idUsuarioDev, $"SinPermiso {sufijo}");
@@ -515,7 +523,9 @@ public class WorkItemsApiTests(WebApplicationFactory<Program> fabricaApp)
             Assert.Equal(HttpStatusCode.BadRequest, respuestaRechazoSinHallazgo.StatusCode);
 
             var respuestaHallazgo = await clienteQa.PostAsJsonAsync(
-                $"/api/v1/workitems/{idItemC}/revisiones", new { comentarios = "No cumple el criterio X" });
+                // S2 (bloqueante): el hallazgo tiene que ser de los que justifican el rechazo.
+                $"/api/v1/workitems/{idItemC}/revisiones",
+                new { comentarios = "No cumple el criterio X", idSeveridad = Severidad.S2Alta });
             respuestaHallazgo.EnsureSuccessStatusCode();
             var hallazgo = await respuestaHallazgo.Content.ReadFromJsonAsync<Envelope<JsonElement>>(OpcionesJson);
             idsRevisiones.Add(hallazgo!.Response.GetProperty("idRevision").GetInt32());
@@ -573,6 +583,122 @@ public class WorkItemsApiTests(WebApplicationFactory<Program> fabricaApp)
         contexto.TblUsuarioRol.RemoveRange(contexto.TblUsuarioRol.Where(ur => ur.IdUsuario == idUsuarioQa));
         contexto.TblUsuario.RemoveRange(contexto.TblUsuario.Where(u => u.IdUsuario == idUsuarioQa));
         await contexto.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// WI.AprobarPropio (2026-08-28): la regla de autoaprobacion se bloquea por defecto, pero
+    /// se puede levantar con permiso. Se verifica el par completo: SIN el permiso da 403, y CON
+    /// el permiso la misma persona ya puede aprobar sus propias pruebas.
+    /// </summary>
+    [Fact]
+    public async Task AprobarPropio_SoloConElPermisoSeLevantaLaAutoaprobacion()
+    {
+        if (!BaseDisponible())
+        {
+            return;
+        }
+
+        var fabricaDatos = CrearFabricaDatos();
+        var sufijo = Guid.NewGuid().ToString("N")[..6].ToUpperInvariant();
+        var clave = $"APR{sufijo}";
+        var dominio = $"apr-e2e-{sufijo}";
+
+        int idProyecto;
+        int idUsuario;
+        int idRolPropio;
+        await using (var contexto = fabricaDatos.ConectarContexto<DbContextGTE>())
+        {
+            // Categoria TI (2): esta prueba mide la autoaprobacion, no RN-GTE-030.
+            var proyecto = new TblProyecto
+            {
+                Clave = clave,
+                Nombre = $"Proyecto AprobarPropio {sufijo}",
+                IdCategoriaProyecto = 2,
+                IdEstatusProyecto = 3,
+                UsuarioRegistro = "e2e",
+                Activo = true
+            };
+            contexto.TblProyecto.Add(proyecto);
+
+            // Rol propio de la prueba, para no alterar los roles reales del sistema.
+            var rol = new TblRol { Nombre = $"RolAprobarPropio {sufijo}", UsuarioRegistro = "e2e", Activo = true };
+            contexto.TblRol.Add(rol);
+
+            var usuario = new TblUsuario
+            {
+                Dominio = dominio, Nombre = "AprobarPropio E2E", UsuarioRegistro = "e2e", Activo = true
+            };
+            contexto.TblUsuario.Add(usuario);
+            await contexto.SaveChangesAsync();
+
+            // Puede aprobar pruebas, pero todavia NO las propias.
+            var idsPermisos = await contexto.TblPermiso.AsNoTracking()
+                .Where(p => p.Clave == PermisosWorkItem.AprobarPruebas)
+                .Select(p => p.IdPermiso)
+                .ToListAsync();
+            foreach (var idPermiso in idsPermisos)
+            {
+                contexto.TblRolPermiso.Add(new TblRolPermiso
+                {
+                    IdRol = rol.IdRol, IdPermiso = idPermiso, UsuarioRegistro = "e2e"
+                });
+            }
+            contexto.TblUsuarioRol.Add(new TblUsuarioRol
+            {
+                IdUsuario = usuario.IdUsuario, IdRol = rol.IdRol, UsuarioRegistro = "e2e", Activo = true
+            });
+            await contexto.SaveChangesAsync();
+
+            idProyecto = proyecto.IdProyecto;
+            idUsuario = usuario.IdUsuario;
+            idRolPropio = rol.IdRol;
+        }
+
+        var cliente = await FabricaApiAutenticada.CrearClienteAsync(fabricaApp, dominio);
+        var idItem = 0;
+        try
+        {
+            var item = await CrearItemAsync(cliente, idProyecto, idUsuario, $"Propio {sufijo}");
+            idItem = item.GetProperty("idWorkItem").GetInt32();
+            await CambiarEstatusAsync(cliente, idItem, "INICIAR", "En Proceso");
+
+            await cliente.PostAsJsonAsync($"/api/v1/workitems/{idItem}/tiempo",
+                new { fecha = DateOnly.FromDateTime(DateTime.Today), minutos = 30, descripcion = "Avance" });
+            await CambiarEstatusAsync(cliente, idItem, "ENVIAR_PRUEBAS", "En Pruebas");
+
+            // SIN WI.AprobarPropio: es su propio elemento, se bloquea con 403.
+            var sinPermiso = await cliente.PutAsJsonAsync(
+                $"/api/v1/workitems/{idItem}/estatus", new { accion = "TERMINAR" });
+            Assert.Equal(HttpStatusCode.Forbidden, sinPermiso.StatusCode);
+
+            // Se concede el permiso al rol de la prueba.
+            await using (var contexto = fabricaDatos.ConectarContexto<DbContextGTE>())
+            {
+                var idPermisoPropio = await contexto.TblPermiso
+                    .Where(p => p.Clave == PermisosWorkItem.AprobarPropio)
+                    .Select(p => p.IdPermiso)
+                    .FirstAsync();
+                contexto.TblRolPermiso.Add(new TblRolPermiso
+                {
+                    IdRol = idRolPropio, IdPermiso = idPermisoPropio, UsuarioRegistro = "e2e"
+                });
+                await contexto.SaveChangesAsync();
+            }
+
+            // CON el permiso: la misma persona ya puede aprobar sus propias pruebas.
+            var clienteConPermiso = await FabricaApiAutenticada.CrearClienteAsync(fabricaApp, dominio);
+            await CambiarEstatusAsync(clienteConPermiso, idItem, "TERMINAR", "Terminado");
+        }
+        finally
+        {
+            await using var contexto = fabricaDatos.ConectarContexto<DbContextGTE>();
+            contexto.TblRolPermiso.RemoveRange(contexto.TblRolPermiso.Where(rp => rp.IdRol == idRolPropio));
+            contexto.TblUsuarioRol.RemoveRange(contexto.TblUsuarioRol.Where(ur => ur.IdRol == idRolPropio));
+            await contexto.SaveChangesAsync();
+            await LimpiarAsync(fabricaDatos, clave, idProyecto, [idItem], idUsuario);
+            contexto.TblRol.RemoveRange(contexto.TblRol.Where(r => r.IdRol == idRolPropio));
+            await contexto.SaveChangesAsync();
+        }
     }
 
     private static async Task<JsonElement> CrearItemAsync(

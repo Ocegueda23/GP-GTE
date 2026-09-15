@@ -4,6 +4,7 @@ public class IncidenteCrearRequest
 {
     public int IdProyecto { get; set; }
     public int IdSeveridad { get; set; }
+    public int IdCategoriaIncidente { get; set; }
     public string Titulo { get; set; } = string.Empty;
     public string? Descripcion { get; set; }
     public DateTime FechaOcurrencia { get; set; }
@@ -13,6 +14,11 @@ public class IncidenteCrearRequest
 /// <summary>Campos propios del incidente, fuera del flujo de estatus.</summary>
 public class IncidenteActualizarRequest
 {
+    /// <summary>
+    /// Obligatoria igual que en el alta: una vez capturada no se puede dejar en blanco.
+    /// Los incidentes registrados antes del catalogo la traen nula y la piden al editarse.
+    /// </summary>
+    public int IdCategoriaIncidente { get; set; }
     public string Titulo { get; set; } = string.Empty;
     public string? Descripcion { get; set; }
     public string? CausaRaiz { get; set; }

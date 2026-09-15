@@ -61,4 +61,13 @@ public interface IReportesQueryService
     Task<PagedResult<AuditoriaItemResponse>> ObtenerAuditoriaAsync(
         DateOnly? desde, DateOnly? hasta, string? usuario, string? entidad,
         int page, int pageSize, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// R15: detalle renglon por renglon de los work items Terminados en el rango (por FechaFin),
+    /// con tiempo invertido, tiempo de espera y tiempo de resolucion en dias naturales y en
+    /// tiempo habil del horario del asignado.
+    /// </summary>
+    Task<ActividadesTerminadasReporteResponse> ObtenerActividadesTerminadasAsync(
+        DateOnly desde, DateOnly hasta, int? idEquipo, int? idAsignado, int? idProyecto,
+        int? idTipoWorkItem, string? folio, CancellationToken cancellationToken = default);
 }

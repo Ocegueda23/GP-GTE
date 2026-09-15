@@ -20,6 +20,13 @@ public static class PermisosRevision
     /// <summary>Reabrir un hallazgo ya corregido: solo lider (regla heredada del GT).</summary>
     public const string Reabrir = "REV.Reabrir";
 
+    /// <summary>
+    /// Cerrar un hallazgo como "No es un error" (falso positivo). Mismo criterio que
+    /// Reabrir: si lo pudiera hacer cualquiera, el desarrollador cerraria sus propios
+    /// hallazgos declarandolos mala interpretacion del tester.
+    /// </summary>
+    public const string Descartar = "REV.Descartar";
+
     /// <summary>Cierre masivo de revisiones de un elemento.</summary>
     public const string Activar = "REV.Activar";
 }

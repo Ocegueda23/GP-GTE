@@ -94,6 +94,9 @@ export function PanelRevisiones({ idWorkItem, folio, alExito, alError }: Props) 
   const [archivosPendientes, setArchivosPendientes] = useState<File[]>([]);
   const inputArchivoRef = useRef<HTMLInputElement>(null);
   const [reabrir, setReabrir] = useState<Revision | null>(null);
+  /** Hallazgo que se esta cerrando como "No es un error"; la razon va en motivoDescarte. */
+  const [descartar, setDescartar] = useState<Revision | null>(null);
+  const [motivoDescarte, setMotivoDescarte] = useState("");
   const [motivo, setMotivo] = useState("");
   const [enviando, setEnviando] = useState(false);
   const clienteQuery = useQueryClient();
@@ -153,6 +156,26 @@ export function PanelRevisiones({ idWorkItem, folio, alExito, alError }: Props) 
     }
   };
 
+  const confirmarDescarte = async () => {
+    if (!descartar) return;
+    setEnviando(true);
+    try {
+      const { mensaje } = await corregirRevision(descartar.idRevision, {
+        corregido: true,
+        esFalsoPositivo: true,
+        motivo: motivoDescarte.trim(),
+      });
+      alExito(mensaje);
+      setDescartar(null);
+      setMotivoDescarte("");
+      await refrescar();
+    } catch (error) {
+      manejarError(error, "No se pudo marcar el hallazgo como falso positivo.");
+    } finally {
+      setEnviando(false);
+    }
+  };
+
   const confirmarReapertura = async () => {
     if (!reabrir) return;
     setEnviando(true);
@@ -205,8 +228,13 @@ export function PanelRevisiones({ idWorkItem, folio, alExito, alError }: Props) 
               primary={
                 <Stack spacing={0.5} sx={{ alignItems: "flex-start" }}>
                   <Stack direction="row" spacing={0.5} sx={{ flexWrap: "wrap" }}>
-                    <Chip size="small" color={revision.corregido ? "success" : "warning"}
-                      label={revision.corregido ? "Corregido" : "Pendiente"} />
+                    {/* Un hallazgo descartado tambien esta cerrado, pero no se arreglo
+                        nada: el chip lo distingue para no inflar los defectos corregidos. */}
+                    <Chip size="small"
+                      color={revision.esFalsoPositivo ? "info" : revision.corregido ? "success" : "warning"}
+                      label={revision.esFalsoPositivo
+                        ? "No es un error"
+                        : revision.corregido ? "Corregido" : "Pendiente"} />
                     {revision.severidad && (
                       <Chip size="small" color={revision.bloqueante ? "error" : "default"}
                         variant={revision.bloqueante ? "filled" : "outlined"}
@@ -217,6 +245,11 @@ export function PanelRevisiones({ idWorkItem, folio, alExito, alError }: Props) 
                     )}
                   </Stack>
                   <ContenidoEnriquecido html={revision.comentarios ?? ""} />
+                  {revision.motivoDescarte && (
+                    <Typography variant="caption" color="text.secondary">
+                      Razon del descarte: {revision.motivoDescarte}
+                    </Typography>
+                  )}
                   <AdjuntosRevision idRevision={revision.idRevision} alError={alError} />
                 </Stack>
               }
@@ -229,10 +262,15 @@ export function PanelRevisiones({ idWorkItem, folio, alExito, alError }: Props) 
                 Reabrir
               </Button>
             ) : (
-              <Button size="small" sx={{ flexShrink: 0 }}
-                onClick={() => void marcarCorregido(revision)}>
-                Marcar corregido
-              </Button>
+              <Stack direction="row" spacing={0.5} sx={{ flexShrink: 0 }}>
+                <Button size="small" onClick={() => void marcarCorregido(revision)}>
+                  Marcar corregido
+                </Button>
+                <Button size="small" color="info"
+                  onClick={() => { setDescartar(revision); setMotivoDescarte(""); }}>
+                  No es un error
+                </Button>
+              </Stack>
             )}
           </ListItem>
         ))}
@@ -286,6 +324,27 @@ export function PanelRevisiones({ idWorkItem, folio, alExito, alError }: Props) 
           <Button variant="contained" disabled={enviando || comentariosVacio || idSeveridad === ""}
             onClick={() => void reportar()}>
             Reportar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={descartar !== null} onClose={() => setDescartar(null)} fullWidth maxWidth="sm">
+        <DialogTitle>Marcar como "No es un error"</DialogTitle>
+        <DialogContent>
+          <TextField autoFocus fullWidth multiline minRows={2} margin="dense"
+            label="Por que no es un error (obligatorio)"
+            value={motivoDescarte} onChange={(e) => setMotivoDescarte(e.target.value)} />
+          <Typography variant="caption" color="text.secondary">
+            El hallazgo se cierra y deja de bloquear el elemento, pero no cuenta como
+            defecto corregido. Descartar un hallazgo es facultad del lider.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button color="error" onClick={() => setDescartar(null)}>Cancelar</Button>
+          <Button variant="contained" color="info"
+            disabled={enviando || motivoDescarte.trim().length === 0}
+            onClick={() => void confirmarDescarte()}>
+            Marcar
           </Button>
         </DialogActions>
       </Dialog>

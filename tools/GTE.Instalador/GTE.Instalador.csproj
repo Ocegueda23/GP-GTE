@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>GTE.Instalador</RootNamespace>
+    <AssemblyName>GTE.Instalador</AssemblyName>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <!-- Sin esto, un doble clic corre sin privilegios y toda escritura al registro del
+         servicio (HKLM\SYSTEM\CurrentControlSet\Services\...) truena en silencio o con un
+         UnauthorizedAccessException poco claro. requireAdministrator fuerza el UAC en cada
+         arranque, igual que las consolas "Ejecutar como administrador" que exigian los
+         .bat/.ps1 que esta herramienta reemplaza. -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Solo para el boton "Probar conexion" (abre y cierra una conexion de prueba); esta
+         herramienta no comparte DbContext ni capas con GTE.Infrastructure a proposito, es
+         un utilitario aparte de la app (ver Doctos/MANUAL_INSTALACION_GTE.md). -->
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="5.2.2" />
+  </ItemGroup>
+
+</Project>

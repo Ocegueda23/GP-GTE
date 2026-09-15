@@ -51,8 +51,8 @@ export function PortalPage() {
   const [idUsuarioSolicitante, setIdUsuarioSolicitante] = useState<number | "">("");
   const [enviando, setEnviando] = useState(false);
   const [busqueda, setBusqueda] = useState("");
-  // Sin filtro = pendientes (Enviada, En Analisis, Aprobada); "Todas" (-1) sigue disponible.
-  const [filtroEstatus, setFiltroEstatus] = useState<number[]>([]);
+  // La UI arranca en "Todas" (-1); sin filtro el back devuelve solo pendientes.
+  const [filtroEstatus, setFiltroEstatus] = useState<number[]>([-1]);
   const clienteQuery = useQueryClient();
   const puede = useSesion((estado) => estado.puede);
   const puedeCapturarSolicitante = puede("SOL.Triage");

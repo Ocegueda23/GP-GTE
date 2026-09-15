@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
 import {
-  Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Typography,
+  Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField,
 } from "@mui/material";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
 import { ComboBuscable } from "../../shared/components/ComboBuscable";
 import { EditorEnriquecido } from "../../shared/editor/EditorEnriquecido";
 import { useSesion } from "../../shared/api/sesion";
-import { crearWorkItem, type CatalogosBandeja } from "../../shared/api/workitems";
+import { crearWorkItem, filtrarComplejidades, type CatalogosBandeja } from "../../shared/api/workitems";
+import { obtenerSprints } from "../../shared/api/planeacion";
+import { useEsMovil } from "../../shared/hooks/useEsMovil";
+import { PresupuestoComplejidad } from "../workitem/PresupuestoComplejidad";
 
 const ID_PRIORIDAD_MEDIA = 3;
 const CATEGORIA_PROYECTO_TI = "TI";
@@ -25,6 +28,12 @@ interface Props {
     idProyecto: number; idTipo: number | ""; idPrioridad: number | ""; titulo: string;
     descripcion: string | null; idAsignado: number | null;
   };
+  /**
+   * Valores con los que abre el alta cuando quien la lanza ya conoce el contexto
+   * (el tablero: proyecto del equipo, sprint activo y persona del filtro). No cambia
+   * ninguna regla: siguen siendo campos editables antes de guardar.
+   */
+  inicial?: { idProyecto?: number; idSprint?: number; idAsignado?: number };
 }
 
 function hoyIso(): string {
@@ -32,32 +41,47 @@ function hoyIso(): string {
 }
 
 /** Alta rapida de elementos: el folio y el estatus inicial los fija el backend. */
-export function NuevoItemModal({ abierto, catalogos, alCerrar, alExito, alError, padre, copiaDe }: Props) {
+export function NuevoItemModal({ abierto, catalogos, alCerrar, alExito, alError, padre, copiaDe, inicial }: Props) {
   const sesion = useSesion((estado) => estado.sesion);
-  const [idProyecto, setIdProyecto] = useState<number | "">(padre?.idProyecto ?? copiaDe?.idProyecto ?? "");
+  const puede = useSesion((estado) => estado.puede);
+  const [idProyecto, setIdProyecto] = useState<number | "">(
+    padre?.idProyecto ?? copiaDe?.idProyecto ?? inicial?.idProyecto ?? "");
   const [idTipo, setIdTipo] = useState<number | "">(copiaDe?.idTipo ?? "");
   const [idPrioridad, setIdPrioridad] = useState<number | "">(copiaDe?.idPrioridad ?? ID_PRIORIDAD_MEDIA);
   const [idAsignado, setIdAsignado] = useState<number | "">(
-    copiaDe ? (copiaDe.idAsignado ?? "") : (sesion?.idUsuario ?? ""),
+    copiaDe ? (copiaDe.idAsignado ?? "") : (inicial?.idAsignado ?? sesion?.idUsuario ?? ""),
   );
   const [idComplejidad, setIdComplejidad] = useState<number | "">("");
+  const [idSprint, setIdSprint] = useState<number | "">(inicial?.idSprint ?? "");
   const [titulo, setTitulo] = useState(copiaDe ? `Copia de ${copiaDe.titulo}` : "");
   const [descripcion, setDescripcion] = useState(copiaDe?.descripcion ?? "");
   const [descripcionVacia, setDescripcionVacia] = useState(true);
   const [compromiso, setCompromiso] = useState("");
   const [enviando, setEnviando] = useState(false);
   const clienteQuery = useQueryClient();
+  const esMovil = useEsMovil();
 
   const valido = idProyecto !== "" && idTipo !== "" && idPrioridad !== "" && idComplejidad !== ""
     && titulo.trim().length > 0;
+
+  // Comprometer al sprint desde el alta exige el permiso de planeacion (el backend lo valida
+  // igual); sin el, el elemento nace en el backlog y se mueve desde el detalle del sprint.
+  const puedeAsignarSprint = puede("PLA.GestionarSprints");
+  const sprints = useQuery({
+    queryKey: ["sprints", "abiertos"],
+    queryFn: () => obtenerSprints({ soloAbiertos: true }),
+    enabled: abierto && puedeAsignarSprint,
+    staleTime: 60_000,
+  });
 
   const limpiar = () => {
     setTitulo("");
     setDescripcion("");
     setDescripcionVacia(true);
     setCompromiso("");
-    setIdAsignado(sesion?.idUsuario ?? "");
+    setIdAsignado(inicial?.idAsignado ?? sesion?.idUsuario ?? "");
     setIdComplejidad("");
+    setIdSprint(inicial?.idSprint ?? "");
   };
 
   // Proyectos de categoria TI suelen iniciarse el mismo dia: precargar la fecha
@@ -70,6 +94,20 @@ export function NuevoItemModal({ abierto, catalogos, alCerrar, alExito, alError,
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo reacciona al cambio de proyecto
   }, [idProyecto, catalogos?.proyectos]);
+
+  // La complejidad depende de la categoria del proyecto: al cambiar de proyecto se
+  // descarta la seleccion previa si ya no pertenece a la categoria nueva.
+  const proyectoSeleccionado = catalogos?.proyectos.find((p) => p.id === idProyecto);
+  const complejidades = filtrarComplejidades(
+    catalogos?.complejidades, proyectoSeleccionado?.idCategoriaProyecto);
+
+  useEffect(() => {
+    if (idComplejidad === "") return;
+    if (!complejidades.some((c) => c.id === idComplejidad)) {
+      setIdComplejidad("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo reacciona al cambio de opciones
+  }, [complejidades, idComplejidad]);
 
   const guardar = async () => {
     if (!valido) return;
@@ -84,6 +122,7 @@ export function NuevoItemModal({ abierto, catalogos, alCerrar, alExito, alError,
         idComplejidad: idComplejidad as number,
         idAsignado: idAsignado === "" ? null : (idAsignado as number),
         fechaCompromiso: compromiso || null,
+        idSprint: idSprint === "" ? null : (idSprint as number),
         idPadre: padre?.idWorkItem,
       });
       alExito(`${mensaje} (${dato.folio})`);
@@ -101,7 +140,7 @@ export function NuevoItemModal({ abierto, catalogos, alCerrar, alExito, alError,
   };
 
   return (
-    <Dialog open={abierto} onClose={alCerrar} fullWidth maxWidth="sm">
+    <Dialog open={abierto} onClose={alCerrar} fullWidth maxWidth="sm" fullScreen={esMovil}>
       <DialogTitle>
         {padre ? `Nueva subtarea de ${padre.folio}` : copiaDe ? "Copiar elemento de trabajo" : "Nuevo elemento de trabajo"}
       </DialogTitle>
@@ -146,13 +185,12 @@ export function NuevoItemModal({ abierto, catalogos, alCerrar, alExito, alError,
         <ComboBuscable
           label="Complejidad"
           required
+          disabled={idProyecto === ""}
           value={idComplejidad}
           onChange={(v) => setIdComplejidad(v as number | "")}
-          opciones={(catalogos?.complejidades ?? []).map((c) => ({ valor: c.id, etiqueta: c.nombre }))}
+          opciones={complejidades.map((c) => ({ valor: c.id, etiqueta: c.nombre }))}
         />
-        <Typography variant="caption" color="text.secondary" sx={{ mt: -1.5 }}>
-          Define automaticamente el presupuesto de horas y puntos de historia (segun el nivel del asignado).
-        </Typography>
+        <PresupuestoComplejidad idComplejidad={idComplejidad} idAsignado={idAsignado} />
         <ComboBuscable
           label="Asignado"
           value={idAsignado}
@@ -162,6 +200,20 @@ export function NuevoItemModal({ abierto, catalogos, alCerrar, alExito, alError,
             ...(catalogos?.usuarios ?? []).map((u) => ({ valor: u.id, etiqueta: u.nombre })),
           ]}
         />
+        {puedeAsignarSprint && (
+          <ComboBuscable
+            label="Sprint"
+            value={idSprint}
+            onChange={(v) => setIdSprint(v as number | "")}
+            opciones={[
+              { valor: "", etiqueta: "Backlog (sin sprint)" },
+              ...(sprints.data ?? []).map((s) => ({
+                valor: s.idSprint,
+                etiqueta: `${s.folio ?? s.nombre} - ${s.nombre} (${s.estatus})`,
+              })),
+            ]}
+          />
+        )}
         <TextField
           size="small"
           type="date"

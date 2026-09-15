@@ -3,6 +3,7 @@ import { Alert, Box, Button, Snackbar, Stack, Typography } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import { useQuery } from "@tanstack/react-query";
 import { obtenerBandeja, obtenerCatalogosBandeja } from "../../shared/api/workitems";
+import { useEsMovil } from "../../shared/hooks/useEsMovil";
 import { useSesion } from "../../shared/api/sesion";
 import { BarraFiltros } from "./BarraFiltros";
 import { NuevoItemModal } from "./NuevoItemModal";
@@ -20,6 +21,7 @@ export function BandejaPage() {
   const sesion = useSesion((estado) => estado.sesion);
   const [aviso, setAviso] = useState<Aviso | null>(null);
   const [modalNuevo, setModalNuevo] = useState(false);
+  const esMovil = useEsMovil();
 
   // Al entrar a la bandeja sin un Asignado ya elegido, parte filtrando por el usuario firmado.
   useEffect(() => {
@@ -43,9 +45,18 @@ export function BandejaPage() {
 
   return (
     <Box sx={{
-      p: 2, height: "calc(100vh - 48px)", display: "flex", flexDirection: "column", overflow: "hidden",
+      p: { xs: 1.5, sm: 2 },
+      // En escritorio la pantalla ocupa el alto de la ventana y la tabla scrollea por
+      // dentro con su encabezado fijo. En movil son tarjetas y lo natural es que
+      // scrollee la pagina completa, sin un area interna con su propia barra.
+      height: esMovil ? "auto" : "calc(100vh - 48px)",
+      display: "flex", flexDirection: "column", overflow: esMovil ? "visible" : "hidden",
     }}>
-      <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", mb: 2, flexShrink: 0 }}>
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={1}
+        sx={{
+          justifyContent: "space-between", alignItems: { xs: "stretch", sm: "center" },
+          mb: 2, flexShrink: 0,
+        }}>
         <Typography variant="h5" sx={{ fontWeight: 700 }}>
           Bandeja de trabajo
         </Typography>

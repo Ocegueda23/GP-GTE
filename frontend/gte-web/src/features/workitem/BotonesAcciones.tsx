@@ -4,6 +4,7 @@ import {
 } from "@mui/material";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
+import { useEsMovil } from "../../shared/hooks/useEsMovil";
 import {
   cambiarEstatus, obtenerAcciones, type AccionDisponible,
 } from "../../shared/api/workitems";
@@ -21,6 +22,7 @@ export function BotonesAcciones({ idWorkItem, folio, alExito, alError }: Props) 
   const [motivo, setMotivo] = useState("");
   const [enviando, setEnviando] = useState(false);
   const clienteQuery = useQueryClient();
+  const esMovil = useEsMovil();
 
   const acciones = useQuery({
     queryKey: ["acciones", idWorkItem],
@@ -56,13 +58,16 @@ export function BotonesAcciones({ idWorkItem, folio, alExito, alError }: Props) 
 
   return (
     <>
-      <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
+      {/* En movil los botones se reparten el ancho: con pocas acciones quedan grandes
+          y faciles de tocar, y con muchas se acomodan en varios renglones. */}
+      <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1 }}>
         {acciones.data?.map((accion) => (
           <Button
             key={accion.accion}
-            size="small"
+            size={esMovil ? "medium" : "small"}
             variant={accion.esAccionPrincipal ? "contained" : "outlined"}
             disabled={enviando}
+            sx={{ flexGrow: { xs: 1, sm: 0 } }}
             onClick={() =>
               accion.requiereMotivo ? setAccionConMotivo(accion) : void ejecutar(accion)}
           >
@@ -71,7 +76,7 @@ export function BotonesAcciones({ idWorkItem, folio, alExito, alError }: Props) 
         ))}
       </Stack>
 
-      <Dialog open={accionConMotivo !== null} onClose={() => setAccionConMotivo(null)} fullWidth>
+      <Dialog open={accionConMotivo !== null} onClose={() => setAccionConMotivo(null)} fullWidth fullScreen={esMovil}>
         <DialogTitle>{accionConMotivo?.etiqueta} - {folio}</DialogTitle>
         <DialogContent>
           <TextField

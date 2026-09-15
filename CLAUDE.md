@@ -132,6 +132,22 @@ despliegue quedo a medias (se copio `wwwroot` sin los DLL, o al reves).
 - El cliente HTTP lee ApiResponse<T> (response para el dato, code/success para el flujo).
 - Pre-validar con Zod como espejo, pero el backend es la fuente de verdad.
 - Botones de estatus desde GET workflow/acciones; nunca decidir transiciones en el front.
+- Movil: por debajo de `sm` las bandejas cambian la tabla por tarjetas. El punto de corte
+  es unico, `useEsMovil()` (shared/hooks) -- el mismo ancho en que App.tsx cambia el Drawer
+  de permanente a temporal. De `sm` en adelante no cambia nada: la tabla y sus encabezados
+  ordenables siguen igual.
+- Piezas de ese patron (no inventar otras): `TarjetaListado` sustituye a la fila -- folio y
+  chips en el encabezado, titulo, campos en dos columnas, acciones al pie, y `tinte`
+  ("error"/"success") replica el fondo de la fila; `OrdenMovil` sustituye a los encabezados
+  ordenables, porque sin tabla no habria donde ordenar. Filtros a
+  `minWidth: { xs: "100%", sm: N }`; si pasan de tres, van dentro de un `Collapse` con boton
+  "Filtros (n)" (ver `features/trabajo/BarraFiltros.tsx`). Dialogos con `fullScreen={esMovil}`
+  e iconos de accion fijados a 44x44 px (con `size="small"` quedan en 30 y ni "medium" con
+  icono chico pasa de 35).
+- `main` en App.tsx lleva `minWidth: 0` y no se quita: como flex item nace con
+  `min-width: auto` y no puede encogerse por debajo de su contenido mas ancho, asi que una
+  tabla o una barra de pestanas estiran el documento completo y dejan toda la app --barra
+  superior incluida-- barriendose en horizontal en el celular.
 
 <!-- INICIO: estructura-proyecto-auto -->
 ## Estructura del proyecto (generado automaticamente)

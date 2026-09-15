@@ -1,5 +1,6 @@
 using GTE.Application.Common;
 using GTE.Domain.Administracion;
+using GTE.Domain.Exceptions;
 using GTE.Domain.Interfaces;
 using GTE.Domain.WorkItems;
 using GTE.Infrastructure.Modelos.bdsGTE;
@@ -144,6 +145,7 @@ public class AdministracionRepository(FabricaContexto fabrica, AuditContext audi
             Nombre = datos.Nombre,
             Descripcion = datos.Descripcion,
             IdLider = datos.IdLider,
+            AmbitoCentroMando = datos.AmbitoCentroMando,
             UsuarioRegistro = Auditoria.Usuario,
             Activo = true
         };
@@ -164,6 +166,7 @@ public class AdministracionRepository(FabricaContexto fabrica, AuditContext audi
         entidad.Nombre = datos.Nombre;
         entidad.Descripcion = datos.Descripcion;
         entidad.IdLider = datos.IdLider;
+        entidad.AmbitoCentroMando = datos.AmbitoCentroMando;
         entidad.UsuarioMovto = Recortar(Auditoria.Usuario);
         entidad.FechaMovto = DateTime.Now;
         await contexto.SaveChangesAsync(cancellationToken);
@@ -174,6 +177,33 @@ public class AdministracionRepository(FabricaContexto fabrica, AuditContext audi
     public async Task<int> AgregarMiembroAsync(MiembroEquipoNuevo datos, CancellationToken cancellationToken = default)
     {
         await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
+
+        // UQ_tblEquipoMiembro_EquipoUsuario es UNIQUE (IdEquipo, IdUsuario) sin importar Activo:
+        // si la persona ya paso por este equipo y fue retirada (baja logica), insertar una fila
+        // nueva revienta esa constraint y cae como error 500 generico. Hay que reactivar la fila
+        // existente en vez de insertar.
+        var existente = await contexto.TblEquipoMiembro
+            .FirstOrDefaultAsync(m => m.IdEquipo == datos.IdEquipo && m.IdUsuario == datos.IdUsuario, cancellationToken);
+
+        if (existente is not null)
+        {
+            if (existente.Activo)
+            {
+                throw new ConflictException("El usuario ya es miembro de este equipo.");
+            }
+
+            existente.Activo = true;
+            existente.RolEquipo = datos.RolEquipo;
+            existente.PorcentajeDedicacion = datos.PorcentajeDedicacion;
+            existente.UsuarioMovto = Recortar(Auditoria.Usuario);
+            existente.FechaMovto = DateTime.Now;
+            await contexto.SaveChangesAsync(cancellationToken);
+
+            await RegistrarBitacoraAsync(
+                "Equipo", datos.IdEquipo, "AGREGAR_MIEMBRO", $"usuario {datos.IdUsuario}", cancellationToken);
+            return existente.IdEquipoMiembro;
+        }
+
         var entidad = new TblEquipoMiembro
         {
             IdEquipo = datos.IdEquipo,
@@ -318,9 +348,47 @@ public class AdministracionRepository(FabricaContexto fabrica, AuditContext audi
 
     /* ---------- Roles ---------- */
 
+    /// <summary>
+    /// Alta de una asignacion de rol (alcance global si IdProyecto es null, acotada al
+    /// proyecto si trae valor). Si la misma persona ya tuvo ese rol con el mismo alcance y
+    /// se le retiro, se REACTIVA la fila en vez de insertar una segunda: tblUsuarioRol no
+    /// tiene UNIQUE que lo impida y dos filas activas iguales ensucian la auditoria sin
+    /// cambiar los permisos efectivos.
+    /// </summary>
     public async Task<int> AsignarRolAsync(RolAsignadoNuevo datos, CancellationToken cancellationToken = default)
     {
         await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
+
+        // El caso global se consulta aparte a proposito: comparar una columna nullable
+        // contra un parametro null depende de la compensacion de null semantics de EF, y
+        // aqui un falso negativo insertaria un duplicado.
+        var existente = datos.IdProyecto is null
+            ? await contexto.TblUsuarioRol.FirstOrDefaultAsync(
+                ur => ur.IdUsuario == datos.IdUsuario && ur.IdRol == datos.IdRol
+                      && ur.IdProyecto == null && ur.IdEquipo == null, cancellationToken)
+            : await contexto.TblUsuarioRol.FirstOrDefaultAsync(
+                ur => ur.IdUsuario == datos.IdUsuario && ur.IdRol == datos.IdRol
+                      && ur.IdProyecto == datos.IdProyecto && ur.IdEquipo == null, cancellationToken);
+
+        var alcance = datos.IdProyecto is int idProyecto ? $"proyecto {idProyecto}" : "global";
+
+        if (existente is not null)
+        {
+            if (existente.Activo)
+            {
+                return existente.IdUsuarioRol;
+            }
+
+            existente.Activo = true;
+            existente.UsuarioMovto = Recortar(Auditoria.Usuario);
+            existente.FechaMovto = DateTime.Now;
+            await contexto.SaveChangesAsync(cancellationToken);
+
+            await RegistrarBitacoraAsync("Usuario", datos.IdUsuario, "ASIGNAR_ROL",
+                $"rol {datos.IdRol} ({alcance}, reactivado)", cancellationToken);
+            return existente.IdUsuarioRol;
+        }
+
         var entidad = new TblUsuarioRol
         {
             IdUsuario = datos.IdUsuario,
@@ -332,7 +400,8 @@ public class AdministracionRepository(FabricaContexto fabrica, AuditContext audi
         contexto.TblUsuarioRol.Add(entidad);
         await contexto.SaveChangesAsync(cancellationToken);
 
-        await RegistrarBitacoraAsync("Usuario", datos.IdUsuario, "ASIGNAR_ROL", $"rol {datos.IdRol}", cancellationToken);
+        await RegistrarBitacoraAsync("Usuario", datos.IdUsuario, "ASIGNAR_ROL",
+            $"rol {datos.IdRol} ({alcance})", cancellationToken);
         return entidad.IdUsuarioRol;
     }
 
@@ -348,7 +417,9 @@ public class AdministracionRepository(FabricaContexto fabrica, AuditContext audi
         entidad.FechaMovto = DateTime.Now;
         await contexto.SaveChangesAsync(cancellationToken);
 
-        await RegistrarBitacoraAsync("Usuario", entidad.IdUsuario, "RETIRAR_ROL", $"rol {entidad.IdRol}", cancellationToken);
+        var alcance = entidad.IdProyecto is int idProyecto ? $"proyecto {idProyecto}" : "global";
+        await RegistrarBitacoraAsync("Usuario", entidad.IdUsuario, "RETIRAR_ROL",
+            $"rol {entidad.IdRol} ({alcance})", cancellationToken);
     }
 
     /// <summary>

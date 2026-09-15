@@ -17,12 +17,13 @@ public class ActualizarIncidenteValidator : AbstractValidator<ActualizarIncident
     {
         RuleFor(c => c.IdIncidente).GreaterThan(0);
         RuleFor(c => c.Datos.Titulo).NotEmpty().WithMessage("El titulo es obligatorio.").MaximumLength(200);
+        RuleFor(c => c.Datos.IdCategoriaIncidente).GreaterThan(0).WithMessage("La categoria es obligatoria.");
         RuleFor(c => c.Datos.MinutosIndisponibilidad).GreaterThanOrEqualTo(0)
             .When(c => c.Datos.MinutosIndisponibilidad.HasValue);
     }
 }
 
-/// <summary>Edita campos propios (titulo, descripcion, causa raiz, minutos de
+/// <summary>Edita campos propios (categoria, titulo, descripcion, causa raiz, minutos de
 /// indisponibilidad, fecha de deteccion) sin tocar el estatus del incidente.</summary>
 public class ActualizarIncidenteHandler(
     IIncidenteRepository repositorio,
@@ -37,7 +38,8 @@ public class ActualizarIncidenteHandler(
             ?? throw new NotFoundException("Incidente", command.IdIncidente);
 
         await repositorio.ActualizarAsync(command.IdIncidente, new IncidenteActualizacion(
-            command.Datos.Titulo.Trim(), command.Datos.Descripcion, command.Datos.CausaRaiz,
+            command.Datos.IdCategoriaIncidente, command.Datos.Titulo.Trim(),
+            command.Datos.Descripcion, command.Datos.CausaRaiz,
             command.Datos.MinutosIndisponibilidad, command.Datos.FechaDeteccion), cancellationToken);
 
         return await consultas.ObtenerPorIdAsync(command.IdIncidente, cancellationToken)

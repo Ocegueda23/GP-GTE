@@ -5,14 +5,19 @@ namespace GTE.Application.DTOs.Responses.Planeacion;
 public class SprintResponse
 {
     public int IdSprint { get; set; }
-    public int IdEquipo { get; set; }
-    public string Equipo { get; set; } = string.Empty;
+    public string? Folio { get; set; }
+    public int? IdLider { get; set; }
+    public string? Lider { get; set; }
     public string Nombre { get; set; } = string.Empty;
     public string? Objetivo { get; set; }
     public DateOnly FechaInicio { get; set; }
     public DateOnly FechaFin { get; set; }
     public int IdEstatus { get; set; }
     public string Estatus { get; set; } = string.Empty;
+    public string CreadoPor { get; set; } = string.Empty;
+    public DateTime FechaCreacion { get; set; }
+    /// <summary>Fecha real en que el sprint paso a Cerrado (historial de estatus), null si sigue abierto.</summary>
+    public DateTime? FechaCierre { get; set; }
     public int TotalItems { get; set; }
     public int ItemsTerminados { get; set; }
     public decimal PuntosComprometidos { get; set; }

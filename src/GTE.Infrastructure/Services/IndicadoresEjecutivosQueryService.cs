@@ -457,9 +457,20 @@ public class IndicadoresEjecutivosQueryService(
     private static async Task<BurndownSprintResponse?> ObtenerBurndownSprintActivoAsync(
         DbContextGTE contexto, int idEquipo, CancellationToken ct)
     {
+        // Sprint ya no se asigna por equipo: se toma el del lider que encabeza el equipo
+        // (TblEquipo.IdLider), ver ADR de Backlog/Sprint 2026-09-02.
+        var datosEquipo = await contexto.TblEquipo.AsNoTracking()
+            .Where(e => e.IdEquipo == idEquipo)
+            .Select(e => new { e.IdLider, e.Nombre })
+            .FirstOrDefaultAsync(ct);
+        if (datosEquipo?.IdLider is null)
+        {
+            return null;
+        }
+
         var sprint = await contexto.TblSprint
-            .Where(s => s.Activo && s.IdEquipo == idEquipo && s.IdEstatusSprint == EstatusSprintActivo)
-            .Select(s => new { s.IdSprint, s.Nombre, s.IdEquipo, Equipo = s.IdEquipoNavigation.Nombre, s.FechaInicio, s.FechaFin })
+            .Where(s => s.Activo && s.IdLider == datosEquipo.IdLider && s.IdEstatusSprint == EstatusSprintActivo)
+            .Select(s => new { s.IdSprint, s.Nombre, Equipo = datosEquipo.Nombre, s.FechaInicio, s.FechaFin })
             .FirstOrDefaultAsync(ct);
 
         if (sprint is null) return null;
@@ -498,7 +509,7 @@ public class IndicadoresEjecutivosQueryService(
         {
             IdSprint = sprint.IdSprint,
             Nombre = sprint.Nombre,
-            IdEquipo = sprint.IdEquipo,
+            IdEquipo = idEquipo,
             Equipo = sprint.Equipo,
             FechaInicio = sprint.FechaInicio,
             FechaFin = sprint.FechaFin,

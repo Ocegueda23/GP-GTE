@@ -3,7 +3,234 @@
 > Documento de continuidad. Sirve para retomar el proyecto en otra sesión sin
 > contexto previo. Actualizar al cerrar cada bloque de trabajo.
 >
-> **Última actualización:** 2026-08-27 (**Centro de Mando TI** — módulo nuevo: evaluación
+> **Bloque en curso (2026-09-14) — `GTE.Instalador`: WinForms en vez de scripts de consola
+> para la instalación inicial.** El usuario reportó que instalar GTE (varios `.bat`/`.ps1`
+> con parámetros posicionales, orden que ya había cambiado una vez, cuidado especial con
+> comillas en PowerShell) se había vuelto demasiado propenso a error. Se creó
+> `tools/GTE.Instalador` (WinForms, `net8.0-windows`, agregado a `GTE.sln` en una carpeta de
+> solución `tools` nueva junto a `src`/`tests`) que reemplaza a
+> `configurar-servicio-completo`/`configurar-variable-servicio`/`configurar-almacen-archivos`
+> (`.bat`/`.ps1`) y `generar-clave-jwt.bat` — ya no viven en el repo (el usuario los movió a
+> `Doctos/SetUpInstaller/`, carpeta **sin trackear**, junto con `asistente-instalacion.html`
+> y dos `.bak`; no tocar esa carpeta, es su archivo local, no parte del flujo versionado).
+> Una sola ventana: lee/crea/modifica las cuatro variables de entorno del servicio
+> (`ASPNETCORE_ENVIRONMENT`, `ConnectionStrings__bdsGTE` armada desde Servidor/Usuario/
+> Password SQL con botón "Probar conexión", `Jwt__ClaveFirma` con generador de 64 bytes, y
+> `AlmacenArchivos__Ruta` con crear-carpeta-y-probar-escritura), conserva cualquier otra
+> variable ya puesta en el registro, y tiene botones para crear el servicio (`sc create`) e
+> Iniciar/Detener/Reiniciar. Manifest con `requireAdministrator` (sin eso, escribir en
+> `HKLM\SYSTEM\CurrentControlSet\Services\...` falla en silencio o con
+> `UnauthorizedAccessException` poco claro). `Doctos/MANUAL_INSTALACION_GTE.md` (Paso 3) ya
+> apunta a esta herramienta en vez de a los scripts viejos.
+>
+> **Trampa de build encontrada (ya conocida, confirmada de nuevo aquí):** compilar el
+> proyecto nuevo con `dotnet build` sin más truena en `CreateAppHost` con
+> `IOException: La operación solicitada no se puede realizar en un archivo con una sección
+> asignada a usuario abierta` — es el problema ya documentado de tener el repo dentro de
+> Google Drive (bloquea el `.exe` nativo), no un bug del proyecto. Se compila igual con
+> `dotnet build -p:UseAppHost=false`; para publicar de verdad (fuera de Drive, con el `.exe`
+> real) no debería hacer falta ese flag.
+>
+> **Deuda de verificación de este bloque:** compila limpio (`dotnet build GTE.sln`, 0
+> advertencias propias) y arranca sin excepción (probado lanzando el `.dll` con `dotnet
+> exec` y confirmando que el proceso se queda vivo en el message loop de WinForms). **No se
+> probó de punta a punta contra un servicio de Windows real** (crear el servicio, guardar
+> variables, reiniciar, confirmar que `GTE.WebApi` las toma) — la próxima vez que se haga una
+> instalación real es el momento de confirmarlo con la herramienta.
+>
+> **Bloque en curso (2026-09-09) — Incidentes: categoría propia y el combo de proyectos que
+> no mostraba nada.** Dos pedidos del mismo día sobre el módulo de Incidentes.
+>
+> (1) **Catálogo de categorías de incidente.** Tabla nueva `dbo.tblCategoriaIncidente`
+> (`Nombre` único + `Nivel`) y columna `tblIncidente.IdCategoriaIncidente`. Es catálogo
+> APARTE de `tblCategoriaTicket` a propósito: la de tickets clasifica lo que pide un usuario
+> (Duda, Acceso, Mejora) y la de incidentes lo que se cayó en operación; mezclarlas ensucia
+> los dos combos y los reportes de ambos módulos. Se sembraron las 41 categorías que definió
+> el equipo, con el nivel que las atiende: 33 en `Soporte N1-N2` y 8 en `Desarrollo`. El
+> `Nivel` no es un catálogo aparte ni tiene CHECK — la tabla se administra desde el motor de
+> catálogo genérico y un CHECK impediría dar de alta un nivel nuevo sin script. El frontend
+> lo usa solo para agrupar el combo (`ComboBuscable` acepta ahora un `grupo` opcional por
+> opción, ver la nota de abajo); no es columna de la bandeja. La categoría es **obligatoria**
+> (decisión del 2026-09-09): la exige el alta y también la edición — una vez capturada no se
+> puede dejar en blanco, y los dos incidentes viejos la piden al editarse. La validación vive
+> en `CrearIncidenteValidator`/`ActualizarIncidenteValidator`, NO en la BD: la columna quedó
+> NULL-able para no inventarle categoría a lo ya registrado y para que el error sea un 400 de
+> dominio y no un 547 de SQL Server.
+>
+> (2) **El combo de Proyecto ignoraba los accesos dados en la pestaña Accesos.**
+> `CatalogosQueryService` listaba solo proyectos donde el usuario es Responsable o está en el
+> equipo asignado, así que dar de alta un acceso en Admin > Proyectos > Accesos (que escribe
+> `tblUsuarioRol` con `IdProyecto`, tercera parte del bloque del 2026-09-04) no hacía
+> absolutamente nada en los 9 combos de `/catalogos/bandeja`: se otorgaba el acceso y el
+> proyecto seguía sin aparecer. Ahora un proyecto aparece por las **tres** vías: responsable,
+> equipo, o rol acotado a ese proyecto. Los roles **globales** (`IdProyecto` null) NO entran
+> deliberadamente: abrirían todos los proyectos del sistema y estos combos son "mis
+> proyectos" (verificado: el usuario con rol Administrador global sigue viendo solo el
+> proyecto del que es responsable). Esto **no relaja** la decisión de negocio del 2026-08-03
+> que dejó el filtro como estaba para los proyectos migrados sin Responsable ni Equipo (§3.4):
+> ahí el dato falta; aquí el acceso estaba dado de forma explícita y se ignoraba.
+>
+> **PENDIENTE INMEDIATO de este bloque:** correr
+> `DataBase/Scripts/12_Scripts/01_2026-09-09_SCRIPT_bdsGTE_CategoriaIncidente.sql`
+> (carpeta nueva de esta sesión) en **cada** servidor. Ya se corrió — dos veces, para probar
+> que es idempotente — en la instancia local `localhost\SQLEXPRESS01`. Hasta que se corra, la
+> bandeja de incidentes truena con `Invalid object name 'dbo.tblCategoriaIncidente'` (misma
+> lección de la sección 5).
+>
+> **Para que el equipo pueda mantener la lista sin scripts:** registrar `tblCategoriaIncidente`
+> en Administración > Catálogos (motor de catálogo genérico), igual que se hizo con
+> `CATEGORIA_TICKET`. Eso crea solo los permisos `CAT.<CLAVE>.*` y la configuración de
+> columnas; no se sembró desde el script porque duplicaría esa lógica.
+>
+> **Re-scaffold hecho a mano, a propósito:** el `--force` del README habría dejado un diff
+> enorme y equivocado, porque la BD local no está sincronizada con el modelo del repo en las
+> dos direcciones — le sobran las 11 tablas de Hangfire y 5 vistas `VwBi*`, y le faltan
+> `tblNotaVersion`, `tblNotaVersionDetalle`, `tblReleaseRespaldo`, `tblTipoCambioVersion` y
+> `tblTipoRespaldo` (los scripts de la rama de respaldos no se han corrido ahí). Se
+> scaffoldeó a una carpeta desechable y se copiaron solo las tres piezas del cambio:
+> `TblCategoriaIncidente.cs`, el campo y la navegación en `TblIncidente.cs`, y el `DbSet` +
+> las dos configuraciones en `DbContextGTE.cs`. **Ojo para la próxima sesión que toque
+> esquema:** corran primero los scripts pendientes en la BD local si quieren volver a
+> scaffoldear completo.
+>
+> **De paso, un bug de pérdida de dato:** el diálogo Editar del detalle de incidente mandaba
+> `fechaDeteccion: null` en cada guardado, así que borraba la fecha de detección aunque ese
+> campo no se edite ahí. Ahora reenvía la que ya trae el incidente. Se arregló porque la
+> categoría obligatoria obliga a editar los incidentes viejos y el bug les habría borrado el
+> dato justo ahí.
+>
+> **Deuda de verificación de este bloque:** `dotnet build` (0 errores), `tsc -b` y `oxlint`
+> limpios, y las tres suites pasan (34 Domain + 2 Application + 37 Api). Las dos consultas
+> nuevas se verificaron **contra la BD real** con su SQL equivalente, dentro de una
+> transacción con ROLLBACK: se reprodujo el bug del combo (acceso dado, cero proyectos), se
+> confirmó que el filtro nuevo trae el proyecto, y que el left join de la categoría no tira
+> los incidentes sin categoría. **No se probó en el navegador**: la pantalla exige login y
+> el API que consume el preview es el servicio de Windows en `:5090`, que corre la versión ya
+> desplegada y no conoce la columna nueva. Recordatorio de `GTE.Api.Tests`: su cadena está
+> clavada a `(localdb)\MSSQLLocalDB`, que no existe en esta máquina, así que sus pruebas se
+> saltan solas sin marcarse como omitidas — pasan sin ejecutar nada.
+>
+> **Bloque en curso (2026-09-04) — Tablero: apartado de tareas suspendidas.**
+> El tablero Kanban no tenía columna para el estatus Suspendido (5): un WorkItem que se
+> suspendía desaparecía del tablero, y del backlog tampoco se ve (ese solo lista lo que no
+> tiene sprint), así que el trabajo detenido quedaba invisible en planeación. Se agregó la
+> columna "Suspendido" a `ColumnasTableroEstandar` (GTE.Domain, única fuente de verdad del
+> mapeo), entre Correccion y Terminado y sin límite WIP: los tableros nuevos ya nacen con
+> ella y la vista consolidada "todos los equipos" la pinta sin tocar BD. El drag & drop no
+> necesitó cambios porque el grafo ya tiene `2 SUSPENDER -> 5` y `5 REANUDAR -> 2`, ambas
+> sin motivo obligatorio. En el front la columna se distingue con borde punteado ámbar,
+> para que se lea como apartado y no como etapa del flujo.
+>
+> **PENDIENTE INMEDIATO de este bloque:** correr
+> `DataBase/Scripts/11_Scripts/01_2026-09-04_INSERT_tblTableroColumna_Suspendido.sql`
+> (carpeta nueva de esta sesión) en LocalDB y en cada servidor. Los tableros que ya existen
+> en `tblTableroColumna` siguen sin la columna hasta que se corra: el código solo aplica el
+> mapeo estándar al aprovisionar un tablero nuevo, no reconcilia los existentes. El script
+> inserta Suspendido en la posición que ocupaba Terminado y desplaza +1 las columnas de su
+> derecha.
+>
+> **Segunda parte del mismo bloque (el tablero deja de ser solo lectura):** (1) botón "Nuevo"
+> que abre el mismo `NuevoItemModal` de la bandeja con el contexto que el tablero ya conoce
+> (prop nueva `inicial`): el proyecto solo se prellena si el equipo filtrado tiene
+> exactamente uno — para eso `ProyectoItemResponse` ahora expone `IdEquipo` — y el sprint
+> activo solo si la persona tiene `PLA.GestionarSprints`, porque el backend lo exige igual
+> (RN-GTE-019). (2) Filtro por usuario asignado que **abre con el usuario firmado**:
+> `GET /api/v1/tablero` acepta `idAsignado` y filtra por la columna real
+> `tblWorkItem.IdAsignado`; "Todas las personas" lo quita.
+>
+> **Deuda de verificación de esta parte:** `dotnet build` (0 errores), `tsc -b` y `oxlint`
+> limpios, pero **no se probó en el navegador**. El preview del front consume el API del
+> servicio de Windows en `:5090`, que corre la versión YA desplegada y no conoce `idAsignado`
+> ni el `IdEquipo` del catálogo: probar ahí daría un falso verde (el filtro no filtraría y el
+> prellenado no aparecería, sin un solo error en consola). Para verificar de verdad hay que
+> publicar el API al servicio, o levantar una instancia aparte y apuntar el front con
+> `VITE_API_URL` — recordando que `localhost` desde una sesión interactiva resuelve a la
+> instancia sin `bdsGTE`, hay que escribir `localhost\SQLEXPRESS01`.
+>
+> **Hallazgo abierto (permisos por proyecto, pregunta del 2026-09-04):** `tblUsuarioRol` ya
+> tiene alcance por proyecto (`IdProyecto` NULL = rol global, con valor = acotado a ese
+> proyecto) y `VerificadorPermisos` ya lo evalúa así — un rol acotado a un proyecto NO cuenta
+> para las verificaciones globales, que es lo correcto. Lo que falta es UI: `UsuariosTab.tsx`
+> asigna roles **siempre** con `idProyecto: null`, así que hoy no hay forma de dar un permiso
+> solo sobre un proyecto desde la aplicación (la lectura ya lo muestra: "rol (global)" vs
+> "rol (Proyecto X)"). Se resolvió en la tercera parte de este mismo bloque: se administra
+> desde la pestaña Accesos del proyecto, sobre esa misma tabla; **no se creó una segunda**.
+>
+> **Tercera parte del bloque (2026-09-04) — pestaña Accesos en el proyecto.** Primer uso real
+> del alcance por proyecto de `tblUsuarioRol`. Admin > Proyectos > editar ahora abre con dos
+> pestañas: "Datos" (lo de siempre) y "Accesos" (`AccesosProyectoTab.tsx`), que lista quién
+> tiene qué rol EN ese proyecto y permite agregar y retirar. Endpoints nuevos:
+> `GET/POST /api/v1/proyectos/{id}/accesos` y `PUT .../accesos/{idUsuarioRol}/retirar`.
+> **No hay tabla nueva ni script**: escribe la misma `tblUsuarioRol` que la pantalla de
+> usuarios, con `IdProyecto` = el de la ruta, así que desde ahí es imposible crear un acceso
+> global, y un rol dado aquí se ve allá como "(nombre del proyecto)".
+>
+> Decisiones de esta parte: (1) el permiso `ADM.Roles` se verifica **con el idProyecto**, así
+> que lo cumple tanto un rol global como uno acotado a ese proyecto — el administrador de un
+> proyecto administra los accesos del suyo, y solo del suyo; (2) `AsignarRolAsync` ahora es a
+> prueba de duplicados: si la misma persona ya tuvo ese rol con el mismo alcance y se le
+> retiró, **reactiva la fila** en vez de insertar otra (`tblUsuarioRol` no tiene UNIQUE que lo
+> impida), y el caso global se consulta aparte porque comparar una columna nullable contra un
+> parámetro null depende de la compensación de null semantics de EF; (3) la bitácora de
+> ASIGNAR_ROL/RETIRAR_ROL ahora dice el alcance ("global" o "proyecto N").
+>
+> **Consecuencia conocida que hay que tener presente ahora que se usan roles acotados:**
+> `SesionQueryService` arma `sesion.permisos` con TODOS los permisos de TODOS los roles del
+> usuario **sin filtrar por alcance**. O sea que alguien con `ADM.Roles` acotado a un proyecto
+> verá la pestaña Accesos en todos los proyectos (y el menú de Administración), aunque el
+> backend le responda 403 en los que no son suyos. El front siempre fue optimista con los
+> permisos; mientras todos los roles eran globales daba igual. Si molesta, la corrección es
+> transversal: la sesión tendría que mandar el alcance junto con cada permiso, y `puede()`
+> recibir el proyecto.
+>
+> **Bloque en curso (2026-09-02) — Releases: listado con filtros y detalle propio.**
+> La pantalla de Releases se partió en dos: `ReleasesPage` es ahora solo la bandeja (filtros
+> por proyecto, estatus y líder asignado, resueltos en el backend; columnas de líder, creado
+> por y fecha de creación) y el detalle vive en su propia ruta `/releases/:id`
+> (`DetalleReleasePage`), igual que `/wi/:folio` en trabajo. En el detalle se agregó la
+> captura del líder, la edición (no solo alta y baja) de artefactos y respaldos mientras el
+> release está En Preparación, la versión que se libera por artefacto, y una columna derecha
+> con cadena de aprobación, versión viva por ambiente y despliegues. La Solicitud de
+> despliegue se compactó para gastar menos hojas (sin tocar el alto de los renglones de
+> firma), ahora encabeza con el líder y ya no imprime el estatus.
+>
+> **PENDIENTE INMEDIATO de este bloque:** los dos scripts de `DataBase/Scripts/08_Scripts`
+> (`01_..._ALTER_tblRelease.sql` — columna `IdLiderAsignado` + FK a `tblUsuario` — y
+> `02_..._ALTER_tblReleaseArtefacto.sql` — `VersionArtefacto` y columnas de movimiento en
+> artefactos y respaldos) **todavía no se han corrido en ningún ambiente**, LocalDB incluida.
+> Hasta que se corran, el listado y el detalle truenan con `Invalid column name` (ver la
+> lección de la sección 5 sobre este mismo síntoma). Backend y frontend compilan y las
+> pruebas de Domain (34) y Application (2) pasan; `GTE.Api.Tests` sigue fallando por el
+> problema de entorno ya documentado (manifiesto de static web assets apuntando a la ruta
+> de otra máquina), no por este cambio.
+>
+> **Última actualización:** 2026-08-28 (**R15 Detalle de actividades terminadas** — con sus
+> tres secciones, los dos relojes de tiempo y el fix de "A tiempo" — y **Notas de versión
+> visibles para el usuario**. Liberado como **1.22.0.0** y **verificado en producción**.
+> Detalle de ambos bloques en la tabla de la sección 2.)
+>
+> **Pendientes de este bloque:** (1) la nota de versión de la 1.22 **no está capturada** —
+> el script `06_Scripts/02` sembró hasta la 1.21, y esa nota además no menciona el propio
+> módulo de notas de versión, que se agregó después de escribirla; (2) las cuatro notas
+> (1.18–1.21) están como **borrador**, hay que revisar la redacción y publicarlas desde la
+> pantalla, y **confirmar las 3 fechas** de 1.18–1.20, que son tentativas porque esas
+> versiones nunca se commitearon y su fecha real no existe en el repositorio.
+>
+> **Deuda de verificación que quedó al descubierto:** el R15 falló DOS veces en producción
+> después de darlo por bueno con `dotnet build` y `oxlint` en verde (ver sección 5). La causa
+> de fondo es que las pruebas de integración no corren aquí: `GTE.Api.Tests` **falla 28 de 36
+> con 500 al pedir el token** en lugar de omitirse solas como dice el `CLAUDE.md` que deberían
+> cuando no hay BD alcanzable. Vale la pena arreglar esa detección: hoy no hay forma de
+> distinguir "se omitió por falta de BD" de "se rompió de verdad".
+>
+> **Aviso que salió de aquí:** `Directory.Build.props` es la única fuente de la versión y
+> `publicar.bat` lo lee como XML. **No escribir notas ni texto suelto en ese archivo**: un
+> comentario XML no admite dos guiones seguidos (que es como se escriben las viñetas) y
+> cualquier contenido fuera de `</Project>` lo invalida. Ya tumbó una publicación con un
+> error que no apunta al archivo (`"+" no es una cadena de versión válida`, en el restore de
+> NuGet). Las notas ahora viven en `tblNotaVersion`.
+>
+> **Bloque anterior:** 2026-08-27 (**Centro de Mando TI** — módulo nuevo: evaluación
 > mensual de los responsables de área con diagnóstico de causa raíz y alertas gerenciales.
 > Verificado end-to-end contra la BD de desarrollo; **falta probar en un ambiente real y
 > escribir pruebas automatizadas**.)
@@ -638,6 +865,9 @@ dotnet test GTE.sln    # 45 pruebas; las de integración se omiten si no hay Loc
 | **Registrar tiempo: total (2026-08-04)** | Suma client-side (el endpoint `/tiempo` ya traia todo, sin cambios de backend) mostrada como fila "Total" al pie de la pestaña Tiempo del Detalle de WorkItem, y como "Total ya registrado: Xh Ym" dentro del propio `ModalTiempo` (mismo query de React Query, sin round-trip extra si ya esta en cache) | pestaña Tiempo del Detalle de WorkItem, modal Registrar tiempo |
 | **Editor de Workflows (P21, 2026-08-04)** | Pantalla nueva en `/admin/workflows` (ruta aparte, no pestaña de Administracion), permiso `ADM.Workflows` (sembrado desde el script 02, sin ningun consumidor hasta ahora). Backend nuevo completo (`GTE.Domain/Workflow`, `GTE.Application/Workflow`, `WorkflowQueryService`, `WorkflowRepository`, `WorkflowController`): lista de procesos (`tblProceso`) -> grafo completo de un proceso (`tblTransicion` + metadatos de `tblTransicionConfig`, unidos en memoria por no tener FK real) -> edicion en lote de etiqueta/permiso/motivo/accion principal/orden. **Deliberadamente NO crea ni elimina transiciones** (el grafo estructural sigue siendo por script SQL, "no tocar CambiarST" de la seccion 9.3 del InterfloClaude.md) -- solo edita los metadatos de UI de transiciones que ya existen en el grafo; para los 6 procesos sin fila de config todavia (Release, Ausencia, Riesgo, Sprint, Aprobacion, Proyecto) el editor muestra defaults (etiqueta = la accion tal cual) y crea la fila al guardar. Sin forma de leer dinamicamente el catalogo de estatus de un proceso sin SQL interpolado (`tblProceso.TablaEstatus` es solo texto descriptivo) -- se opto por un mapeo explicito de 11 casos en codigo en vez de reflection o SQL dinamico. Verificado en vivo: edicion de etiqueta/permiso en la transicion APROBAR de Solicitud, guardado, recargado y confirmado persistido, despues revertido | Workflows (`/admin/workflows`) |
 | **Catalogos Area y Puesto (2026-08-04)** | `tblArea`/`tblPuesto` existian y se leian para los combos de Usuarios, pero sin CRUD ni pantalla propia (gap documentado en la seccion 3.4 de este archivo, ahora resuelto). Se clono el patron de Ambientes (Domain/Application/Infrastructure/WebApi + `AreasTab.tsx`/`PuestosTab.tsx`) para alta/edicion/baja logica completas, con buscador+orden desde el dia 1 (`useOrdenTabla`). Sin script SQL de esquema (las tablas ya existian). Verificado en vivo: alta de un Area y un Puesto vinculado a esa Area, ambos visibles de inmediato en su tabla | Administracion > Areas, Administracion > Puestos |
+| **Flujo de registro de ausencias (2026-08-27)** | La BD ya tenia todo desde los scripts 01/02 de `01_Libera` (`tblAusencia`, `tblTipoAusencia`, `tblEstatusAusencia`) y el proceso `Ausencia` sembrado en `tblProceso`/`tblTransicion` (APROBAR/RECHAZAR/CANCELAR desde Solicitada), ademas de dos consumidores de lectura ya vivos (`PlaneacionRepository.ObtenerAusenciasAprobadasAsync` para capacidad de sprint y `ReportesQueryService` para la columna Ausencia del reporte de actividad); lo que faltaba era el flujo. Se construyo `GTE.Domain/Ausencias` (EstatusAusencia/AccionesAusencia/PermisosAusencia + `IAusenciaRepository`), `GTE.Application/Ausencias` (Crear/Actualizar/CambiarEstatus + queries mias/bandeja/detalle/acciones/catalogos/conteo), `AusenciaRepository` + `AusenciaQueryService`, `AusenciasController` (8 endpoints) y la pantalla `/ausencias` con pestañas "Mis ausencias" y "Por aprobar". **Aprobacion por permiso `ADM.Ausencias`, no por jefe directo**: el Documento Maestro (A12) preveia al jefe directo, pero `tblUsuarioRol` admite varios equipos/proyectos por persona y no modela una jefatura unica, asi que resolver "el jefe" seria ambiguo -- decision explicita, migrable despues si el negocio lo pide. Reglas propias del backend (las que el grafo no conoce): traslape con otra ausencia vigente (Solicitada/Aprobada) de la misma persona -> 409 con la lista de periodos que chocan (el front la pinta sin re-consultar); edicion solo mientras siga Solicitada; CANCELAR la ejecuta el dueño o quien gestione; RECHAZAR exige motivo. Notificacion A12 in-app en las dos direcciones: al solicitar, a todos los que tienen `ADM.Ausencias`; al aprobar/rechazar, a la persona. El permiso nuevo entra por `DataBase/Scripts/05_Scripts/01_2026-08-27_INSERT_bdsGTE_PermisoAusencias.sql` (siembra + asignacion al rol Administrador). **Sin verificar en vivo todavia**: exige correr ese script y la unica BD alcanzable es la real (el API lo sirve el servicio de Windows con los DLL anteriores). Backend y frontend compilan limpio | Ausencias (`/ausencias`) |
+| **R15 Detalle de actividades terminadas (2026-08-28)** | Los reportes R01-R03 agregan por persona o proyecto; faltaba el detalle renglon por renglon, que es lo que se entrega como evidencia de trabajo del periodo. Nuevo reporte con filtros de equipo, asignado, proyecto, tipo y folio, atajos Hoy/Mes/Año, chips de totales y exportacion a Excel gemela (los minutos salen como horas decimales para que Excel los sume). Por cada actividad Terminada en el rango (filtrado por `FechaFin`): titulo, descripcion, tiempo invertido (`VwBandejaTrabajo.MinutosInvertidos`), fechas, **tiempo de espera** (creacion -> inicio) y **tiempo de resolucion** (creacion -> fin), ambos en dias naturales Y en tiempo habil. **Se agrego `ICalendarioLaboral.CalcularMinutosLaboralesLoteAsync`**: el metodo existente abre una conexion por llamada y un detalle de 300 renglones habria hecho 600 conexiones; el lote agrupa por horario y carga tramos/festivos una vez. Sigue pasando todo por el motor unico, no se introdujo un segundo motor de tiempo. El tiempo habil usa el horario **del asignado**; si no tiene horario configurado la columna sale vacia en vez de tronar el reporte. Tope de 5000 renglones con aviso en pantalla para que un rango abierto no tumbe la pagina ni el Excel. **DOS relojes de tiempo, no uno** (hallazgo de la sesion, valia la pena separarlos): la columna "En proceso" es tiempo habil en estatus En Proceso (`vwTiempoInvertido` suma `tblHistorialEstatus.MinutosLaborales`, materializados por `spCambiarEstatus`), mientras que "Registrado" es lo que la persona capturo a mano en `tblRegistroTiempo` (lo que reporta R02). Miden cosas distintas y no tienen por que coincidir, asi que se muestran ambas + su diferencia (roja solo cuando se registro DE MENOS, el caso accionable) + un contador "con tiempo capturado X de Y", sin el cual un total bajo no distingue "nadie captura" de "pocos capturan mucho". Atajos de rango Hoy/Semana/Mes/Año (Semana arranca en LUNES; `getDay()` da 0 en domingo y una resta ingenua dejaba el rango en un solo dia). **Tres secciones en el mismo reporte** (decision del equipo 2026-08-28): WorkItems, Tickets (Resuelto+Cerrado, con % de SLA y espera a primera respuesta) e Incidentes (Resuelto+Cerrado, con indisponibilidad y tiempo hasta la deteccion). Las tres usan el MISMO criterio de tiempo, el reloj de estatus: En Atencion es el analogo de En Proceso. No se mezclan en una sola tabla porque **no son simetricas**: un ticket no tiene equipo ni proyecto y un incidente ademas no tiene asignado, asi que filtrar por equipo (o por asignado en incidentes) VACIA esa seccion y el front explica por que, en vez de devolver datos que no honran el filtro. La indisponibilidad de un incidente es impacto, no esfuerzo: va en su propia columna y nunca se suma a los tiempos de trabajo. **BUG corregido en "A tiempo"**: comparaba los `datetime` completos, y como `FechaCompromiso` se captura a medianoche y `FechaFin` trae hora real, TODA tarea entregada el dia del compromiso salia como incumplida; ahora compara solo la parte de fecha (mismo bug que ya se habia corregido en `vwBandejaTrabajo.EsVencida`, script 27 de `02_Libera`). El SLA de tickets NO se toco: ahi `FechaLimiteResolucion` si es un instante con hora exacta y comparar con hora es lo correcto. **Verificado en produccion el 2026-08-28** tras dos fallos de EF en tiempo de ejecucion (ver seccion 5, "Dos fallos de EF que el compilador NO ve") | Reportes > R15 |
+| **Notas de version visibles para el usuario (2026-08-28)** | El historial de lo liberado se escribia a mano al pie de `Directory.Build.props`, **dentro de un comentario XML con vinetas `--`, lo cual rompia el `[xml]` que lee `publicar.bat` y tumbo una publicacion** (error `"+" no es una cadena de version valida` en el restore). Se saco de ahi (el archivo ya solo tiene el `<Version>`, con una advertencia escrita) y se convirtio en modulo: `tblNotaVersion` + `tblNotaVersionDetalle` + `tblTipoCambioVersion` (enumerado de ID fijo 1 Proyecto / 2 Mejora / 3 Defecto, **el mismo eje del estandar de versionado**, para que la nota justifique por que subio el digito que subio). Guardado atomico del arbol con patron `uiId`; el `Orden` lo renumera el backend segun la posicion en el arreglo. Bajas: la nota es logica, los renglones fisica (son contenido en edicion, no historia). `GET /api/v1/notas-version` **no exige permiso a proposito** (cualquier usuario autenticado debe poder ver que trae la version que usa); redactar y publicar exige `ADM.NotasVersion`. El usuario lo abre desde el sello de version de la barra superior, que ahora es clickeable (se respeto la logica del descuadre ambar: si bundle y API no coinciden, el tooltip sigue avisando del despliegue a medias). **Las 3 entidades y su config en `DbContextGTE` se escribieron A MANO, sin re-scaffold**, porque habia trabajo en curso de otro equipo sobre la misma BD -- queda anotado en el `DbContext`; conviene cotejar el mapeo contra `INFORMATION_SCHEMA` la proxima vez que se toque. Scripts en `06_Scripts`: `01` esquema + permiso (ya corrido), `02` carga de las notas 1.18-1.21 migradas del texto viejo y reescritas en voz de usuario, **como borrador** (la redaccion es una interpretacion de peticiones y hay que revisarla antes de publicar). **Sin verificar en vivo**; backend y frontend compilan limpio | Administracion > Notas de version, sello de version de la barra superior |
 
 **Inventario:** 156 endpoints en 19 controladores + 1 hub de SignalR · 20 pantallas ·
 18 scripts SQL (mínimo; recuento aproximado entre sesiones paralelas) · ~100 tablas
@@ -760,6 +990,12 @@ transiciones automáticas configurables.
   checksums de la migracion en B3 arriba). Decision del negocio: el filtro se queda
   como esta: el pendiente real es capturar Responsable/Equipo en esos proyectos
   (via el nuevo boton Editar de Administracion > Proyectos), no relajar el filtro.
+  **Actualizacion 2026-09-09:** desde este dia hay una tercera via de acceso que si
+  cuenta para el filtro -- un rol acotado al proyecto, dado en Admin > Proyectos >
+  Accesos. No es una relajacion del filtro: es un acceso capturado a mano, proyecto
+  por proyecto, que hasta ahora se otorgaba y el combo ignoraba. Los proyectos
+  migrados sin Responsable ni Equipo siguen invisibles hasta que se les capture el
+  dato o se le de acceso explicito a alguien.
 - **Dato de prueba en LocalDB:** proyecto `TESTCERR` ("Proyecto prueba cierre"),
   llevado a Cancelado a proposito para probar RN-PRY-02, con un WorkItem
   `TESTCERR-0001` creado antes de cerrar el proyecto -- queda como esta en LocalDB,
@@ -934,6 +1170,25 @@ transiciones automáticas configurables.
   `PlaneacionQueryService`).
 - **EF y SPs con valor de retorno**: `ExecuteSqlRaw` no sirve; usar `DbCommand` con
   `ParameterDirection.ReturnValue` (ver `MotorWorkflow`).
+- **Dos fallos de EF que el compilador NO ve y solo aparecen contra datos reales** (2026-08-28,
+  R15: los dos tumbaron el reporte en producción, uno tras otro, después de haberlo dado por
+  bueno porque "compilaba limpio"):
+  1. **Constructor dentro del `Select` de un `GroupBy` que entra a un join → no traduce.** Se
+     usó `new RelojEstatusDTO(g.Key, g.Sum(...))` (record posicional) como subconsulta de un
+     LEFT JOIN: EF pierde el tipo, castea las llaves a `object` y lanza *The LINQ expression
+     could not be translated* al EJECUTAR. Correcto: tipo de **referencia** con propiedades
+     settables e **inicializador de objeto** (`new X { A = ..., B = ... }`), o un tipo anónimo.
+  2. **`SUM()` de un LEFT JOIN llega NULL y revienta al MATERIALIZAR.** Un item sin filas del
+     lado derecho hace que el SUM sea NULL; leerlo en un `int` no nullable da *Nullable object
+     must have a value*, con la consulta ya traducida y ejecutada. Correcto: la propiedad
+     destino va como `int?` (o el SUM casteado a `(int?)`) y se coalesce al proyectar. Ademas,
+     probar `r.Minutos != null` en vez de `r == null`: EF aplana el LEFT JOIN en columnas, no
+     entrega un objeto nulo.
+  **Lección de método**, más allá de los dos casos: `dotnet build` y `oxlint` en verde NO son
+  evidencia de que una consulta EF funciona. `ToQueryString()` (que no abre conexión) cubre la
+  traducción pero es CIEGO a la materialización, porque nunca lee filas. La regresión de los dos
+  patrones está en `GTE.Api.Tests/TraduccionConsultasR15Tests.cs`, que corre sin BD y por eso es
+  útil en cualquier máquina; la segunda trampa se cubre exigiendo `COALESCE` en el SQL generado.
 - **MUI 9**: `justifyContent`, `alignItems`, `flexWrap` y `display` van dentro de `sx`, no
   como props.
 - **Fechas `DateOnly`**: `new Date("2026-07-31")` se interpreta como UTC y muestra el día

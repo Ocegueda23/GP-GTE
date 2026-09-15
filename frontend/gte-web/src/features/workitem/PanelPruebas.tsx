@@ -198,10 +198,11 @@ export function PanelPruebas({ idWorkItem, idProyecto, alExito, alError }: Props
                 </TableCell>
                 <TableCell align="right">
                   <Stack direction="row" spacing={0.5} sx={{ justifyContent: "flex-end" }}>
-                    <Button size="small" startIcon={<PlaylistAddCheckIcon fontSize="small" />}
-                      onClick={() => abrirRegistrarResultado(caso)}>
-                      Registrar
-                    </Button>
+                    <Tooltip title="Registrar resultado">
+                      <IconButton size="small" onClick={() => abrirRegistrarResultado(caso)}>
+                        <PlaylistAddCheckIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
                     <Tooltip title="Quitar de este elemento">
                       <IconButton size="small" onClick={() => void retirar(caso.idWorkItemCasoPrueba)}>
                         <DeleteOutlineIcon fontSize="small" />

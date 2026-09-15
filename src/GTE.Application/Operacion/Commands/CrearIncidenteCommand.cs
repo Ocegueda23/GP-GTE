@@ -18,6 +18,7 @@ public class CrearIncidenteValidator : AbstractValidator<CrearIncidenteCommand>
         RuleFor(c => c.Datos.Titulo).NotEmpty().WithMessage("El titulo es obligatorio.").MaximumLength(200);
         RuleFor(c => c.Datos.IdProyecto).GreaterThan(0).WithMessage("El proyecto es obligatorio.");
         RuleFor(c => c.Datos.IdSeveridad).GreaterThan(0).WithMessage("La severidad es obligatoria.");
+        RuleFor(c => c.Datos.IdCategoriaIncidente).GreaterThan(0).WithMessage("La categoria es obligatoria.");
         RuleFor(c => c.Datos.FechaOcurrencia).NotEqual(default(DateTime)).WithMessage("La fecha de ocurrencia es obligatoria.");
     }
 }
@@ -40,7 +41,8 @@ public class CrearIncidenteHandler(
         var folio = await folios.GenerarAsync($"INC-{DateTime.Today.Year}", cancellationToken: cancellationToken);
 
         var idIncidente = await repositorio.CrearAsync(new IncidenteNuevo(
-            folio, command.Datos.IdProyecto, command.Datos.IdSeveridad, command.Datos.Titulo.Trim(),
+            folio, command.Datos.IdProyecto, command.Datos.IdSeveridad,
+            command.Datos.IdCategoriaIncidente, command.Datos.Titulo.Trim(),
             command.Datos.Descripcion, command.Datos.FechaOcurrencia, command.Datos.FechaDeteccion),
             cancellationToken);
 

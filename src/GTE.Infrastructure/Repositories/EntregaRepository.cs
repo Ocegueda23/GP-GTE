@@ -94,6 +94,22 @@ public class EntregaRepository(FabricaContexto fabrica, AuditContext auditoria)
         await RegistrarBitacoraAsync("Release", idRelease, "INSTRUCCIONES", null, cancellationToken);
     }
 
+    public async Task AsignarLiderAsync(
+        int idRelease, int? idLiderAsignado, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
+        var entidad = await contexto.TblRelease
+            .FirstOrDefaultAsync(r => r.IdRelease == idRelease, cancellationToken)
+            ?? throw new InvalidOperationException($"Release {idRelease} no existe.");
+
+        entidad.IdLiderAsignado = idLiderAsignado;
+        MarcarMovimiento(entidad);
+        await contexto.SaveChangesAsync(cancellationToken);
+
+        await RegistrarBitacoraAsync("Release", idRelease, "ASIGNAR_LIDER",
+            idLiderAsignado?.ToString(), cancellationToken);
+    }
+
     public async Task AplicarEfectosTransicionAsync(
         int idRelease, string accion, CancellationToken cancellationToken = default)
     {
@@ -194,8 +210,8 @@ public class EntregaRepository(FabricaContexto fabrica, AuditContext auditoria)
         var artefacto = await contexto.TblArtefacto
             .FirstOrDefaultAsync(a => a.IdArtefacto == idArtefacto, cancellationToken);
 
-        // tblReleaseArtefacto no tiene columnas de movimiento; la baja queda en bitacora.
         vinculo.Activo = false;
+        MarcarMovimientoVinculoArtefacto(vinculo);
         if (artefacto is not null)
         {
             artefacto.Activo = false;
@@ -246,6 +262,7 @@ public class EntregaRepository(FabricaContexto fabrica, AuditContext auditoria)
             IdArtefactoRollback = datos.IdArtefactoRollback,
             JustificacionIrreversible = datos.JustificacionIrreversible,
             InstruccionesImplementacion = datos.InstruccionesImplementacion,
+            VersionArtefacto = datos.VersionArtefacto,
             UsuarioRegistro = Auditoria.Usuario,
             Activo = true
         });
@@ -254,6 +271,49 @@ public class EntregaRepository(FabricaContexto fabrica, AuditContext auditoria)
         await RegistrarBitacoraAsync("Release", datos.IdRelease, "AGREGAR_ARTEFACTO",
             datos.Nombre, cancellationToken);
         return artefacto.IdArtefacto;
+    }
+
+    public async Task<bool> EditarArtefactoAsync(
+        ArtefactoEditar datos, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
+
+        var vinculo = await contexto.TblReleaseArtefacto
+            .FirstOrDefaultAsync(
+                ra => ra.IdRelease == datos.IdRelease && ra.IdArtefacto == datos.IdArtefacto && ra.Activo,
+                cancellationToken);
+        if (vinculo is null)
+        {
+            return false;
+        }
+
+        var artefacto = await contexto.TblArtefacto
+            .FirstOrDefaultAsync(a => a.IdArtefacto == datos.IdArtefacto, cancellationToken);
+        if (artefacto is null)
+        {
+            return false;
+        }
+
+        // El nombre, el tipo y el hash describen el objeto (tblArtefacto); el orden, la
+        // reversa, el instructivo y la version son de ESTA entrega (tblReleaseArtefacto):
+        // el mismo objeto se libera con version distinta en cada release.
+        artefacto.Nombre = datos.Nombre;
+        artefacto.IdTipoArtefacto = datos.IdTipoArtefacto;
+        artefacto.HashSha256 = datos.HashSha256;
+        MarcarMovimientoArtefacto(artefacto);
+
+        vinculo.OrdenEjecucion = datos.OrdenEjecucion;
+        vinculo.IdArtefactoRollback = datos.IdArtefactoRollback;
+        vinculo.JustificacionIrreversible = datos.JustificacionIrreversible;
+        vinculo.InstruccionesImplementacion = datos.InstruccionesImplementacion;
+        vinculo.VersionArtefacto = datos.VersionArtefacto;
+        MarcarMovimientoVinculoArtefacto(vinculo);
+
+        await contexto.SaveChangesAsync(cancellationToken);
+
+        await RegistrarBitacoraAsync("Release", datos.IdRelease, "EDITAR_ARTEFACTO",
+            datos.Nombre, cancellationToken);
+        return true;
     }
 
     public async Task<IReadOnlyList<ArtefactoRelease>> ObtenerArtefactosAsync(
@@ -267,7 +327,7 @@ public class EntregaRepository(FabricaContexto fabrica, AuditContext auditoria)
             select new ArtefactoRelease(
                 ra.IdReleaseArtefacto, a.IdArtefacto, a.Nombre, a.IdTipoArtefacto,
                 ra.OrdenEjecucion, ra.IdArtefactoRollback, ra.JustificacionIrreversible,
-                ra.InstruccionesImplementacion)
+                ra.InstruccionesImplementacion, ra.VersionArtefacto)
             ).ToListAsync(cancellationToken);
     }
 
@@ -294,6 +354,31 @@ public class EntregaRepository(FabricaContexto fabrica, AuditContext auditoria)
         return respaldo.IdReleaseRespaldo;
     }
 
+    public async Task<bool> EditarRespaldoAsync(
+        RespaldoEditar datos, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
+
+        var respaldo = await contexto.TblReleaseRespaldo
+            .FirstOrDefaultAsync(
+                r => r.IdReleaseRespaldo == datos.IdReleaseRespaldo
+                     && r.IdRelease == datos.IdRelease && r.Activo,
+                cancellationToken);
+        if (respaldo is null)
+        {
+            return false;
+        }
+
+        respaldo.IdTipoRespaldo = datos.IdTipoRespaldo;
+        respaldo.Descripcion = datos.Descripcion;
+        MarcarMovimientoRespaldo(respaldo);
+        await contexto.SaveChangesAsync(cancellationToken);
+
+        await RegistrarBitacoraAsync("Release", datos.IdRelease, "EDITAR_RESPALDO",
+            datos.Descripcion, cancellationToken);
+        return true;
+    }
+
     public async Task<bool> QuitarRespaldoAsync(
         int idRelease, int idRespaldo, CancellationToken cancellationToken = default)
     {
@@ -308,8 +393,8 @@ public class EntregaRepository(FabricaContexto fabrica, AuditContext auditoria)
             return false;
         }
 
-        // tblReleaseRespaldo no tiene columnas de movimiento; la baja queda en bitacora.
         respaldo.Activo = false;
+        MarcarMovimientoRespaldo(respaldo);
         await contexto.SaveChangesAsync(cancellationToken);
 
         await RegistrarBitacoraAsync("Release", idRelease, "QUITAR_RESPALDO",
@@ -453,6 +538,42 @@ public class EntregaRepository(FabricaContexto fabrica, AuditContext auditoria)
             aprobada ? "APROBAR" : "RECHAZAR", $"Firma {firmaHash[..16]}", cancellationToken);
     }
 
+    /// <summary>
+    /// Cierra como Omitidas las firmas que seguian Pendientes cuando alguien autorizo el
+    /// release. Se les escribe el autorizador, su motivo y su firma electronica: la fila
+    /// queda resuelta y trazable, pero con estatus Omitida para que la Solicitud de
+    /// despliegue no las presuma como firmadas. Las que ya se habian resuelto no se tocan.
+    /// </summary>
+    public async Task<int> OmitirAprobacionesPendientesAsync(
+        int idRelease, int idAutorizador, string motivo, string firmaHash,
+        CancellationToken cancellationToken = default)
+    {
+        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
+
+        var pendientes = await contexto.TblAprobacion
+            .Where(a => a.Entidad == EntidadAprobacion
+                        && a.IdEntidad == idRelease
+                        && a.Activo
+                        && a.IdEstatusAprobacion == EstatusAprobacion.Pendiente)
+            .ToListAsync(cancellationToken);
+
+        foreach (var pendiente in pendientes)
+        {
+            pendiente.IdAprobador = idAutorizador;
+            pendiente.IdEstatusAprobacion = EstatusAprobacion.Omitida;
+            pendiente.Comentario = motivo;
+            pendiente.FirmaHash = firmaHash;
+            pendiente.FechaResolucion = DateTime.Now;
+        }
+
+        await contexto.SaveChangesAsync(cancellationToken);
+
+        await RegistrarBitacoraAsync("Release", idRelease, AccionesRelease.Autorizar,
+            $"Firmas omitidas: {pendientes.Count}. Firma {firmaHash[..16]}", cancellationToken);
+
+        return pendientes.Count;
+    }
+
     public async Task<AprobacionRelease?> ObtenerAprobacionAsync(
         int idAprobacion, CancellationToken cancellationToken = default)
     {
@@ -562,6 +683,18 @@ public class EntregaRepository(FabricaContexto fabrica, AuditContext auditoria)
     }
 
     private void MarcarMovimientoArtefacto(TblArtefacto entidad)
+    {
+        entidad.UsuarioMovto = Auditoria.Usuario.Length > 50 ? Auditoria.Usuario[..50] : Auditoria.Usuario;
+        entidad.FechaMovto = DateTime.Now;
+    }
+
+    private void MarcarMovimientoVinculoArtefacto(TblReleaseArtefacto entidad)
+    {
+        entidad.UsuarioMovto = Auditoria.Usuario.Length > 50 ? Auditoria.Usuario[..50] : Auditoria.Usuario;
+        entidad.FechaMovto = DateTime.Now;
+    }
+
+    private void MarcarMovimientoRespaldo(TblReleaseRespaldo entidad)
     {
         entidad.UsuarioMovto = Auditoria.Usuario.Length > 50 ? Auditoria.Usuario[..50] : Auditoria.Usuario;
         entidad.FechaMovto = DateTime.Now;

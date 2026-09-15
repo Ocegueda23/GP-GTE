@@ -19,7 +19,20 @@ public class TicketResponse
     public DateTime? FechaPrimeraRespuesta { get; set; }
     public DateTime? FechaResolucion { get; set; }
     public string? Solucion { get; set; }
+
+    /// <summary>Minutos que captura a mano el ingeniero al RESOLVER (lo que dice que invirtio).</summary>
     public int? MinutosSolucion { get; set; }
+
+    /// <summary>
+    /// Tiempo de atencion medido por el sistema: minutos laborables que el ticket lleva o
+    /// llevo en estatus En Atencion, segun el historial de estatus y el horario de su SLA.
+    /// Corre en vivo mientras siga En Atencion. Null si nunca se inicio la atencion o si el
+    /// ticket no trae SLA (sin horario no hay contra que medir).
+    /// </summary>
+    public int? MinutosAtencion { get; set; }
+
+    /// <summary>true mientras el ticket siga En Atencion: MinutosAtencion sigue creciendo.</summary>
+    public bool AtencionEnCurso { get; set; }
     public string? UsuarioSolicitante { get; set; }
     public string? Locacion { get; set; }
     public int? IdWorkItemDerivado { get; set; }

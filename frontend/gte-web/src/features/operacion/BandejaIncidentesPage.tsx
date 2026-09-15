@@ -2,7 +2,7 @@ import { useState } from "react";
 import {
   Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent,
   DialogTitle, IconButton, Menu, MenuItem, Paper,
-  Snackbar, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  Snackbar, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   TextField, Tooltip, Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
@@ -13,11 +13,14 @@ import { Link as RouterLink } from "react-router-dom";
 import { ErrorApi } from "../../shared/api/http";
 import { ComboBuscable, ComboBuscableMultiple } from "../../shared/components/ComboBuscable";
 import { EncabezadoOrdenable } from "../../shared/components/EncabezadoOrdenable";
-import { obtenerCatalogosBandeja, type AccionDisponible, type CatalogosBandeja } from "../../shared/api/workitems";
+import { OrdenMovil } from "../../shared/components/OrdenMovil";
+import { TarjetaListado } from "../../shared/components/TarjetaListado";
+import { useEsMovil } from "../../shared/hooks/useEsMovil";
+import { formatearMinutos, obtenerCatalogosBandeja, type AccionDisponible, type CatalogosBandeja } from "../../shared/api/workitems";
 import {
   cambiarEstatusIncidente, cambiarSeveridadIncidente, colorEstatusIncidente, colorSeveridad,
   crearIncidente, filtroBandejaIncidentesInicial, obtenerAccionesIncidente,
-  obtenerBandejaIncidentes, vincularCorrectivo, type Incidente,
+  obtenerBandejaIncidentes, opcionesCategoriaIncidente, vincularCorrectivo, type Incidente,
 } from "../../shared/api/incidentes";
 
 function formatearFecha(iso: string | null): string {
@@ -31,6 +34,15 @@ function fechaLocalAhora(): string {
   return ahora.toISOString().slice(0, 16);
 }
 
+/** Reloj corrido desde que el incidente entro En Atencion; sigue corriendo mientras no
+    se mitigue o resuelva. */
+function tiempoAtencion(incidente: Incidente): string {
+  if (incidente.minutosAtencion === null) return "-";
+  return incidente.atencionEnCurso
+    ? `${formatearMinutos(incidente.minutosAtencion)} (en curso)`
+    : formatearMinutos(incidente.minutosAtencion);
+}
+
 /** Contrato de IDs de dbo.tblEstatusIncidente (GTE.Domain.Operacion.EstatusIncidente). */
 const ESTATUS_INCIDENTE = [
   { id: 1, nombre: "Detectado" },
@@ -40,6 +52,18 @@ const ESTATUS_INCIDENTE = [
   { id: 5, nombre: "Cerrado" },
 ];
 
+/** Mismas claves que los encabezados ordenables de la tabla, para el selector de movil. */
+const COLUMNAS_ORDEN = [
+  { valor: "folio", etiqueta: "Folio" },
+  { valor: "titulo", etiqueta: "Titulo" },
+  { valor: "proyecto", etiqueta: "Proyecto" },
+  { valor: "categoria", etiqueta: "Categoria" },
+  { valor: "severidad", etiqueta: "Severidad" },
+  { valor: "estatus", etiqueta: "Estatus" },
+  { valor: "fechaOcurrencia", etiqueta: "Ocurrencia" },
+  { valor: "fechaResolucion", etiqueta: "Resolucion" },
+];
+
 /** P17 - Incidentes: bandeja de operacion (permiso INC.Gestionar). */
 export function BandejaIncidentesPage() {
   const [texto, setTexto] = useState("");
@@ -47,9 +71,10 @@ export function BandejaIncidentesPage() {
   const [aviso, setAviso] = useState<{ tipo: "success" | "error"; mensaje: string } | null>(null);
   const [idProyecto, setIdProyecto] = useState<number | "">("");
   const [idSeveridad, setIdSeveridad] = useState<number | "">("");
+  const [idCategoria, setIdCategoria] = useState<number | "">("");
   // Sin filtro = abiertos (todos menos Cerrado); "Todos" (-1) sigue disponible como opcion
   // explicita en el combo de abajo.
-  const [filtroEstatus, setFiltroEstatus] = useState<number[]>([]);
+  const [filtroEstatus, setFiltroEstatus] = useState<number[]>([-1]);
   const [filtroSeveridad, setFiltroSeveridad] = useState<number | "">("");
   const [filtroProyecto, setFiltroProyecto] = useState<number | "">("");
   const [titulo, setTitulo] = useState("");
@@ -60,8 +85,11 @@ export function BandejaIncidentesPage() {
   const [ordenarPor, setOrdenarPor] = useState<string | null>(null);
   const [ordenDescendente, setOrdenDescendente] = useState(false);
   const clienteQuery = useQueryClient();
+  const esMovil = useEsMovil();
 
   const manejarOrden = (clave: string) => {
+    // Cadena vacia = el selector de movil se quedo sin columna (boton de limpiar del combo).
+    if (clave === "") { setOrdenarPor(null); setOrdenDescendente(false); return; }
     if (ordenarPor === clave) setOrdenDescendente((d) => !d);
     else { setOrdenarPor(clave); setOrdenDescendente(false); }
   };
@@ -86,8 +114,20 @@ export function BandejaIncidentesPage() {
   });
 
   const refrescar = () => clienteQuery.invalidateQueries({ queryKey: ["bandeja-incidentes"] });
+  const items = bandeja.data?.items ?? [];
+  const sinResultados = bandeja.data !== undefined && items.length === 0;
 
-  const valido = titulo.trim().length > 0 && idProyecto !== "" && idSeveridad !== "" && fechaOcurrencia !== "";
+  const menuAcciones = (i: Incidente) => (
+    <MenuAccionesIncidente
+      incidente={i}
+      catalogos={catalogos.data}
+      alExito={(mensaje) => { setAviso({ tipo: "success", mensaje }); void refrescar(); }}
+      alError={(mensaje) => setAviso({ tipo: "error", mensaje })}
+    />
+  );
+
+  const valido = titulo.trim().length > 0 && idProyecto !== "" && idSeveridad !== ""
+    && idCategoria !== "" && fechaOcurrencia !== "";
 
   const guardar = async () => {
     if (!valido) return;
@@ -96,6 +136,7 @@ export function BandejaIncidentesPage() {
       const { mensaje } = await crearIncidente({
         idProyecto: idProyecto as number,
         idSeveridad: idSeveridad as number,
+        idCategoriaIncidente: idCategoria as number,
         titulo: titulo.trim(),
         descripcion: descripcion.trim() || null,
         fechaOcurrencia: new Date(fechaOcurrencia).toISOString(),
@@ -107,6 +148,7 @@ export function BandejaIncidentesPage() {
       setDescripcion("");
       setIdProyecto("");
       setIdSeveridad("");
+      setIdCategoria("");
       setFechaOcurrencia(fechaLocalAhora());
       setFechaDeteccion("");
       await refrescar();
@@ -118,17 +160,18 @@ export function BandejaIncidentesPage() {
   };
 
   return (
-    <Box sx={{ p: 2 }}>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+    <Box sx={{ p: { xs: 1.5, sm: 2 } }}>
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={1}
+        sx={{ justifyContent: "space-between", alignItems: { xs: "stretch", sm: "center" }, mb: 2 }}>
         <Typography variant="h5" sx={{ fontWeight: 700 }}>Incidentes</Typography>
         <Button variant="contained" startIcon={<AddIcon />} onClick={() => setModal(true)}>
           Nuevo incidente
         </Button>
-      </Box>
+      </Stack>
 
       <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5, mb: 2 }}>
         <TextField size="small" label="Buscar folio o titulo" value={texto}
-          onChange={(e) => setTexto(e.target.value)} sx={{ minWidth: 260 }} />
+          onChange={(e) => setTexto(e.target.value)} sx={{ minWidth: { xs: "100%", sm: 260 } }} />
         <ComboBuscableMultiple
           label="Estatus"
           value={filtroEstatus}
@@ -141,7 +184,7 @@ export function BandejaIncidentesPage() {
             { valor: -1, etiqueta: "Todos" },
             ...ESTATUS_INCIDENTE.map((e) => ({ valor: e.id, etiqueta: e.nombre })),
           ]}
-          sx={{ minWidth: 220 }}
+          sx={{ minWidth: { xs: "100%", sm: 220 } }}
         />
         <ComboBuscable
           label="Severidad"
@@ -151,7 +194,7 @@ export function BandejaIncidentesPage() {
             { valor: "", etiqueta: "Todas" },
             ...(catalogos.data?.severidades ?? []).map((s) => ({ valor: s.id, etiqueta: s.nombre })),
           ]}
-          sx={{ minWidth: 160 }}
+          sx={{ minWidth: { xs: "100%", sm: 160 } }}
         />
         <ComboBuscable
           label="Proyecto"
@@ -161,77 +204,125 @@ export function BandejaIncidentesPage() {
             { valor: "", etiqueta: "Todos" },
             ...(catalogos.data?.proyectos ?? []).map((p) => ({ valor: p.id, etiqueta: `${p.clave} - ${p.nombre}` })),
           ]}
-          sx={{ minWidth: 220 }}
+          sx={{ minWidth: { xs: "100%", sm: 220 } }}
         />
+
+        {/* En movil la tabla se cambia por tarjetas y no quedan encabezados donde ordenar. */}
+        {esMovil && (
+          <OrdenMovil opciones={COLUMNAS_ORDEN} ordenarPor={ordenarPor}
+            descendente={ordenDescendente} onOrdenar={manejarOrden} />
+        )}
       </Box>
 
       {bandeja.isError && (
         <Alert severity="error" sx={{ mb: 2 }}>{(bandeja.error as Error).message}</Alert>
       )}
 
-      <Paper variant="outlined">
-        <TableContainer sx={{ overflowX: "auto" }}>
-          <Table size="small">
-            <TableHead>
-              <TableRow sx={{ "& th": { fontWeight: 700, whiteSpace: "nowrap" } }}>
-                <EncabezadoOrdenable clave="folio" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Folio</EncabezadoOrdenable>
-                <EncabezadoOrdenable clave="titulo" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Titulo</EncabezadoOrdenable>
-                <EncabezadoOrdenable clave="proyecto" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Proyecto</EncabezadoOrdenable>
-                <EncabezadoOrdenable clave="severidad" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Severidad</EncabezadoOrdenable>
-                <EncabezadoOrdenable clave="estatus" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Estatus</EncabezadoOrdenable>
-                <EncabezadoOrdenable clave="fechaOcurrencia" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Ocurrencia</EncabezadoOrdenable>
-                <EncabezadoOrdenable clave="fechaResolucion" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Resolucion</EncabezadoOrdenable>
-                <TableCell align="center">Acciones</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {bandeja.data?.items.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={8}>
-                    <Typography color="text.secondary" sx={{ py: 4, textAlign: "center" }}>
-                      No hay incidentes con estos filtros.
-                    </Typography>
-                  </TableCell>
-                </TableRow>
+      {esMovil ? (
+        <Stack spacing={1}>
+          {sinResultados && (
+            <Paper variant="outlined" sx={{ p: 3 }}>
+              <Typography color="text.secondary" sx={{ textAlign: "center" }}>
+                No hay incidentes con estos filtros.
+              </Typography>
+            </Paper>
+          )}
+          {items.map((i) => (
+            <TarjetaListado
+              key={i.idIncidente}
+              encabezado={(
+                <>
+                  <Typography component={RouterLink} to={`/operacion/incidentes/${i.folio}`} variant="body2"
+                    sx={{ fontWeight: 700, color: "info.main" }}>
+                    {i.folio}
+                  </Typography>
+                  <Chip size="small" label={i.estatus} color={colorEstatusIncidente(i.idEstatus)} />
+                  <Chip size="small" label={i.severidad} color={colorSeveridad(i.idSeveridad)} />
+                </>
               )}
-              {bandeja.data?.items.map((i) => (
-                <TableRow key={i.idIncidente} hover>
-                  <TableCell sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>
-                    <Typography component={RouterLink} to={`/operacion/incidentes/${i.folio}`} variant="body2"
-                      sx={{ fontWeight: 600, color: "info.main" }}>
-                      {i.folio}
-                    </Typography>
-                  </TableCell>
-                  <TableCell sx={{ maxWidth: 280 }}>
-                    <Tooltip title={i.descripcion ?? ""}>
-                      <Typography noWrap variant="body2">{i.titulo}</Typography>
-                    </Tooltip>
-                  </TableCell>
-                  <TableCell sx={{ whiteSpace: "nowrap" }}>{i.proyecto}</TableCell>
-                  <TableCell>
-                    <Chip size="small" label={i.severidad} color={colorSeveridad(i.idSeveridad)} />
-                  </TableCell>
-                  <TableCell>
-                    <Chip size="small" label={i.estatus} color={colorEstatusIncidente(i.idEstatus)} />
-                  </TableCell>
-                  <TableCell sx={{ whiteSpace: "nowrap" }}>{formatearFecha(i.fechaOcurrencia)}</TableCell>
-                  <TableCell sx={{ whiteSpace: "nowrap" }}>{formatearFecha(i.fechaResolucion)}</TableCell>
-                  <TableCell align="center">
-                    <MenuAccionesIncidente
-                      incidente={i}
-                      catalogos={catalogos.data}
-                      alExito={(mensaje) => { setAviso({ tipo: "success", mensaje }); void refrescar(); }}
-                      alError={(mensaje) => setAviso({ tipo: "error", mensaje })}
-                    />
-                  </TableCell>
+              titulo={(
+                <Typography component={RouterLink} to={`/operacion/incidentes/${i.folio}`} variant="body2"
+                  sx={{ fontWeight: 600, color: "text.primary", textDecoration: "none" }}>
+                  {i.titulo}
+                </Typography>
+              )}
+              campos={[
+                { etiqueta: "Proyecto", valor: i.proyecto, completo: true },
+                { etiqueta: "Categoria", valor: i.categoriaIncidente ?? "-", completo: true },
+                { etiqueta: "Ocurrencia", valor: formatearFecha(i.fechaOcurrencia) },
+                { etiqueta: "Resolucion", valor: formatearFecha(i.fechaResolucion) },
+                { etiqueta: "Tiempo atencion", valor: tiempoAtencion(i) },
+              ]}
+              acciones={menuAcciones(i)}
+            />
+          ))}
+        </Stack>
+      ) : (
+        <Paper variant="outlined">
+          <TableContainer sx={{ overflowX: "auto" }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow sx={{ "& th": { fontWeight: 700, whiteSpace: "nowrap" } }}>
+                  <EncabezadoOrdenable clave="folio" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Folio</EncabezadoOrdenable>
+                  <EncabezadoOrdenable clave="titulo" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Titulo</EncabezadoOrdenable>
+                  <EncabezadoOrdenable clave="proyecto" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Proyecto</EncabezadoOrdenable>
+                  <EncabezadoOrdenable clave="categoria" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Categoria</EncabezadoOrdenable>
+                  <EncabezadoOrdenable clave="severidad" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Severidad</EncabezadoOrdenable>
+                  <EncabezadoOrdenable clave="estatus" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Estatus</EncabezadoOrdenable>
+                  <EncabezadoOrdenable clave="fechaOcurrencia" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Ocurrencia</EncabezadoOrdenable>
+                  <EncabezadoOrdenable clave="fechaResolucion" ordenActual={ordenarPor} descendente={ordenDescendente} onOrdenar={manejarOrden}>Resolucion</EncabezadoOrdenable>
+                  <TableCell align="right">Tiempo atencion</TableCell>
+                  <TableCell align="center">Acciones</TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+              </TableHead>
+              <TableBody>
+                {sinResultados && (
+                  <TableRow>
+                    <TableCell colSpan={10}>
+                      <Typography color="text.secondary" sx={{ py: 4, textAlign: "center" }}>
+                        No hay incidentes con estos filtros.
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                )}
+                {items.map((i) => (
+                  <TableRow key={i.idIncidente} hover>
+                    <TableCell sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>
+                      <Typography component={RouterLink} to={`/operacion/incidentes/${i.folio}`} variant="body2"
+                        sx={{ fontWeight: 600, color: "info.main" }}>
+                        {i.folio}
+                      </Typography>
+                    </TableCell>
+                    <TableCell sx={{ maxWidth: 280 }}>
+                      <Tooltip title={i.descripcion ?? ""}>
+                        <Typography noWrap variant="body2">{i.titulo}</Typography>
+                      </Tooltip>
+                    </TableCell>
+                    <TableCell sx={{ whiteSpace: "nowrap" }}>{i.proyecto}</TableCell>
+                    <TableCell sx={{ whiteSpace: "nowrap" }}>{i.categoriaIncidente ?? "-"}</TableCell>
+                    <TableCell>
+                      <Chip size="small" label={i.severidad} color={colorSeveridad(i.idSeveridad)} />
+                    </TableCell>
+                    <TableCell>
+                      <Chip size="small" label={i.estatus} color={colorEstatusIncidente(i.idEstatus)} />
+                    </TableCell>
+                    <TableCell sx={{ whiteSpace: "nowrap" }}>{formatearFecha(i.fechaOcurrencia)}</TableCell>
+                    <TableCell sx={{ whiteSpace: "nowrap" }}>{formatearFecha(i.fechaResolucion)}</TableCell>
+                    <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                      {tiempoAtencion(i)}
+                    </TableCell>
+                    <TableCell align="center">
+                      {menuAcciones(i)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+      )}
 
-      <Dialog open={modal} onClose={() => setModal(false)} fullWidth maxWidth="sm">
+      <Dialog open={modal} onClose={() => setModal(false)} fullWidth maxWidth="sm" fullScreen={esMovil}>
         <DialogTitle>Nuevo incidente</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
           <ComboBuscable
@@ -247,6 +338,13 @@ export function BandejaIncidentesPage() {
             value={idSeveridad}
             onChange={(v) => setIdSeveridad(v as number | "")}
             opciones={(catalogos.data?.severidades ?? []).map((s) => ({ valor: s.id, etiqueta: s.nombre }))}
+          />
+          <ComboBuscable
+            label="Categoria"
+            required
+            value={idCategoria}
+            onChange={(v) => setIdCategoria(v as number | "")}
+            opciones={opcionesCategoriaIncidente(catalogos.data?.categoriasIncidente ?? [])}
           />
           <TextField size="small" required label="Titulo" value={titulo}
             onChange={(e) => setTitulo(e.target.value)} slotProps={{ htmlInput: { maxLength: 200 } }} />
@@ -296,6 +394,11 @@ function MenuAccionesIncidente({ incidente, catalogos, alExito, alError }: Props
   const [idPrioridad, setIdPrioridad] = useState<number | "">("");
   const [idAsignado, setIdAsignado] = useState<number | "">("");
   const [fechaCompromiso, setFechaCompromiso] = useState("");
+  const esMovil = useEsMovil();
+  // En la tarjeta de movil los iconos de accion se llevan a 44 px, el area tocable
+  // minima: "small" los deja en 30 y ni "medium" con un icono chico pasa de 35.
+  const tamanoIcono = esMovil ? "medium" : "small";
+  const areaTactil = esMovil ? { width: 44, height: 44 } : undefined;
 
   const abrirMenu = async (evento: React.MouseEvent<HTMLElement>) => {
     setAncla(evento.currentTarget);
@@ -369,17 +472,17 @@ function MenuAccionesIncidente({ incidente, catalogos, alExito, alError }: Props
 
   return (
     <>
-      <IconButton size="small" onClick={abrirMenu} aria-label={`Acciones de ${incidente.folio}`}>
+      <IconButton size={tamanoIcono} sx={areaTactil} onClick={abrirMenu} aria-label={`Acciones de ${incidente.folio}`}>
         {cargando ? <CircularProgress size={18} /> : <MoreVertIcon fontSize="small" />}
       </IconButton>
       <Tooltip title="Cambiar severidad">
-        <IconButton size="small" onClick={() => { setNuevaSeveridad(incidente.idSeveridad); setMotivoSeveridad(""); setDialogoSeveridad(true); }}>
+        <IconButton size={tamanoIcono} sx={areaTactil} onClick={() => { setNuevaSeveridad(incidente.idSeveridad); setMotivoSeveridad(""); setDialogoSeveridad(true); }}>
           <AddIcon fontSize="small" sx={{ transform: "rotate(45deg)" }} />
         </IconButton>
       </Tooltip>
       {!incidente.idWorkItemCorrectivo && (
         <Tooltip title="Vincular correctivo">
-          <IconButton size="small" onClick={() => { setIdPrioridad(""); setIdAsignado(""); setFechaCompromiso(""); setDialogoCorrectivo(true); }}>
+          <IconButton size={tamanoIcono} sx={areaTactil} onClick={() => { setIdPrioridad(""); setIdAsignado(""); setFechaCompromiso(""); setDialogoCorrectivo(true); }}>
             <BuildIcon fontSize="small" />
           </IconButton>
         </Tooltip>
@@ -392,7 +495,7 @@ function MenuAccionesIncidente({ incidente, catalogos, alExito, alError }: Props
         ))}
       </Menu>
 
-      <Dialog open={accionConMotivo !== null} onClose={() => setAccionConMotivo(null)} fullWidth>
+      <Dialog open={accionConMotivo !== null} onClose={() => setAccionConMotivo(null)} fullWidth fullScreen={esMovil}>
         <DialogTitle>{accionConMotivo?.etiqueta} - {incidente.folio}</DialogTitle>
         <DialogContent>
           <TextField autoFocus fullWidth multiline minRows={2} margin="dense"
@@ -407,7 +510,7 @@ function MenuAccionesIncidente({ incidente, catalogos, alExito, alError }: Props
         </DialogActions>
       </Dialog>
 
-      <Dialog open={dialogoSeveridad} onClose={() => setDialogoSeveridad(false)} fullWidth maxWidth="xs">
+      <Dialog open={dialogoSeveridad} onClose={() => setDialogoSeveridad(false)} fullWidth maxWidth="xs" fullScreen={esMovil}>
         <DialogTitle>Cambiar severidad de {incidente.folio}</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
           <ComboBuscable
@@ -429,7 +532,7 @@ function MenuAccionesIncidente({ incidente, catalogos, alExito, alError }: Props
         </DialogActions>
       </Dialog>
 
-      <Dialog open={dialogoCorrectivo} onClose={() => setDialogoCorrectivo(false)} fullWidth maxWidth="xs">
+      <Dialog open={dialogoCorrectivo} onClose={() => setDialogoCorrectivo(false)} fullWidth maxWidth="xs" fullScreen={esMovil}>
         <DialogTitle>Vincular correctivo a {incidente.folio}</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
           <ComboBuscable

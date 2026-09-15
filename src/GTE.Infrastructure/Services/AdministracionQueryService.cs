@@ -86,6 +86,7 @@ public class AdministracionQueryService(FabricaContexto fabrica) : IAdministraci
                 Descripcion = e.Descripcion,
                 IdLider = e.IdLider,
                 Lider = l != null ? l.Nombre : null,
+                AmbitoCentroMando = e.AmbitoCentroMando,
                 TotalMiembros = contexto.TblEquipoMiembro.Count(m => m.IdEquipo == e.IdEquipo && m.Activo)
             }).ToListAsync(cancellationToken);
     }
@@ -105,7 +106,8 @@ public class AdministracionQueryService(FabricaContexto fabrica) : IAdministraci
                 Nombre = e.Nombre,
                 Descripcion = e.Descripcion,
                 IdLider = e.IdLider,
-                Lider = l != null ? l.Nombre : null
+                Lider = l != null ? l.Nombre : null,
+                AmbitoCentroMando = e.AmbitoCentroMando
             }).FirstOrDefaultAsync(cancellationToken);
 
         if (equipo is null)
@@ -276,6 +278,34 @@ public class AdministracionQueryService(FabricaContexto fabrica) : IAdministraci
                 Proyecto = p != null ? p.Nombre : null,
                 IdEquipo = ur.IdEquipo,
                 Equipo = e != null ? e.Nombre : null
+            }).ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Accesos del proyecto: mismas filas de tblUsuarioRol que ve la pantalla de usuarios,
+    /// pero filtradas por el proyecto. Solo las vigentes (Activo): las retiradas se quedan
+    /// como historia y las lee la bitacora, no esta pantalla.
+    /// </summary>
+    public async Task<IReadOnlyList<AccesoProyectoResponse>> ObtenerAccesosProyectoAsync(
+        int idProyecto, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
+        return await (
+            from ur in contexto.TblUsuarioRol.AsNoTracking()
+            where ur.IdProyecto == idProyecto && ur.Activo
+            join u in contexto.TblUsuario.AsNoTracking() on ur.IdUsuario equals u.IdUsuario
+            join r in contexto.TblRol.AsNoTracking() on ur.IdRol equals r.IdRol
+            orderby u.Nombre, r.Nombre
+            select new AccesoProyectoResponse
+            {
+                IdUsuarioRol = ur.IdUsuarioRol,
+                IdUsuario = ur.IdUsuario,
+                Usuario = u.Nombre,
+                Dominio = u.Dominio,
+                IdRol = ur.IdRol,
+                Rol = r.Nombre,
+                FechaRegistro = ur.FechaRegistro,
+                UsuarioRegistro = ur.UsuarioRegistro
             }).ToListAsync(cancellationToken);
     }
 

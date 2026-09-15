@@ -11,13 +11,15 @@ namespace GTE.Infrastructure.Repositories;
 public class PlaneacionRepository(FabricaContexto fabrica, AuditContext auditoria)
     : RepositoryBase(fabrica, auditoria), IPlaneacionRepository
 {
-    public async Task<int> CrearSprintAsync(SprintNuevo datos, CancellationToken cancellationToken = default)
+    public async Task<int> CrearSprintAsync(
+        SprintNuevo datos, string folio, CancellationToken cancellationToken = default)
     {
         await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
 
         var entidad = new TblSprint
         {
-            IdEquipo = datos.IdEquipo,
+            Folio = folio,
+            IdLider = datos.IdLider,
             Nombre = datos.Nombre,
             Objetivo = datos.Objetivo,
             FechaInicio = datos.FechaInicio,
@@ -69,17 +71,34 @@ public class PlaneacionRepository(FabricaContexto fabrica, AuditContext auditori
         return await contexto.TblSprint.AsNoTracking()
             .Where(s => s.IdSprint == idSprint)
             .Select(s => new EstadoSprint(
-                s.IdSprint, s.IdEquipo, s.Nombre, s.IdEstatusSprint,
+                s.IdSprint, s.IdLider, s.Nombre, s.IdEstatusSprint,
                 s.FechaInicio, s.FechaFin, s.Activo))
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    public async Task<int?> ObtenerSprintActivoAsync(
-        int idEquipo, int idExcluido, CancellationToken cancellationToken = default)
+    public async Task AsignarLiderSprintAsync(
+        int idSprint, int? idLider, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
+        var entidad = await contexto.TblSprint
+            .FirstOrDefaultAsync(s => s.IdSprint == idSprint, cancellationToken)
+            ?? throw new InvalidOperationException($"Sprint {idSprint} no existe.");
+
+        entidad.IdLider = idLider;
+        entidad.UsuarioMovto = Auditoria.Usuario.Length > 50 ? Auditoria.Usuario[..50] : Auditoria.Usuario;
+        entidad.FechaMovto = DateTime.Now;
+        await contexto.SaveChangesAsync(cancellationToken);
+
+        await RegistrarBitacoraAsync("Sprint", idSprint, "ASIGNAR_LIDER",
+            idLider?.ToString() ?? "sin asignar", cancellationToken);
+    }
+
+    public async Task<int?> ObtenerSprintActivoPorLiderAsync(
+        int idLider, int idExcluido, CancellationToken cancellationToken = default)
     {
         await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
         return await contexto.TblSprint.AsNoTracking()
-            .Where(s => s.IdEquipo == idEquipo
+            .Where(s => s.IdLider == idLider
                         && s.IdEstatusSprint == EstatusSprint.Activo
                         && s.IdSprint != idExcluido
                         && s.Activo)
@@ -87,12 +106,12 @@ public class PlaneacionRepository(FabricaContexto fabrica, AuditContext auditori
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    public async Task<int?> ObtenerSiguienteSprintPlaneadoAsync(
-        int idEquipo, int idSprintActual, CancellationToken cancellationToken = default)
+    public async Task<int?> ObtenerSiguienteSprintPlaneadoPorLiderAsync(
+        int idLider, int idSprintActual, CancellationToken cancellationToken = default)
     {
         await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
         return await contexto.TblSprint.AsNoTracking()
-            .Where(s => s.IdEquipo == idEquipo
+            .Where(s => s.IdLider == idLider
                         && s.IdEstatusSprint == EstatusSprint.Planeado
                         && s.IdSprint != idSprintActual
                         && s.Activo)
@@ -181,30 +200,36 @@ public class PlaneacionRepository(FabricaContexto fabrica, AuditContext auditori
         await contexto.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<MiembroEquipo>> ObtenerMiembrosEquipoAsync(
-        int idEquipo, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<MiembroEquipo>> ObtenerMiembrosPorLiderAsync(
+        int idLider, CancellationToken cancellationToken = default)
     {
         await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
         return await (
             from em in contexto.TblEquipoMiembro.AsNoTracking()
+            join eq in contexto.TblEquipo.AsNoTracking() on em.IdEquipo equals eq.IdEquipo
             join u in contexto.TblUsuario.AsNoTracking() on em.IdUsuario equals u.IdUsuario
-            where em.IdEquipo == idEquipo && em.Activo && u.Activo
-            select new MiembroEquipo(u.IdUsuario, u.Nombre, u.IdHorario, em.PorcentajeDedicacion)
-            ).ToListAsync(cancellationToken);
+            where eq.IdLider == idLider && eq.Activo && em.Activo && u.Activo
+            select new { u.IdUsuario, u.Nombre, u.IdHorario, em.PorcentajeDedicacion }
+            ).Distinct()
+            .Select(m => new MiembroEquipo(m.IdUsuario, m.Nombre, m.IdHorario, m.PorcentajeDedicacion))
+            .ToListAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<AusenciaAprobada>> ObtenerAusenciasAprobadasAsync(
-        int idEquipo, DateOnly desde, DateOnly hasta, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<AusenciaAprobada>> ObtenerAusenciasAprobadasPorLiderAsync(
+        int idLider, DateOnly desde, DateOnly hasta, CancellationToken cancellationToken = default)
     {
         await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
         return await (
             from a in contexto.TblAusencia.AsNoTracking()
             join em in contexto.TblEquipoMiembro.AsNoTracking() on a.IdUsuario equals em.IdUsuario
-            where em.IdEquipo == idEquipo && em.Activo && a.Activo
+            join eq in contexto.TblEquipo.AsNoTracking() on em.IdEquipo equals eq.IdEquipo
+            where eq.IdLider == idLider && eq.Activo && em.Activo && a.Activo
                   && a.IdEstatusAusencia == 2      // Aprobada
                   && a.FechaInicio <= hasta && a.FechaFin >= desde
-            select new AusenciaAprobada(a.IdUsuario, a.FechaInicio, a.FechaFin)
-            ).ToListAsync(cancellationToken);
+            select new { a.IdUsuario, a.FechaInicio, a.FechaFin }
+            ).Distinct()
+            .Select(a => new AusenciaAprobada(a.IdUsuario, a.FechaInicio, a.FechaFin))
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<ColumnaTablero>> ObtenerOCrearColumnasAsync(

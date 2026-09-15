@@ -64,6 +64,36 @@ public class AdministracionController(IMediator mediator) : ControllerBase
         return Ok(ApiResponse<ProyectoResponse>.Exito(resultado, $"El proyecto paso a {resultado.Estatus}."));
     }
 
+    /* ---------- Accesos del proyecto (pestana Accesos) ---------- */
+
+    /// <summary>
+    /// Quien tiene que rol EN ESTE proyecto. Son las filas de tblUsuarioRol acotadas al
+    /// proyecto: la misma tabla que la pantalla de usuarios, vista desde el otro lado.
+    /// </summary>
+    [HttpGet("proyectos/{id:int}/accesos")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<AccesoProyectoResponse>>>> ObtenerAccesosProyecto(
+        int id, CancellationToken cancellationToken)
+    {
+        var resultado = await mediator.Send(new ObtenerAccesosProyectoQuery(id), cancellationToken);
+        return Ok(ApiResponse<IReadOnlyList<AccesoProyectoResponse>>.Exito(resultado));
+    }
+
+    [HttpPost("proyectos/{id:int}/accesos")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<AccesoProyectoResponse>>>> AsignarAccesoProyecto(
+        int id, [FromBody] AsignarAccesoProyectoRequest request, CancellationToken cancellationToken)
+    {
+        var resultado = await mediator.Send(new AsignarAccesoProyectoCommand(id, request), cancellationToken);
+        return Ok(ApiResponse<IReadOnlyList<AccesoProyectoResponse>>.Exito(resultado, "Acceso asignado."));
+    }
+
+    [HttpPut("proyectos/{id:int}/accesos/{idUsuarioRol:int}/retirar")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<AccesoProyectoResponse>>>> RetirarAccesoProyecto(
+        int id, int idUsuarioRol, CancellationToken cancellationToken)
+    {
+        var resultado = await mediator.Send(new RetirarAccesoProyectoCommand(id, idUsuarioRol), cancellationToken);
+        return Ok(ApiResponse<IReadOnlyList<AccesoProyectoResponse>>.Exito(resultado, "Acceso retirado."));
+    }
+
     /* ---------- Equipos ---------- */
 
     [HttpGet("equipos")]

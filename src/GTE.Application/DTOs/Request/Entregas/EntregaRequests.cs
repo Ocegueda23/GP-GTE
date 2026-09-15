@@ -52,6 +52,27 @@ public class ArtefactoAgregarRequest
 
     /// <summary>HTML enriquecido con el instructivo propio de este artefacto.</summary>
     public string? InstruccionesImplementacion { get; set; }
+
+    /// <summary>
+    /// Version que se libera de este artefacto en este release. Texto libre porque conviven
+    /// los 4 digitos de aplicaciones e instaladores y los 3 de procedimientos almacenados.
+    /// </summary>
+    public string? VersionArtefacto { get; set; }
+}
+
+/// <summary>
+/// Cambios a un artefacto ya registrado. Mismo payload que el alta: la pantalla manda el
+/// artefacto completo, no un parche. Solo aplica mientras el release esta En Preparacion.
+/// </summary>
+public class ArtefactoEditarRequest : ArtefactoAgregarRequest;
+
+/// <summary>Cambios a un respaldo ya registrado; igual que artefactos, solo En Preparacion.</summary>
+public class RespaldoEditarRequest : RespaldoAgregarRequest;
+
+/// <summary>Lider responsable de la entrega. Nulo lo desasigna.</summary>
+public class AsignarLiderRequest
+{
+    public int? IdLiderAsignado { get; set; }
 }
 
 /// <summary>Respaldo que se debe tomar antes de desplegar (apartado de la Solicitud).</summary>

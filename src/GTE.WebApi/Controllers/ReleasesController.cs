@@ -17,9 +17,13 @@ public class ReleasesController(IMediator mediator) : ControllerBase
     public async Task<ActionResult<ApiResponse<IReadOnlyList<ReleaseResponse>>>> ObtenerReleases(
         [FromQuery] int? idProyecto = null,
         [FromQuery] bool soloAbiertos = true,
+        [FromQuery] int? idEstatus = null,
+        [FromQuery] int? idLiderAsignado = null,
         CancellationToken cancellationToken = default)
     {
-        var resultado = await mediator.Send(new ObtenerReleasesQuery(idProyecto, soloAbiertos), cancellationToken);
+        var resultado = await mediator.Send(
+            new ObtenerReleasesQuery(idProyecto, soloAbiertos, idEstatus, idLiderAsignado),
+            cancellationToken);
         return Ok(ApiResponse<IReadOnlyList<ReleaseResponse>>.Exito(resultado));
     }
 
@@ -85,6 +89,29 @@ public class ReleasesController(IMediator mediator) : ControllerBase
         return Ok(ApiResponse<ReleaseDetalleResponse>.Exito(resultado, "Instrucciones de implementacion guardadas."));
     }
 
+    /// <summary>Lider responsable de la entrega; cuerpo con IdLiderAsignado nulo lo desasigna.</summary>
+    [HttpPut("releases/{id:int}/lider")]
+    public async Task<ActionResult<ApiResponse<ReleaseDetalleResponse>>> AsignarLider(
+        int id, [FromBody] AsignarLiderRequest request, CancellationToken cancellationToken)
+    {
+        var resultado = await mediator.Send(
+            new AsignarLiderCommand(id, request.IdLiderAsignado), cancellationToken);
+        return Ok(ApiResponse<ReleaseDetalleResponse>.Exito(resultado,
+            resultado.IdLiderAsignado.HasValue
+                ? $"Lider asignado: {resultado.LiderAsignado}."
+                : "Lider desasignado."));
+    }
+
+    /// <summary>Edita un artefacto del release; solo mientras esta En Preparacion.</summary>
+    [HttpPut("releases/{id:int}/artefactos/{idArtefacto:int}")]
+    public async Task<ActionResult<ApiResponse<object>>> EditarArtefacto(
+        int id, int idArtefacto, [FromBody] ArtefactoEditarRequest request,
+        CancellationToken cancellationToken)
+    {
+        await mediator.Send(new EditarArtefactoCommand(id, idArtefacto, request), cancellationToken);
+        return Ok(ApiResponse<object>.Exito(new { }, "Artefacto actualizado."));
+    }
+
     [HttpDelete("releases/{id:int}/artefactos/{idArtefacto:int}")]
     public async Task<ActionResult<ApiResponse<object>>> QuitarArtefacto(
         int id, int idArtefacto, CancellationToken cancellationToken)
@@ -108,6 +135,16 @@ public class ReleasesController(IMediator mediator) : ControllerBase
     {
         var idRespaldo = await mediator.Send(new AgregarRespaldoCommand(id, request), cancellationToken);
         return Ok(ApiResponse<int>.Exito(idRespaldo, "Respaldo registrado."));
+    }
+
+    /// <summary>Edita un respaldo del release; solo mientras esta En Preparacion.</summary>
+    [HttpPut("releases/{id:int}/respaldos/{idRespaldo:int}")]
+    public async Task<ActionResult<ApiResponse<object>>> EditarRespaldo(
+        int id, int idRespaldo, [FromBody] RespaldoEditarRequest request,
+        CancellationToken cancellationToken)
+    {
+        await mediator.Send(new EditarRespaldoCommand(id, idRespaldo, request), cancellationToken);
+        return Ok(ApiResponse<object>.Exito(new { }, "Respaldo actualizado."));
     }
 
     [HttpDelete("releases/{id:int}/respaldos/{idRespaldo:int}")]

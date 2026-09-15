@@ -16,6 +16,17 @@ public class ReleaseResponse
 
     public int IdEstatus { get; set; }
     public string Estatus { get; set; } = string.Empty;
+
+    /// <summary>Lider responsable de sacar la entrega; nulo mientras no se le asigna.</summary>
+    public int? IdLiderAsignado { get; set; }
+
+    public string? LiderAsignado { get; set; }
+
+    /// <summary>Quien dio de alta el release (tblRelease.UsuarioRegistro), para el listado.</summary>
+    public string CreadoPor { get; set; } = string.Empty;
+
+    public DateTime FechaCreacion { get; set; }
+
     public DateOnly? FechaPlan { get; set; }
     public DateTime? FechaLiberacion { get; set; }
     public int TotalItems { get; set; }
@@ -61,6 +72,13 @@ public class ArtefactoResponse
     public int? IdArtefactoRollback { get; set; }
     public string? NombreRollback { get; set; }
     public string? JustificacionIrreversible { get; set; }
+
+    /// <summary>
+    /// Version que se libera de este artefacto EN ESTE release (el mismo objeto se libera
+    /// con versiones distintas en cada entrega). Texto libre: conviven los 4 digitos de
+    /// aplicaciones e instaladores y los 3 de procedimientos almacenados.
+    /// </summary>
+    public string? VersionArtefacto { get; set; }
 
     /// <summary>Instructivo propio del artefacto, en HTML enriquecido (ver ReleaseResponse).</summary>
     public string? InstruccionesImplementacion { get; set; }

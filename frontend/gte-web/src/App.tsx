@@ -1,6 +1,6 @@
 import {
   AppBar, Badge, Box, Button, Chip, CssBaseline, Divider, Drawer, IconButton, List,
-  ListItemButton, ListItemText, Menu, MenuItem, Stack, ThemeProvider, Toolbar, Tooltip,
+  ListItemButton, ListItemText, ListSubheader, Menu, MenuItem, Stack, ThemeProvider, Toolbar, Tooltip,
   Typography, createTheme, type PaletteMode,
 } from "@mui/material";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
@@ -17,11 +17,13 @@ import {
 } from "./shared/api/notificaciones";
 import { useConexionTiempoReal } from "./shared/tiempoReal/useConexionTiempoReal";
 import { VERSION_FRONTEND, obtenerVersionApi } from "./shared/api/version";
+import { PanelNotasVersion } from "./features/notasVersion/PanelNotasVersion";
 import { BandejaPage } from "./features/trabajo/BandejaPage";
 import { DetallePage } from "./features/workitem/DetallePage";
 import { MiDiaPage } from "./features/midia/MiDiaPage";
 import { PortalPage } from "./features/solicitudes/PortalPage";
 import { TriagePage } from "./features/triage/TriagePage";
+import { AusenciasPage } from "./features/ausencias/AusenciasPage";
 import { PortalTicketsPage } from "./features/soporte/PortalTicketsPage";
 import { BandejaTicketsPage } from "./features/soporte/BandejaTicketsPage";
 import { DetalleTicketPage } from "./features/soporte/DetalleTicketPage";
@@ -30,6 +32,9 @@ import { DetalleIncidentePage } from "./features/operacion/DetalleIncidentePage"
 import { PortafolioPage } from "./features/portafolio/PortafolioPage";
 import { BacklogPage } from "./features/planeacion/BacklogPage";
 import { TableroPage } from "./features/planeacion/TableroPage";
+import { SprintsPage } from "./features/planeacion/SprintsPage";
+import { DetalleSprintPage } from "./features/planeacion/DetalleSprintPage";
+import { DetalleReleasePage } from "./features/entregas/DetalleReleasePage";
 import { ReleasesPage } from "./features/entregas/ReleasesPage";
 import { SolicitudDesplieguePage } from "./features/entregas/SolicitudDesplieguePage";
 import { GuardiaSesion } from "./features/sesion/GuardiaSesion";
@@ -38,6 +43,7 @@ import { IndicadoresEjecutivosPage } from "./features/indicadoresEjecutivos/Indi
 import { ActividadUsuarioPage } from "./features/reportes/ActividadUsuarioPage";
 import { CatalogoReportesPage } from "./features/reportes/CatalogoReportesPage";
 import { AdminPage } from "./features/admin/AdminPage";
+import { CasosPruebaPage } from "./features/calidad/CasosPruebaPage";
 import { WorkflowsPage } from "./features/admin/WorkflowsPage";
 import { CatalogosPage } from "./features/catalogos/CatalogosPage";
 import { CatalogosAdminPage } from "./features/catalogos/admin/CatalogosAdminPage";
@@ -254,35 +260,84 @@ function useModoTema() {
 
 const ANCHO_MENU = 220;
 
-/** Opciones del menu con el/los permisos que las habilita (null = disponible para todos). */
-const NAVEGACION: { ruta: string; etiqueta: string; permiso: string | string[] | null }[] = [
-  { ruta: "/mi-dia", etiqueta: "Mi dia", permiso: null },
-  { ruta: "/trabajo", etiqueta: "Trabajo", permiso: null },
-  { ruta: "/tablero", etiqueta: "Tablero", permiso: null },
-  { ruta: "/backlog", etiqueta: "Backlog", permiso: "PLA.GestionarSprints" },
-  { ruta: "/releases", etiqueta: "Releases", permiso: "REL.Crear" },
-  { ruta: "/solicitudes", etiqueta: "Solicitudes", permiso: null },
-  { ruta: "/triage", etiqueta: "Revision de solicitudes", permiso: "SOL.Triage" },
-  { ruta: "/tickets", etiqueta: "Mis tickets", permiso: null },
-  { ruta: "/soporte", etiqueta: "Mesa de ayuda", permiso: "TKT.Atender" },
-  { ruta: "/operacion/incidentes", etiqueta: "Incidentes", permiso: "INC.Gestionar" },
-  { ruta: "/dashboard-ejecutivo", etiqueta: "Dashboard ejecutivo", permiso: null },
-  { ruta: "/indicadores-ejecutivos", etiqueta: "Indicadores ejecutivos", permiso: ["DASH.Ejecutivo", "DASH.VerDepartamento"] },
-  { ruta: "/centro-mando", etiqueta: "Centro de Mando TI", permiso: "GES.Ver" },
-  { ruta: "/centro-mando/catalogo", etiqueta: "Indicadores de gestion", permiso: "GES.Administrar" },
-  { ruta: "/portafolio", etiqueta: "Portafolio", permiso: ["POR.GestionarCosteo", "POR.GestionarOkr", "RPT.Costos"] },
-  { ruta: "/reportes", etiqueta: "Reportes", permiso: ["RPT.Ver", "RPT.Costos", "RPT.Auditoria", "RPT.Actividad"] },
-  { ruta: "/catalogos", etiqueta: "Catalogos", permiso: null },
-  { ruta: "/catalogos/admin", etiqueta: "Administrar catalogos", permiso: "ADM.CatalogoGenerico" },
-  { ruta: "/admin", etiqueta: "Administracion", permiso: ["ADM.Usuarios", "ADM.Roles"] },
-  { ruta: "/admin/workflows", etiqueta: "Workflows", permiso: "ADM.Workflows" },
-  // P23 es "Todos" en el Documento Maestro: leer no exige permiso (escribir si, CON.Administrar).
-  { ruta: "/conocimiento", etiqueta: "Base de conocimiento", permiso: null },
-  { ruta: "/reglas-negocio", etiqueta: "Reglas de negocio", permiso: "RGN.Ver" },
-  { ruta: "/ayuda", etiqueta: "Ayuda", permiso: null },
-  // El Manual de usuario es para todos; el Centro de Mando TI describe como se evalua a
-  // cada responsable de area, asi que exige permiso (el backend tambien lo valida).
-  { ruta: "/ayuda/centro-mando", etiqueta: "Centro de Mando TI", permiso: "AYU.CentroMando" },
+type OpcionMenu = { ruta: string; etiqueta: string; permiso: string | string[] | null };
+
+/**
+ * Menu agrupado por ciclo de trabajo: de lo que uno hace todos los dias hacia lo que se
+ * configura una vez. Las 24 entradas planas de antes obligaban a barrer la lista completa
+ * para encontrar cualquier cosa.
+ *
+ * Una seccion completa desaparece si el usuario no tiene permiso para ninguna de sus
+ * opciones (ver ListaNavegacion): no tiene caso pintar un encabezado vacio.
+ */
+const SECCIONES_MENU: { seccion: string; opciones: OpcionMenu[] }[] = [
+  {
+    seccion: "Mi trabajo",
+    opciones: [
+      { ruta: "/mi-dia", etiqueta: "Mi dia", permiso: null },
+      { ruta: "/trabajo", etiqueta: "Trabajo", permiso: null },
+      { ruta: "/tablero", etiqueta: "Tablero", permiso: null },
+      { ruta: "/tickets", etiqueta: "Mis tickets", permiso: null },
+      // Registrar la propia ausencia no exige permiso; la pestaña de aprobacion dentro
+      // de la pantalla si (ADM.Ausencias), y el backend la vuelve a validar.
+      { ruta: "/ausencias", etiqueta: "Ausencias", permiso: null },
+    ],
+  },
+  {
+    seccion: "Planeacion y entrega",
+    opciones: [
+      { ruta: "/sprints", etiqueta: "Sprints", permiso: "PLA.GestionarSprints" },
+      { ruta: "/backlog", etiqueta: "Backlog", permiso: "PLA.GestionarSprints" },
+      { ruta: "/releases", etiqueta: "Releases", permiso: "REL.Crear" },
+      { ruta: "/portafolio", etiqueta: "Portafolio", permiso: ["POR.GestionarCosteo", "POR.GestionarOkr", "RPT.Costos"] },
+    ],
+  },
+  {
+    seccion: "Calidad",
+    opciones: [
+      { ruta: "/calidad/casos-prueba", etiqueta: "Casos de prueba", permiso: "QA.GestionarPlanes" },
+    ],
+  },
+  {
+    seccion: "Demanda y soporte",
+    opciones: [
+      { ruta: "/solicitudes", etiqueta: "Solicitudes", permiso: null },
+      { ruta: "/triage", etiqueta: "Revision de solicitudes", permiso: "SOL.Triage" },
+      { ruta: "/soporte", etiqueta: "Mesa de ayuda", permiso: "TKT.Atender" },
+      { ruta: "/operacion/incidentes", etiqueta: "Incidentes", permiso: "INC.Gestionar" },
+    ],
+  },
+  {
+    seccion: "Indicadores",
+    opciones: [
+      { ruta: "/dashboard-ejecutivo", etiqueta: "Dashboard ejecutivo", permiso: null },
+      { ruta: "/indicadores-ejecutivos", etiqueta: "Indicadores ejecutivos", permiso: ["DASH.Ejecutivo", "DASH.VerDepartamento"] },
+      { ruta: "/centro-mando", etiqueta: "Centro de Mando TI", permiso: "GES.Ver" },
+      { ruta: "/reportes", etiqueta: "Reportes", permiso: ["RPT.Ver", "RPT.Costos", "RPT.Auditoria", "RPT.Actividad"] },
+    ],
+  },
+  {
+    seccion: "Conocimiento",
+    opciones: [
+      // P23 es "Todos" en el Documento Maestro: leer no exige permiso (escribir si, CON.Administrar).
+      { ruta: "/conocimiento", etiqueta: "Base de conocimiento", permiso: null },
+      { ruta: "/reglas-negocio", etiqueta: "Reglas de negocio", permiso: "RGN.Ver" },
+      { ruta: "/ayuda", etiqueta: "Ayuda", permiso: null },
+      // El Manual de usuario es para todos; el Centro de Mando TI describe como se evalua a
+      // cada responsable de area, asi que exige permiso (el backend tambien lo valida).
+      { ruta: "/ayuda/centro-mando", etiqueta: "Ayuda: Centro de Mando TI", permiso: "AYU.CentroMando" },
+    ],
+  },
+  {
+    seccion: "Configuracion",
+    opciones: [
+      { ruta: "/catalogos", etiqueta: "Catalogos", permiso: null },
+      { ruta: "/catalogos/admin", etiqueta: "Administrar catalogos", permiso: "ADM.CatalogoGenerico" },
+      { ruta: "/admin", etiqueta: "Administracion", permiso: ["ADM.Usuarios", "ADM.Roles"] },
+      { ruta: "/admin/workflows", etiqueta: "Workflows", permiso: "ADM.Workflows" },
+      { ruta: "/centro-mando/catalogo", etiqueta: "Indicadores de gestion", permiso: "GES.Administrar" },
+    ],
+  },
 ];
 
 function CampanaNotificaciones() {
@@ -365,22 +420,37 @@ function ListaNavegacion({ alNavegar }: { alNavegar?: () => void }) {
   const { puede } = useSesion();
   const ubicacion = useLocation();
 
+  const visibles = SECCIONES_MENU
+    .map((s) => ({
+      ...s,
+      opciones: s.opciones.filter((opcion) => opcion.permiso === null
+        || (Array.isArray(opcion.permiso) ? opcion.permiso.some(puede) : puede(opcion.permiso))),
+    }))
+    .filter((s) => s.opciones.length > 0);
+
   return (
-    <List sx={{ pt: 1 }}>
-      {NAVEGACION
-        .filter((opcion) => opcion.permiso === null
-          || (Array.isArray(opcion.permiso) ? opcion.permiso.some(puede) : puede(opcion.permiso)))
-        .map((opcion) => (
-          <ListItemButton
-            key={opcion.ruta}
-            component={RouterLink}
-            to={opcion.ruta}
-            selected={ubicacion.pathname === opcion.ruta}
-            onClick={alNavegar}
-          >
-            <ListItemText primary={opcion.etiqueta} />
-          </ListItemButton>
-        ))}
+    <List sx={{ pt: 1 }} disablePadding>
+      {visibles.map((s) => (
+        <li key={s.seccion}>
+          <ListSubheader disableSticky
+            sx={{ lineHeight: 2.2, fontSize: 11, letterSpacing: 0.6, textTransform: "uppercase" }}>
+            {s.seccion}
+          </ListSubheader>
+          {s.opciones.map((opcion) => (
+            <ListItemButton
+              key={opcion.ruta}
+              component={RouterLink}
+              to={opcion.ruta}
+              selected={ubicacion.pathname === opcion.ruta}
+              onClick={alNavegar}
+              sx={{ pl: 3 }}
+            >
+              <ListItemText primary={opcion.etiqueta}
+                slotProps={{ primary: { variant: "body2" } }} />
+            </ListItemButton>
+          ))}
+        </li>
+      ))}
     </List>
   );
 }
@@ -393,6 +463,7 @@ function ListaNavegacion({ alNavegar }: { alNavegar?: () => void }) {
  * reves) y el sello se pinta en ambar para que salte a la vista.
  */
 function SelloVersion() {
+  const [novedadesAbiertas, setNovedadesAbiertas] = useState(false);
   const { data: versionApi } = useQuery({
     queryKey: ["version-api"],
     queryFn: obtenerVersionApi,
@@ -411,22 +482,43 @@ function SelloVersion() {
     ? `API ${versionApi.version} · ${versionApi.ambiente}`
     : "No se pudo consultar la version del API";
 
+  const titulo = descuadre
+    ? `${detalle}. El frontend y el API no coinciden: el despliegue quedo a medias.`
+    : `${detalle}. Click para ver las novedades.`;
+
   return (
-    <Tooltip title={descuadre ? `${detalle}. El frontend y el API no coinciden: el despliegue quedo a medias.` : detalle}>
-      <Typography
-        variant="caption"
-        sx={{
-          display: "block",
-          lineHeight: 1,
-          letterSpacing: 0,
-          opacity: descuadre ? 1 : 0.7,
-          color: descuadre ? "warning.main" : "inherit",
-          cursor: "default",
-        }}
-      >
-        v{sello}{descuadre ? " !" : ""}
-      </Typography>
-    </Tooltip>
+    <>
+      <Tooltip title={titulo}>
+        <Typography
+          variant="caption"
+          role="button"
+          tabIndex={0}
+          onClick={() => setNovedadesAbiertas(true)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setNovedadesAbiertas(true);
+            }
+          }}
+          sx={{
+            display: "block",
+            lineHeight: 1,
+            letterSpacing: 0,
+            opacity: descuadre ? 1 : 0.7,
+            color: descuadre ? "warning.main" : "inherit",
+            cursor: "pointer",
+            "&:hover": { textDecoration: "underline" },
+          }}
+        >
+          v{sello}{descuadre ? " !" : ""}
+        </Typography>
+      </Tooltip>
+      <PanelNotasVersion
+        abierto={novedadesAbiertas}
+        alCerrar={() => setNovedadesAbiertas(false)}
+        versionActual={sello}
+      />
+    </>
   );
 }
 
@@ -549,7 +641,12 @@ function AplicacionAutenticada({ modo, alternarModo }: { modo: PaletteMode; alte
               <ListaNavegacion alNavegar={() => setMenuMovilAbierto(false)} />
             </Drawer>
 
-            <Box component="main" sx={{ flexGrow: 1, width: { sm: `calc(100% - ${ANCHO_MENU}px)` } }}>
+            {/* minWidth: 0 es indispensable: como flex item, main nace con min-width auto
+                y no puede encogerse por debajo del contenido mas ancho que tenga dentro
+                (una tabla, una barra de pestanas). Sin esto, en un celular cualquier
+                pantalla con contenido ancho estira el documento completo y deja la barra
+                superior y el resto del contenido barriendose en horizontal. */}
+            <Box component="main" sx={{ flexGrow: 1, minWidth: 0, width: { sm: `calc(100% - ${ANCHO_MENU}px)` } }}>
               <Toolbar variant="dense" />
               <Routes>
                 <Route path="/" element={<Navigate to="/mi-dia" replace />} />
@@ -558,10 +655,16 @@ function AplicacionAutenticada({ modo, alternarModo }: { modo: PaletteMode; alte
                 <Route path="/wi/:folio" element={<DetallePage />} />
                 <Route path="/tablero" element={<TableroPage />} />
                 <Route path="/backlog" element={<BacklogPage />} />
+                <Route path="/sprints" element={<SprintsPage />} />
+                <Route path="/sprints/:id" element={<DetalleSprintPage />} />
                 <Route path="/releases" element={<ReleasesPage />} />
+                {/* La ruta de la solicitud va antes que /releases/:id para que "solicitud"
+                    no se lea como un id de release. */}
                 <Route path="/releases/:id/solicitud" element={<SolicitudDesplieguePage />} />
+                <Route path="/releases/:id" element={<DetalleReleasePage />} />
                 <Route path="/solicitudes" element={<PortalPage />} />
                 <Route path="/triage" element={<TriagePage />} />
+                <Route path="/ausencias" element={<AusenciasPage />} />
                 <Route path="/tickets" element={<PortalTicketsPage />} />
                 <Route path="/tickets/:folio" element={<DetalleTicketPage />} />
                 <Route path="/soporte" element={<BandejaTicketsPage />} />
@@ -575,6 +678,7 @@ function AplicacionAutenticada({ modo, alternarModo }: { modo: PaletteMode; alte
                 <Route path="/catalogos" element={<CatalogosPage />} />
                 <Route path="/catalogos/admin" element={<CatalogosAdminPage />} />
                 <Route path="/admin" element={<AdminPage />} />
+                <Route path="/calidad/casos-prueba" element={<CasosPruebaPage />} />
                 <Route path="/admin/workflows" element={<WorkflowsPage />} />
                 <Route path="/conocimiento" element={<ConocimientoPage />} />
                 <Route path="/conocimiento/:id" element={<DetalleArticuloPage />} />

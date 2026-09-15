@@ -50,6 +50,8 @@ public class RevisionQueryService(FabricaContexto fabrica) : IRevisionQueryServi
                    IdEstatus = r.IdEstatusRevision,
                    Estatus = e.Descripcion,
                    Corregido = r.Corregido,
+                   EsFalsoPositivo = r.EsFalsoPositivo,
+                   MotivoDescarte = r.MotivoDescarte,
                    FechaCorreccion = r.FechaCorreccion,
                    FechaRegistro = r.FechaRegistro,
                    IdSeveridad = r.IdSeveridad,

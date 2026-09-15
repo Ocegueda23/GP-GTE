@@ -5,7 +5,7 @@ namespace GTE.Application.Interfaces;
 public interface IPlaneacionQueryService
 {
     Task<IReadOnlyList<SprintResponse>> ObtenerSprintsAsync(
-        int? idEquipo, bool soloAbiertos, CancellationToken cancellationToken = default);
+        int? idSprint, int? idEstatus, int? idLider, bool soloAbiertos, CancellationToken cancellationToken = default);
 
     Task<SprintResponse?> ObtenerSprintAsync(int idSprint, CancellationToken cancellationToken = default);
 
@@ -17,8 +17,12 @@ public interface IPlaneacionQueryService
 
     Task<BacklogResponse> ObtenerItemsDeSprintAsync(int idSprint, CancellationToken cancellationToken = default);
 
-    /// <summary>idEquipo null = vista consolidada de todos los equipos.</summary>
-    Task<TableroResponse> ObtenerTableroAsync(int? idEquipo, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// idEquipo null = vista consolidada de todos los equipos; idAsignado null = todas las
+    /// personas (el tablero filtra por quien tiene asignado el elemento).
+    /// </summary>
+    Task<TableroResponse> ObtenerTableroAsync(
+        int? idEquipo, int? idAsignado, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<PuntoBurndownResponse>> ObtenerBurndownAsync(
         int idSprint, CancellationToken cancellationToken = default);

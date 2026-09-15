@@ -6,7 +6,11 @@ using MediatR;
 
 namespace GTE.Application.Entregas.Queries;
 
-public record ObtenerReleasesQuery(int? IdProyecto, bool SoloAbiertos) : IRequest<IReadOnlyList<ReleaseResponse>>;
+public record ObtenerReleasesQuery(
+    int? IdProyecto,
+    bool SoloAbiertos,
+    int? IdEstatus = null,
+    int? IdLiderAsignado = null) : IRequest<IReadOnlyList<ReleaseResponse>>;
 
 public class ObtenerReleasesHandler(IEntregaQueryService consultas)
     : IRequestHandler<ObtenerReleasesQuery, IReadOnlyList<ReleaseResponse>>
@@ -14,7 +18,9 @@ public class ObtenerReleasesHandler(IEntregaQueryService consultas)
     public async Task<IReadOnlyList<ReleaseResponse>> Handle(
         ObtenerReleasesQuery query, CancellationToken cancellationToken)
     {
-        return await consultas.ObtenerReleasesAsync(query.IdProyecto, query.SoloAbiertos, cancellationToken);
+        return await consultas.ObtenerReleasesAsync(
+            query.IdProyecto, query.SoloAbiertos, query.IdEstatus, query.IdLiderAsignado,
+            cancellationToken);
     }
 }
 

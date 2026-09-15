@@ -18,7 +18,9 @@ export interface BandejaItem {
   complejidad: string | null;
   idAsignado: number | null;
   asignado: string | null;
+  idSprint: number | null;
   sprint: string | null;
+  folioSprint: string | null;
   fechaCompromiso: string | null;
   esVencida: boolean;
   puntosHistoria: number | null;
@@ -45,29 +47,41 @@ export interface CatalogoItem {
   nombre: string;
 }
 
+/** IdCategoriaProyecto nulo = la complejidad aplica a cualquier categoria de proyecto. */
+export interface ComplejidadItem extends CatalogoItem {
+  idCategoriaProyecto: number | null;
+}
+
 export interface CatalogosBandeja {
   estatus: CatalogoItem[];
   tipos: CatalogoItem[];
   prioridades: CatalogoItem[];
-  proyectos: { id: number; clave: string; nombre: string; categoriaProyecto: string }[];
+  proyectos: {
+    id: number; clave: string; nombre: string; idCategoriaProyecto: number;
+    categoriaProyecto: string; idEquipo: number | null;
+  }[];
   usuarios: CatalogoItem[];
   tiposSolicitud: CatalogoItem[];
   equipos: CatalogoItem[];
-  complejidades: CatalogoItem[];
+  complejidades: ComplejidadItem[];
   categoriasTicket: CatalogoItem[];
+  /** Categorias de incidente con el nivel que las atiende; ya vienen ordenadas por nivel. */
+  categoriasIncidente: { id: number; nombre: string; nivel: string }[];
   estatusTicket: CatalogoItem[];
   severidades: CatalogoItem[];
   usuariosSolicitantes: CatalogoItem[];
   locaciones: CatalogoItem[];
+  sprints: CatalogoItem[];
 }
 
 export interface FiltroBandeja {
   page: number;
   pageSize: number;
-  estatus: number[]; // vacio = abiertos; [-1] = todos
+  estatus: number[]; // vacio = abiertos; [-1] = todos (default de la UI)
   idProyecto: number | null;
   idAsignado: number | null;
   idTipo: number | null;
+  idSprint: number | null; // -1 = Backlog (sin sprint)
   texto: string;
   soloVencidas: boolean;
   ordenarPor: string | null;
@@ -77,10 +91,11 @@ export interface FiltroBandeja {
 export const filtroInicial: FiltroBandeja = {
   page: 1,
   pageSize: 25,
-  estatus: [],
+  estatus: [-1],
   idProyecto: null,
   idAsignado: null,
   idTipo: null,
+  idSprint: null,
   texto: "",
   soloVencidas: false,
   ordenarPor: null,
@@ -95,6 +110,7 @@ export async function obtenerBandeja(filtro: FiltroBandeja) {
   if (filtro.idProyecto) params.set("idProyecto", String(filtro.idProyecto));
   if (filtro.idAsignado) params.set("idAsignado", String(filtro.idAsignado));
   if (filtro.idTipo) params.set("idTipo", String(filtro.idTipo));
+  if (filtro.idSprint) params.set("idSprint", String(filtro.idSprint));
   if (filtro.texto.trim()) params.set("texto", filtro.texto.trim());
   if (filtro.soloVencidas) params.set("soloVencidas", "true");
   if (filtro.ordenarPor) params.set("ordenarPor", filtro.ordenarPor);
@@ -154,6 +170,7 @@ export interface WorkItemDetalle {
   idProyecto: number;
   claveProyecto: string;
   proyecto: string;
+  idCategoriaProyecto: number;
   esMantenimiento: boolean;
   idEstatus: number;
   estatus: string;
@@ -165,7 +182,9 @@ export interface WorkItemDetalle {
   asignado: string | null;
   solicitante: string | null;
   usuarioSolicitante: string | null;
+  idSprint: number | null;
   sprint: string | null;
+  folioSprint: string | null;
   puntosHistoria: number | null;
   minutosPresupuesto: number | null;
   minutosInvertidos: number | null;
@@ -175,6 +194,10 @@ export interface WorkItemDetalle {
   fechaRegistro: string;
   esVencida: boolean;
   revisionesPendientes: number;
+  /** Tarea padre si este elemento es una subtarea; nulo si es de primer nivel. */
+  idPadre: number | null;
+  folioPadre: string | null;
+  tituloPadre: string | null;
 }
 
 export interface WorkItemEditar {
@@ -185,6 +208,7 @@ export interface WorkItemEditar {
   idComplejidad: number | null;
   idAsignado: number | null;
   fechaCompromiso: string | null;
+  idSprint: number | null;
 }
 
 export interface RegistroTiempo {
@@ -207,7 +231,26 @@ export interface NuevoWorkItem {
   idComplejidad: number;
   idAsignado: number | null;
   fechaCompromiso: string | null;
+  idSprint: number | null;
   idPadre?: number;
+}
+
+/** Vista previa del presupuesto por complejidad (RN-GTE-015); el valor real lo congela el backend. */
+export interface PresupuestoEstimado {
+  idComplejidad: number;
+  complejidad: string;
+  idAsignado: number | null;
+  idNivel: number | null;
+  nivel: string | null;
+  minutos: number | null;
+  puntos: number | null;
+  niveles: { idNivel: number; nivel: string; minutos: number; puntos: number | null }[];
+}
+
+export async function obtenerPresupuestoEstimado(idComplejidad: number, idAsignado: number | null) {
+  const params = new URLSearchParams({ idComplejidad: String(idComplejidad) });
+  if (idAsignado !== null) params.set("idAsignado", String(idAsignado));
+  return obtener<PresupuestoEstimado>("/api/v1/workitems/presupuesto", params);
 }
 
 export async function obtenerWorkItem(folio: string) {
@@ -278,6 +321,9 @@ export interface Revision {
   idEstatus: number;
   estatus: string;
   corregido: boolean;
+  /** Cerrado como "No es un error" en vez de arreglado; la razon va en motivoDescarte. */
+  esFalsoPositivo: boolean;
+  motivoDescarte: string | null;
   fechaCorreccion: string | null;
   fechaRegistro: string;
   idSeveridad: number | null;
@@ -297,10 +343,28 @@ export async function crearRevision(idWorkItem: number, datos: { comentarios: st
 
 export async function corregirRevision(
   idRevision: number,
-  datos: { corregido: boolean; motivo?: string },
+  datos: { corregido: boolean; motivo?: string; esFalsoPositivo?: boolean },
 ) {
   return enviar<Revision>("put", `/api/v1/revisiones/${idRevision}/correccion`, {
     corregido: datos.corregido,
     motivo: datos.motivo || null,
+    esFalsoPositivo: datos.esFalsoPositivo ?? false,
   });
+}
+
+/**
+ * Las complejidades del catalogo pertenecen a una categoria de proyecto (tblComplejidad
+ * .IdCategoriaProyecto); las de categoria nula aplican a cualquiera. Se filtra por la
+ * categoria del proyecto del elemento para no ofrecer complejidades de otra categoria.
+ * Sin categoria conocida se devuelve el catalogo completo.
+ */
+export function filtrarComplejidades(
+  complejidades: ComplejidadItem[] | undefined,
+  idCategoriaProyecto: number | null | undefined,
+): ComplejidadItem[] {
+  const lista = complejidades ?? [];
+  if (idCategoriaProyecto == null) return lista;
+  return lista.filter(
+    (c) => c.idCategoriaProyecto == null || c.idCategoriaProyecto === idCategoriaProyecto,
+  );
 }

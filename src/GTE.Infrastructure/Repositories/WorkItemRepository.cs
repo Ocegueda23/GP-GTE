@@ -30,6 +30,7 @@ public class WorkItemRepository(FabricaContexto fabrica, AuditContext auditoria)
             IdComplejidad = datos.IdComplejidad,
             IdAsignado = datos.IdAsignado,
             IdSolicitante = datos.IdSolicitante,
+            IdSprint = datos.IdSprint,
             IdUsuarioSolicitante = datos.IdUsuarioSolicitante,
             PuntosHistoria = datos.PuntosHistoria,
             MinutosPresupuesto = datos.MinutosPresupuesto,
@@ -71,6 +72,7 @@ public class WorkItemRepository(FabricaContexto fabrica, AuditContext auditoria)
         entidad.IdPrioridad = datos.IdPrioridad;
         entidad.IdComplejidad = datos.IdComplejidad;
         entidad.IdAsignado = datos.IdAsignado;
+        entidad.IdSprint = datos.IdSprint;
         entidad.FechaCompromiso = datos.FechaCompromiso;
         if (datos.ActualizarPresupuesto)
         {
@@ -96,7 +98,7 @@ public class WorkItemRepository(FabricaContexto fabrica, AuditContext auditoria)
                 w.IdAsignado,
                 contexto.TblUsuario.Where(u => u.IdUsuario == w.IdAsignado)
                     .Select(u => u.IdHorario).FirstOrDefault(),
-                w.IdComplejidad, w.FechaCompromiso, w.Activo, p.Administrado, p.IdCategoriaProyecto)
+                w.IdComplejidad, w.FechaCompromiso, w.Activo, p.Administrado, p.IdCategoriaProyecto, w.IdSprint)
             ).FirstOrDefaultAsync(cancellationToken);
     }
 

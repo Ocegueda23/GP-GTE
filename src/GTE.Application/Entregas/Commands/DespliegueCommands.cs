@@ -1,4 +1,5 @@
 using FluentValidation;
+using GTE.Application.Common;
 using GTE.Application.DTOs.Request.Entregas;
 using GTE.Application.DTOs.Responses.Entregas;
 using GTE.Application.Interfaces;
@@ -23,6 +24,8 @@ public class CambiarEstatusReleaseValidator : AbstractValidator<CambiarEstatusRe
         RuleFor(c => c.Motivo).MaximumLength(500);
         RuleFor(c => c.Motivo).NotEmpty().When(c => c.Accion == AccionesRelease.Reabrir)
             .WithMessage("Explica por que reabres el release.");
+        RuleFor(c => c.Motivo).NotEmpty().When(c => c.Accion == AccionesRelease.Autorizar)
+            .WithMessage("Explica por que autorizas el release sin recabar las firmas.");
     }
 }
 
@@ -33,12 +36,17 @@ public class CambiarEstatusReleaseValidator : AbstractValidator<CambiarEstatusRe
 /// REABRIR regresa un release ya Aprobado a preparacion (para agregar contenido o
 /// artefactos que hicieron falta) e invalida la cadena de firmas vigente: como deshace
 /// aprobaciones ya puestas, exige el mismo permiso que firmar, no el de solo preparar.
+/// AUTORIZAR salta la cadena completa (En Aprobacion -> Aprobado) dando por cubiertas las
+/// firmas que seguian pendientes; es la unica accion que abre REL.Autorizar, un acceso
+/// aparte de REL.Aprobar justamente porque dispensa firmas en vez de ponerlas.
 /// </summary>
 public class CambiarEstatusReleaseHandler(
     IEntregaRepository repositorio,
     IEntregaQueryService consultas,
     IMotorWorkflow motor,
-    IVerificadorPermisos permisos) : IRequestHandler<CambiarEstatusReleaseCommand, ReleaseDetalleResponse>
+    IVerificadorPermisos permisos,
+    IProveedorUsuarioActual proveedorUsuario,
+    AuditContext auditoria) : IRequestHandler<CambiarEstatusReleaseCommand, ReleaseDetalleResponse>
 {
     public async Task<ReleaseDetalleResponse> Handle(
         CambiarEstatusReleaseCommand command, CancellationToken cancellationToken)
@@ -50,11 +58,16 @@ public class CambiarEstatusReleaseHandler(
         {
             AccionesRelease.Rollback => PermisosEntregas.Desplegar,
             AccionesRelease.Reabrir => PermisosEntregas.Aprobar,
+            AccionesRelease.Autorizar => PermisosEntregas.Autorizar,
             _ => PermisosEntregas.Crear,
         };
         await permisos.ExigirPermisoAsync(permisoRequerido, release.IdProyecto, cancellationToken);
 
-        if (command.Accion == AccionesRelease.SolicitarAprobacion)
+        if (command.Accion == AccionesRelease.Autorizar)
+        {
+            await AutorizarSaltandoFirmasAsync(release, command.Motivo!, cancellationToken);
+        }
+        else if (command.Accion == AccionesRelease.SolicitarAprobacion)
         {
             await ValidarListoParaAprobacionAsync(command.IdRelease, cancellationToken);
 
@@ -85,8 +98,49 @@ public class CambiarEstatusReleaseHandler(
             ?? throw new NotFoundException("Release", command.IdRelease);
     }
 
+    /// <summary>
+    /// Cierra las firmas pendientes como Omitidas y las deja atribuidas al autorizador,
+    /// con su motivo y su firma electronica. Se hace ANTES de mover el estatus, igual que
+    /// el armado de la cadena: si falla, el release se queda En Aprobacion y la
+    /// autorizacion se puede reintentar, en vez de quedar Aprobado con firmas colgando.
+    /// </summary>
+    private async Task AutorizarSaltandoFirmasAsync(
+        EstadoRelease release, string motivo, CancellationToken cancellationToken)
+    {
+        if (release.IdEstatus != EstatusRelease.EnAprobacion)
+        {
+            throw new BusinessException(
+                "Solo se autoriza un release que ya esta En Aprobacion. "
+                + "Solicita primero la aprobacion para congelar el contenido.");
+        }
+
+        var usuario = await proveedorUsuario.ObtenerAsync(cancellationToken)
+            ?? throw new ForbiddenException("La identidad actual no esta registrada como usuario de GTE.");
+
+        var firma = FirmaElectronica.Calcular(
+            auditoria.Usuario, release.Folio ?? release.Version, RolAutorizacion, true);
+
+        await repositorio.OmitirAprobacionesPendientesAsync(
+            release.IdRelease, usuario.IdUsuario, motivo, firma, cancellationToken);
+    }
+
+    /// <summary>Rol con el que se firma la autorizacion; no es parte de la cadena de la Solicitud.</summary>
+    private const string RolAutorizacion = "Autorizacion de release";
+
     private async Task ValidarListoParaAprobacionAsync(int idRelease, CancellationToken cancellationToken)
     {
+        // El instructivo general es lo que lee quien despliega: sin el, la Solicitud de
+        // despliegue se firma sin decir que hay que hacer, y el que ejecuta en produccion
+        // se queda adivinando. Va junto a los otros gates, no como aviso suelto en la UI.
+        var detalle = await consultas.ObtenerDetalleAsync(idRelease, cancellationToken)
+            ?? throw new NotFoundException("Release", idRelease);
+        if (string.IsNullOrWhiteSpace(detalle.InstruccionesImplementacion))
+        {
+            throw new BusinessException(
+                "Captura las instrucciones generales de implementacion antes de mandar el "
+                + "release a aprobacion.");
+        }
+
         var contenido = await repositorio.ObtenerContenidoAsync(idRelease, cancellationToken);
         if (contenido.Count == 0)
         {

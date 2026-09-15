@@ -2,11 +2,17 @@ namespace GTE.Application.DTOs.Request.Planeacion;
 
 public class SprintCrearRequest
 {
-    public int IdEquipo { get; set; }
     public string Nombre { get; set; } = string.Empty;
     public string? Objetivo { get; set; }
     public DateOnly FechaInicio { get; set; }
     public DateOnly FechaFin { get; set; }
+    public int? IdLider { get; set; }
+}
+
+/// <summary>Reasignar el lider responsable del sprint, independiente de editar nombre/fechas.</summary>
+public class AsignarLiderSprintRequest
+{
+    public int? IdLider { get; set; }
 }
 
 /// <summary>Editar nombre/objetivo/fechas de un sprint no cerrado.</summary>

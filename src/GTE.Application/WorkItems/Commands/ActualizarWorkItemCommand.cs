@@ -4,6 +4,7 @@ using GTE.Application.DTOs.Responses.WorkItems;
 using GTE.Application.Interfaces;
 using GTE.Domain.Exceptions;
 using GTE.Domain.Interfaces;
+using GTE.Domain.Planeacion;
 using GTE.Domain.WorkItems;
 using MediatR;
 
@@ -27,6 +28,7 @@ public class ActualizarWorkItemHandler(
     IWorkItemRepository repositorio,
     IWorkItemQueryService consultas,
     IVerificadorPermisos permisos,
+    IPlaneacionRepository planeacion,
     IProveedorUsuarioActual proveedorUsuario,
     ISanitizadorHtml sanitizador) : IRequestHandler<ActualizarWorkItemCommand, WorkItemResponse>
 {
@@ -87,10 +89,35 @@ public class ActualizarWorkItemHandler(
                 repositorio, datos.IdComplejidad, datos.IdAsignado, cancellationToken);
         }
 
+        // RN-GTE-019: mover el elemento de sprint (o regresarlo al backlog) desde la edicion
+        // pasa por lo mismo que moverlo en el detalle del sprint: permiso de planeacion,
+        // sprint destino abierto y nada de replanificar lo terminado o cancelado.
+        var sprintCambio = datos.IdSprint != estado.IdSprint;
+        if (sprintCambio)
+        {
+            if (estado.IdEstatus is EstatusWorkItem.Terminado or EstatusWorkItem.Cancelado)
+            {
+                throw new BusinessException(
+                    "Un elemento terminado o cancelado ya no se replanifica; su sprint queda como historia.");
+            }
+
+            if (datos.IdSprint.HasValue)
+            {
+                await CrearWorkItemHandler.ExigirSprintAbiertoAsync(
+                    planeacion, permisos, datos.IdSprint.Value, cancellationToken);
+            }
+            else
+            {
+                await permisos.ExigirPermisoAsync(
+                    PermisosPlaneacion.GestionarSprints, null, cancellationToken);
+            }
+        }
+
         await repositorio.ActualizarAsync(new WorkItemEdicion(
             command.IdWorkItem, datos.Titulo.Trim(), descripcion, datos.CriteriosAceptacion,
             datos.IdPrioridad, datos.IdComplejidad, datos.IdAsignado, puntosHistoria,
-            recalcularPresupuesto, minutosPresupuesto, datos.FechaCompromiso), cancellationToken);
+            recalcularPresupuesto, minutosPresupuesto, datos.FechaCompromiso,
+            datos.IdSprint), cancellationToken);
 
         return await consultas.ObtenerPorIdAsync(command.IdWorkItem, cancellationToken)
             ?? throw new NotFoundException("WorkItem", command.IdWorkItem);

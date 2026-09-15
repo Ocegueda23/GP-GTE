@@ -43,6 +43,10 @@ public partial class TblIncidente
 
     public bool Activo { get; set; }
 
+    public int? IdCategoriaIncidente { get; set; }
+
+    public virtual TblCategoriaIncidente? IdCategoriaIncidenteNavigation { get; set; }
+
     public virtual TblEstatusIncidente IdEstatusIncidenteNavigation { get; set; } = null!;
 
     public virtual TblProyecto IdProyectoNavigation { get; set; } = null!;

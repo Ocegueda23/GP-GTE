@@ -21,6 +21,10 @@ public interface IAdministracionQueryService
     Task<MatrizPermisosResponse?> ObtenerMatrizPermisosAsync(int idRol, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<RolUsuarioResponse>> ObtenerRolesUsuarioAsync(int idUsuario, CancellationToken cancellationToken = default);
 
+    /// <summary>Accesos vigentes de un proyecto: las asignaciones de tblUsuarioRol acotadas a el.</summary>
+    Task<IReadOnlyList<AccesoProyectoResponse>> ObtenerAccesosProyectoAsync(
+        int idProyecto, CancellationToken cancellationToken = default);
+
     /* ---------- Horarios ---------- */
     Task<IReadOnlyList<HorarioResponse>> ObtenerHorariosAsync(CancellationToken cancellationToken = default);
     Task<HorarioDetalleResponse?> ObtenerHorarioAsync(int idHorario, CancellationToken cancellationToken = default);

@@ -12,7 +12,8 @@ namespace GTE.Infrastructure.Services;
 public class EntregaQueryService(FabricaContexto fabrica) : IEntregaQueryService
 {
     public async Task<IReadOnlyList<ReleaseResponse>> ObtenerReleasesAsync(
-        int? idProyecto, bool soloAbiertos, CancellationToken cancellationToken = default)
+        int? idProyecto, bool soloAbiertos, int? idEstatus = null, int? idLiderAsignado = null,
+        CancellationToken cancellationToken = default)
     {
         await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
 
@@ -21,7 +22,17 @@ public class EntregaQueryService(FabricaContexto fabrica) : IEntregaQueryService
         {
             consulta = consulta.Where(r => r.IdProyecto == idProyecto.Value);
         }
-        if (soloAbiertos)
+        if (idEstatus.HasValue)
+        {
+            consulta = consulta.Where(r => r.IdEstatus == idEstatus.Value);
+        }
+        if (idLiderAsignado.HasValue)
+        {
+            consulta = consulta.Where(r => r.IdLiderAsignado == idLiderAsignado.Value);
+        }
+        // Un filtro de estatus explicito manda sobre el default de "solo abiertos": si se
+        // pide ver los Cancelados, esconderlos dejaria el filtro sin efecto visible.
+        if (soloAbiertos && !idEstatus.HasValue)
         {
             consulta = consulta.Where(r => r.IdEstatus != EstatusRelease.Cancelado);
         }
@@ -71,6 +82,10 @@ public class EntregaQueryService(FabricaContexto fabrica) : IEntregaQueryService
             InstruccionesImplementacion = cabecera.InstruccionesImplementacion,
             IdEstatus = cabecera.IdEstatus,
             Estatus = cabecera.Estatus,
+            IdLiderAsignado = cabecera.IdLiderAsignado,
+            LiderAsignado = cabecera.LiderAsignado,
+            CreadoPor = cabecera.CreadoPor,
+            FechaCreacion = cabecera.FechaCreacion,
             FechaPlan = cabecera.FechaPlan,
             FechaLiberacion = cabecera.FechaLiberacion,
             TotalItems = cabecera.TotalItems,
@@ -113,7 +128,8 @@ public class EntregaQueryService(FabricaContexto fabrica) : IEntregaQueryService
                 IdArtefactoRollback = ra.IdArtefactoRollback,
                 NombreRollback = ar != null ? ar.Nombre : null,
                 JustificacionIrreversible = ra.JustificacionIrreversible,
-                InstruccionesImplementacion = ra.InstruccionesImplementacion
+                InstruccionesImplementacion = ra.InstruccionesImplementacion,
+                VersionArtefacto = ra.VersionArtefacto
             }).ToListAsync(cancellationToken);
 
         // RN-GTE-032 evaluada para la interfaz: los scripts SQL necesitan rollback o justificacion
@@ -381,6 +397,9 @@ public class EntregaQueryService(FabricaContexto fabrica) : IEntregaQueryService
         return from r in contexto.TblRelease.AsNoTracking()
                join p in contexto.TblProyecto.AsNoTracking() on r.IdProyecto equals p.IdProyecto
                join e in contexto.TblEstatusRelease.AsNoTracking() on r.IdEstatusRelease equals e.Id
+               join u in contexto.TblUsuario.AsNoTracking() on r.IdLiderAsignado equals u.IdUsuario
+                   into lideres
+               from u in lideres.DefaultIfEmpty()
                where r.Activo
                select new ReleaseResponse
                {
@@ -394,6 +413,10 @@ public class EntregaQueryService(FabricaContexto fabrica) : IEntregaQueryService
                    InstruccionesImplementacion = r.InstruccionesImplementacion,
                    IdEstatus = r.IdEstatusRelease,
                    Estatus = e.Descripcion,
+                   IdLiderAsignado = r.IdLiderAsignado,
+                   LiderAsignado = u != null ? u.Nombre : null,
+                   CreadoPor = r.UsuarioRegistro,
+                   FechaCreacion = r.FechaRegistro,
                    FechaPlan = r.FechaPlan,
                    FechaLiberacion = r.FechaLiberacion,
                    TotalItems = contexto.TblWorkItem.Count(w => w.IdRelease == r.IdRelease && w.Activo),

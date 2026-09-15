@@ -1,6 +1,7 @@
 using GTE.Application.DTOs.Responses.Administracion;
 using GTE.Application.DTOs.Responses.WorkItems;
 using GTE.Application.Interfaces;
+using GTE.Domain.Administracion;
 using GTE.Domain.Exceptions;
 using GTE.Domain.Interfaces;
 using MediatR;
@@ -139,6 +140,33 @@ public class ObtenerRolesUsuarioHandler(IAdministracionQueryService consultas)
 {
     public async Task<IReadOnlyList<RolUsuarioResponse>> Handle(ObtenerRolesUsuarioQuery query, CancellationToken cancellationToken)
         => await consultas.ObtenerRolesUsuarioAsync(query.IdUsuario, cancellationToken);
+}
+
+public record ObtenerAccesosProyectoQuery(int IdProyecto) : IRequest<IReadOnlyList<AccesoProyectoResponse>>;
+
+/// <summary>
+/// Accesos del proyecto (pestana Accesos). El permiso se verifica CON el idProyecto: lo
+/// cumple un rol global de administracion y tambien uno acotado a este proyecto, para que
+/// el administrador de un proyecto pueda ver y gestionar los accesos del suyo -- y solo
+/// del suyo, porque el alta siempre escribe IdProyecto = este proyecto.
+/// </summary>
+public class ObtenerAccesosProyectoHandler(
+    IAdministracionQueryService consultas,
+    IAdministracionRepository repositorio,
+    IVerificadorPermisos permisos)
+    : IRequestHandler<ObtenerAccesosProyectoQuery, IReadOnlyList<AccesoProyectoResponse>>
+{
+    public async Task<IReadOnlyList<AccesoProyectoResponse>> Handle(
+        ObtenerAccesosProyectoQuery query, CancellationToken cancellationToken)
+    {
+        await permisos.ExigirPermisoAsync(
+            PermisosAdministracion.Roles, query.IdProyecto, cancellationToken);
+
+        _ = await repositorio.ObtenerEstadoProyectoAsync(query.IdProyecto, cancellationToken)
+            ?? throw new NotFoundException("Proyecto", query.IdProyecto);
+
+        return await consultas.ObtenerAccesosProyectoAsync(query.IdProyecto, cancellationToken);
+    }
 }
 
 /* ---------- Horarios ---------- */

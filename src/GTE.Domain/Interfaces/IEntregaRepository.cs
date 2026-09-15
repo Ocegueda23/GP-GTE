@@ -17,6 +17,14 @@ public interface IEntregaRepository
     Task ActualizarInstruccionesAsync(
         int idRelease, string? instrucciones, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Lider responsable de sacar la entrega. Nulo lo desasigna. Es un usuario del sistema
+    /// para que el listado de releases pueda filtrarse por lider sin depender de como se
+    /// escribio el nombre.
+    /// </summary>
+    Task AsignarLiderAsync(
+        int idRelease, int? idLiderAsignado, CancellationToken cancellationToken = default);
+
     Task AplicarEfectosTransicionAsync(int idRelease, string accion, CancellationToken cancellationToken = default);
 
     /// <summary>Marca la fecha de liberacion al desplegar a produccion.</summary>
@@ -44,11 +52,20 @@ public interface IEntregaRepository
     Task<string?> QuitarArtefactoAsync(
         int idRelease, int idArtefacto, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Actualiza un artefacto del release. Devuelve false si el artefacto no pertenece al
+    /// release (o ya se dio de baja); el gate de estatus lo valida el handler.
+    /// </summary>
+    Task<bool> EditarArtefactoAsync(ArtefactoEditar datos, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<ArtefactoRelease>> ObtenerArtefactosAsync(int idRelease, CancellationToken cancellationToken = default);
 
     /* Respaldos previos al despliegue */
 
     Task<int> AgregarRespaldoAsync(RespaldoNuevo datos, CancellationToken cancellationToken = default);
+
+    /// <summary>Actualiza un respaldo. Devuelve false si no pertenece al release.</summary>
+    Task<bool> EditarRespaldoAsync(RespaldoEditar datos, CancellationToken cancellationToken = default);
 
     /// <summary>Baja logica del respaldo. Devuelve false si no pertenece al release.</summary>
     Task<bool> QuitarRespaldoAsync(
@@ -81,6 +98,15 @@ public interface IEntregaRepository
 
     Task ResolverAprobacionAsync(
         int idAprobacion, int idAprobador, bool aprobada, string? comentario, string firmaHash,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Cierra como Omitidas las firmas que seguian Pendientes al autorizar el release
+    /// (AUTORIZAR), dejando escrito el autorizador, su motivo y su firma electronica.
+    /// Devuelve cuantas se omitieron. Las ya resueltas no se tocan.
+    /// </summary>
+    Task<int> OmitirAprobacionesPendientesAsync(
+        int idRelease, int idAutorizador, string motivo, string firmaHash,
         CancellationToken cancellationToken = default);
 
     Task<AprobacionRelease?> ObtenerAprobacionAsync(int idAprobacion, CancellationToken cancellationToken = default);

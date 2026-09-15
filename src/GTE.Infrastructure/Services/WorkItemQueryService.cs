@@ -50,6 +50,13 @@ public class WorkItemQueryService(FabricaContexto fabrica) : IWorkItemQueryServi
         {
             consulta = consulta.Where(x => x.w.IdTipoWorkItem == filtro.IdTipoWorkItem.Value);
         }
+        // -1 = Backlog (elementos sin sprint asignado); cualquier otro valor = ese sprint
+        if (filtro.IdSprint.HasValue)
+        {
+            consulta = filtro.IdSprint.Value == -1
+                ? consulta.Where(x => x.w.IdSprint == null)
+                : consulta.Where(x => x.w.IdSprint == filtro.IdSprint.Value);
+        }
         if (!string.IsNullOrWhiteSpace(filtro.Texto))
         {
             var texto = filtro.Texto.Trim();
@@ -130,6 +137,7 @@ public class WorkItemQueryService(FabricaContexto fabrica) : IWorkItemQueryServi
                 IdAsignado = x.v.IdAsignado,
                 Asignado = x.v.Asignado,
                 Sprint = x.v.Sprint,
+                FolioSprint = x.v.FolioSprint,
                 FechaCompromiso = x.v.FechaCompromiso,
                 EsVencida = x.v.EsVencida == true,
                 PuntosHistoria = x.v.PuntosHistoria,
@@ -210,14 +218,70 @@ public class WorkItemQueryService(FabricaContexto fabrica) : IWorkItemQueryServi
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<PresupuestoEstimadoResponse?> ObtenerPresupuestoEstimadoAsync(
+        int idComplejidad, int? idAsignado, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
+
+        var complejidad = await contexto.TblComplejidad.AsNoTracking()
+            .Where(c => c.IdComplejidad == idComplejidad)
+            .Select(c => c.Nombre)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (complejidad is null)
+        {
+            return null;
+        }
+
+        var niveles = await (
+            from m in contexto.TblMatrizPresupuesto.AsNoTracking()
+            join n in contexto.TblNivel.AsNoTracking() on m.IdNivel equals n.IdNivel
+            where m.IdComplejidad == idComplejidad && m.Activo
+            orderby n.Orden
+            select new PresupuestoNivelDTO
+            {
+                IdNivel = n.IdNivel,
+                Nivel = n.Nombre,
+                Minutos = m.Minutos,
+                Puntos = m.Puntos
+            }).ToListAsync(cancellationToken);
+
+        // El nivel del asignado es lo que resuelve el renglon de la matriz; sin asignado (o
+        // sin nivel capturado) la vista previa se queda en la matriz completa.
+        var idNivel = idAsignado.HasValue
+            ? await contexto.TblUsuario.AsNoTracking()
+                .Where(u => u.IdUsuario == idAsignado.Value)
+                .Select(u => u.IdNivel)
+                .FirstOrDefaultAsync(cancellationToken)
+            : null;
+        var renglon = idNivel.HasValue ? niveles.FirstOrDefault(n => n.IdNivel == idNivel.Value) : null;
+
+        return new PresupuestoEstimadoResponse
+        {
+            IdComplejidad = idComplejidad,
+            Complejidad = complejidad,
+            IdAsignado = idAsignado,
+            IdNivel = renglon?.IdNivel,
+            Nivel = renglon?.Nivel,
+            Minutos = renglon?.Minutos,
+            Puntos = renglon?.Puntos,
+            Niveles = niveles
+        };
+    }
+
     private static IQueryable<WorkItemResponse> ProyectarDetalle(DbContextGTE contexto)
     {
         return from v in contexto.VwBandejaTrabajo.AsNoTracking()
                join w in contexto.TblWorkItem.AsNoTracking() on v.IdWorkItem equals w.IdWorkItem
                join us in contexto.TblUsuarioSolicitante.AsNoTracking() on w.IdUsuarioSolicitante equals us.IdUsuarioSolicitante into solicitantesExternos
                from us in solicitantesExternos.DefaultIfEmpty()
+               join p in contexto.TblWorkItem.AsNoTracking() on w.IdPadre equals p.IdWorkItem into padres
+               from p in padres.DefaultIfEmpty()
+               join proy in contexto.TblProyecto.AsNoTracking() on w.IdProyecto equals proy.IdProyecto
                select new WorkItemResponse
                {
+                   IdPadre = w.IdPadre,
+                   FolioPadre = p != null ? p.Folio : null,
+                   TituloPadre = p != null ? p.Titulo : null,
                    IdWorkItem = v.IdWorkItem,
                    Folio = v.Folio,
                    Tipo = v.Tipo,
@@ -227,6 +291,7 @@ public class WorkItemQueryService(FabricaContexto fabrica) : IWorkItemQueryServi
                    IdProyecto = w.IdProyecto,
                    ClaveProyecto = v.ClaveProyecto,
                    Proyecto = v.Proyecto,
+                   IdCategoriaProyecto = proy.IdCategoriaProyecto,
                    EsMantenimiento = v.EsMantenimiento,
                    IdEstatus = v.IdEstatusWorkItem,
                    Estatus = v.Estatus,
@@ -240,6 +305,7 @@ public class WorkItemQueryService(FabricaContexto fabrica) : IWorkItemQueryServi
                    UsuarioSolicitante = us != null ? (us.Nombre ?? us.Usuario) : null,
                    IdSprint = v.IdSprint,
                    Sprint = v.Sprint,
+                   FolioSprint = v.FolioSprint,
                    PuntosHistoria = v.PuntosHistoria,
                    MinutosPresupuesto = v.MinutosPresupuesto,
                    MinutosInvertidos = v.MinutosInvertidos,

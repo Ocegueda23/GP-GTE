@@ -25,10 +25,24 @@ const ESTILOS_IMPRESION = (
       "#solicitud-despliegue": {
         position: "absolute", left: 0, top: 0, width: "100%", padding: 0,
         WebkitPrintColorAdjust: "exact", printColorAdjust: "exact",
+        fontSize: "10pt", lineHeight: 1.25,
       },
       ".no-imprimir": { display: "none !important" },
       // Las tablas del instructivo no se deben partir a la mitad de un renglon.
       "tr, img": { pageBreakInside: "avoid" },
+      // El documento se imprime en papel, no se lee en pantalla: en papel el cuerpo puede
+      // ser mas chico y los renglones mas apretados sin perder legibilidad, y asi la
+      // solicitud deja de consumir hojas de mas. Los renglones de firma llevan alto fijo
+      // (ver la tabla de Firmas) y quedan fuera de este apretado a proposito: ahi el
+      // espacio es para la pluma.
+      "#solicitud-despliegue .MuiTableCell-root": {
+        paddingTop: "2px", paddingBottom: "2px", paddingLeft: "6px", paddingRight: "6px",
+        lineHeight: 1.25,
+      },
+      "#solicitud-despliegue p": { margin: "0 0 2px" },
+      // Un titulo de seccion solo en el pie de una hoja, con su tabla en la siguiente,
+      // desperdicia media pagina; se mantiene pegado a lo que encabeza.
+      "#solicitud-despliegue .titulo-seccion": { pageBreakAfter: "avoid" },
     },
   }} />
 );
@@ -42,7 +56,7 @@ function formatearFecha(iso: string | null | undefined): string {
 /** Renglon del bloque de datos generales: etiqueta a la izquierda, valor con subrayado tipo formato. */
 function Dato({ etiqueta, valor }: { etiqueta: string; valor: string }) {
   return (
-    <Stack direction="row" spacing={1} sx={{ alignItems: "baseline", py: 0.4 }}>
+    <Stack direction="row" spacing={1} sx={{ alignItems: "baseline", py: 0.15 }}>
       <Typography variant="body2" sx={{ fontWeight: 700, minWidth: 190 }}>{etiqueta}</Typography>
       <Typography variant="body2" sx={{ flex: 1, borderBottom: "1px solid", borderColor: "divider" }}>
         {valor || " "}
@@ -53,14 +67,14 @@ function Dato({ etiqueta, valor }: { etiqueta: string; valor: string }) {
 
 function Seccion({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
-    <Box sx={{ mt: 3 }}>
-      <Typography variant="subtitle2" sx={{
-        fontWeight: 700, bgcolor: "action.hover", px: 1, py: 0.5,
+    <Box sx={{ mt: 1.5 }}>
+      <Typography variant="subtitle2" className="titulo-seccion" sx={{
+        fontWeight: 700, bgcolor: "action.hover", px: 1, py: 0.25,
         border: "1px solid", borderColor: "divider",
       }}>
         {titulo}
       </Typography>
-      <Box sx={{ px: 1, pt: 1 }}>{children}</Box>
+      <Box sx={{ px: 1, pt: 0.5 }}>{children}</Box>
     </Box>
   );
 }
@@ -115,12 +129,12 @@ export function SolicitudDesplieguePage() {
         </Alert>
       )}
 
-      <Paper id="solicitud-despliegue" variant="outlined" sx={{ p: 3, maxWidth: 900, mx: "auto" }}>
+      <Paper id="solicitud-despliegue" variant="outlined" sx={{ p: 2, maxWidth: 900, mx: "auto" }}>
         {/* El folio identifica el documento: va en el encabezado y en rojo para que se
             localice de un vistazo entre las solicitudes impresas, no perdido como un
             renglon mas de datos generales. */}
-        <Stack direction="row" spacing={2} sx={{ alignItems: "baseline", mb: 2 }}>
-          <Typography variant="h5" sx={{ fontWeight: 700, flex: 1, textAlign: "center" }}>
+        <Stack direction="row" spacing={2} sx={{ alignItems: "baseline", mb: 1 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, flex: 1, textAlign: "center" }}>
             Solicitud de despliegue
           </Typography>
           <Typography variant="h6" sx={{ fontWeight: 700, color: "#c62828", whiteSpace: "nowrap" }}>
@@ -128,14 +142,17 @@ export function SolicitudDesplieguePage() {
           </Typography>
         </Stack>
 
+        {/* El lider encabeza los datos generales: es a quien se le pregunta por la entrega
+            cuando alguien tiene el documento impreso en la mano. El estatus no se imprime:
+            en papel siempre queda desactualizado respecto al sistema. */}
         <Seccion titulo="Datos generales">
+          <Dato etiqueta="Lider asignado:" valor={r.liderAsignado ?? ""} />
           <Dato etiqueta="Proyecto:" valor={`${r.claveProyecto} - ${r.proyecto}`} />
           <Dato etiqueta="Version:" valor={r.version} />
           <Dato etiqueta="Fecha requerimiento:" valor={formatearFecha(r.fechaPlan)} />
           <Dato etiqueta="Fecha PREPROD:" valor={formatearFecha(despliegue(/pre/i)?.fechaInicio)} />
           <Dato etiqueta="Fecha PRODUCCION:"
             valor={formatearFecha(despliegue(/prod/i)?.fechaInicio ?? r.fechaLiberacion)} />
-          <Dato etiqueta="Estatus:" valor={r.estatus} />
         </Seccion>
 
         {r.notasVersion && (
@@ -178,6 +195,7 @@ export function SolicitudDesplieguePage() {
                   <TableRow sx={{ "& th": { fontWeight: 700 } }}>
                     <TableCell sx={{ width: 50 }}>Orden</TableCell>
                     <TableCell sx={{ width: 220 }}>Objeto</TableCell>
+                    <TableCell sx={{ width: 80 }}>Version</TableCell>
                     <TableCell>Tipo</TableCell>
                     <TableCell sx={{ width: 200 }}>Reversa</TableCell>
                   </TableRow>
@@ -187,6 +205,7 @@ export function SolicitudDesplieguePage() {
                     <TableRow key={a.idArtefacto}>
                       <TableCell>{a.ordenEjecucion ?? ""}</TableCell>
                       <TableCell sx={{ wordBreak: "break-all" }}>{a.nombre}</TableCell>
+                      <TableCell sx={{ whiteSpace: "nowrap" }}>{a.versionArtefacto ?? ""}</TableCell>
                       <TableCell>{a.tipo}</TableCell>
                       <TableCell>
                         {a.nombreRollback ?? a.justificacionIrreversible ?? "N/A"}
@@ -250,15 +269,13 @@ export function SolicitudDesplieguePage() {
                 </TableHead>
                 <TableBody>
                   {/* Renglon alto a proposito: este bloque se imprime para firmarse a mano,
-                      asi que la celda de firma tiene que dar espacio de pluma. El estatus y
-                      la fecha se quitaron porque los pone quien firma, no el sistema. */}
+                      asi que las celdas de nombre y firma se dejan vacias -- las llenan los
+                      interesados con pluma, sin datos del sistema (ni aprobador ni hash). */}
                   {firmas.map((ap) => (
                     <TableRow key={ap.idAprobacion} sx={{ "& td": { height: 64, verticalAlign: "top", pt: 1 } }}>
                       <TableCell>{ap.rolAprobacion}</TableCell>
-                      <TableCell>{ap.aprobador ?? ""}</TableCell>
-                      <TableCell sx={{ fontFamily: "monospace", fontSize: 11, wordBreak: "break-all" }}>
-                        {ap.firmaHash ? `${ap.firmaHash.slice(0, 16)}...` : ""}
-                      </TableCell>
+                      <TableCell />
+                      <TableCell />
                     </TableRow>
                   ))}
                 </TableBody>
@@ -267,9 +284,7 @@ export function SolicitudDesplieguePage() {
         </Seccion>
 
         <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 3 }}>
-          Documento generado por GTE el {new Date().toLocaleString("es-MX")}. Las firmas son
-          electronicas (SHA-256 de usuario, fecha, folio, rol y decision) y quedan respaldadas
-          por la bitacora del release.
+          Documento generado por GTE el {new Date().toLocaleString("es-MX")}.
         </Typography>
       </Paper>
     </Box>

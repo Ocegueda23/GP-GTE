@@ -233,3 +233,22 @@ public class ObtenerAuditoriaReporteHandler(IReportesQueryService consultas, IVe
             query.Desde, query.Hasta, query.Usuario, query.Entidad, query.Page, query.PageSize, cancellationToken);
     }
 }
+
+// ---------- R15 Detalle de actividades terminadas ----------
+public record ObtenerActividadesTerminadasQuery(
+    DateOnly Desde, DateOnly Hasta, int? IdEquipo, int? IdAsignado, int? IdProyecto,
+    int? IdTipoWorkItem, string? Folio) : IRequest<ActividadesTerminadasReporteResponse>;
+
+public class ObtenerActividadesTerminadasHandler(IReportesQueryService consultas, IVerificadorPermisos permisos)
+    : IRequestHandler<ObtenerActividadesTerminadasQuery, ActividadesTerminadasReporteResponse>
+{
+    public async Task<ActividadesTerminadasReporteResponse> Handle(
+        ObtenerActividadesTerminadasQuery query, CancellationToken cancellationToken)
+    {
+        await permisos.ExigirPermisoAsync(PermisosReportes.Ver, null, cancellationToken);
+        ValidacionRangoFechas.Exigir(query.Desde, query.Hasta);
+        return await consultas.ObtenerActividadesTerminadasAsync(
+            query.Desde, query.Hasta, query.IdEquipo, query.IdAsignado, query.IdProyecto,
+            query.IdTipoWorkItem, query.Folio, cancellationToken);
+    }
+}

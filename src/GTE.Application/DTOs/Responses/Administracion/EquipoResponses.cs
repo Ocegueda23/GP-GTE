@@ -7,6 +7,10 @@ public class EquipoResponse
     public string? Descripcion { get; set; }
     public int? IdLider { get; set; }
     public string? Lider { get; set; }
+
+    /// <summary>Bloque tecnico del Centro de Mando TI; null = solo bloque comun.</summary>
+    public string? AmbitoCentroMando { get; set; }
+
     public int TotalMiembros { get; set; }
 }
 
@@ -26,5 +30,9 @@ public class EquipoDetalleResponse
     public string? Descripcion { get; set; }
     public int? IdLider { get; set; }
     public string? Lider { get; set; }
+
+    /// <summary>Bloque tecnico del Centro de Mando TI; null = solo bloque comun.</summary>
+    public string? AmbitoCentroMando { get; set; }
+
     public List<MiembroEquipoResponse> Miembros { get; set; } = [];
 }

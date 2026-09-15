@@ -10,6 +10,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   formatearMinutos, obtenerCatalogosBandeja, obtenerTiempos, obtenerWorkItem,
 } from "../../shared/api/workitems";
+import { useEsMovil } from "../../shared/hooks/useEsMovil";
 import { useSesion } from "../../shared/api/sesion";
 import { ContenidoEnriquecido } from "../../shared/editor/ContenidoEnriquecido";
 import { ModalTiempo } from "../trabajo/ModalTiempo";
@@ -30,11 +31,18 @@ function formatearFecha(iso: string | null): string {
   return fecha.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+/** En movil la etiqueta va arriba del valor: lado a lado en 360 px el valor se parte a la mitad. */
 function Campo({ etiqueta, valor, resaltar }: { etiqueta: string; valor: string; resaltar?: boolean }) {
   return (
-    <Box sx={{ display: "flex", justifyContent: "space-between", gap: 2, py: 0.5 }}>
+    <Box sx={{
+      display: "flex", flexDirection: { xs: "column", sm: "row" },
+      justifyContent: "space-between", gap: { xs: 0, sm: 2 }, py: 0.5,
+    }}>
       <Typography variant="body2" color="text.secondary">{etiqueta}</Typography>
-      <Typography variant="body2" sx={{ fontWeight: 600, color: resaltar ? "error.main" : undefined }}>
+      <Typography variant="body2" sx={{
+        fontWeight: 600, color: resaltar ? "error.main" : undefined,
+        textAlign: { xs: "left", sm: "right" }, wordBreak: "break-word",
+      }}>
         {valor}
       </Typography>
     </Box>
@@ -50,6 +58,7 @@ export function DetallePage() {
   const [aviso, setAviso] = useState<{ tipo: "success" | "error"; mensaje: string } | null>(null);
   const sesion = useSesion((estado) => estado.sesion);
   const puede = useSesion((estado) => estado.puede);
+  const esMovil = useEsMovil();
 
   const detalle = useQuery({
     queryKey: ["workitem", folio],
@@ -91,7 +100,7 @@ export function DetallePage() {
   const puedeEditar = !esTerminado && !esAjeno;
 
   return (
-    <Box sx={{ p: 2 }}>
+    <Box sx={{ p: { xs: 1.5, sm: 2 } }}>
       <Link component={RouterLink} to="/trabajo" underline="hover"
         sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, mb: 1 }}>
         <ArrowBackIcon fontSize="small" /> Bandeja de trabajo
@@ -100,7 +109,7 @@ export function DetallePage() {
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
         <Stack direction={{ xs: "column", md: "row" }} spacing={1} sx={{ justifyContent: "space-between" }}>
           <Box>
-            <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+            <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", flexWrap: "wrap" }}>
               <Typography variant="h6" sx={{ fontWeight: 700 }}>{item.folio}</Typography>
               <Chip size="small" label={item.tipo} variant="outlined" />
               <Chip size="small" label={item.estatus}
@@ -112,9 +121,13 @@ export function DetallePage() {
               {item.claveProyecto} - {item.proyecto}
             </Typography>
           </Box>
-          <Stack direction="row" spacing={1} sx={{ pt: 0.5, alignItems: "flex-start" }}>
+          {/* En movil Editar toma su propio renglon y las acciones de workflow el de
+              abajo; en una fila sola quedan botones de dos centimetros. */}
+          <Stack direction={{ xs: "column", sm: "row" }}
+            sx={{ pt: 0.5, alignItems: { xs: "stretch", sm: "flex-start" }, flexWrap: "wrap", gap: 1 }}>
             {puedeEditar && (
-              <Button size="small" variant="outlined" startIcon={<EditIcon fontSize="small" />}
+              <Button size={esMovil ? "medium" : "small"} variant="outlined"
+                startIcon={<EditIcon fontSize="small" />}
                 onClick={() => setModalEditar(true)}>
                 Editar
               </Button>
@@ -131,7 +144,9 @@ export function DetallePage() {
 
       <Box sx={{ display: "flex", gap: 2, flexDirection: { xs: "column", md: "row" } }}>
         <Paper variant="outlined" sx={{ flex: 2, p: 2 }}>
-          <Tabs value={pestana} onChange={(_, valor) => setPestana(valor)} sx={{ mb: 2 }}>
+          {/* Scrollable: las seis pestanas no caben en el ancho de un celular. */}
+          <Tabs value={pestana} onChange={(_, valor) => setPestana(valor)} sx={{ mb: 2 }}
+            variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile>
             <Tab label="Descripcion" />
             <Tab label="Tiempo" />
             <Tab label={item.revisionesPendientes > 0
@@ -167,7 +182,10 @@ export function DetallePage() {
                   Registrar tiempo
                 </Button>
               </Stack>
-              <Table size="small">
+              {/* Cinco columnas no caben en un celular: la tabla scrollea dentro de su
+                  caja en vez de estirar la pantalla completa. */}
+              <Box sx={{ overflowX: "auto" }}>
+              <Table size="small" sx={{ minWidth: 480 }}>
                 <TableHead>
                   <TableRow sx={{ "& th": { fontWeight: 700 } }}>
                     <TableCell>Fecha</TableCell>
@@ -211,6 +229,7 @@ export function DetallePage() {
                   )}
                 </TableBody>
               </Table>
+              </Box>
             </Box>
           )}
 
@@ -259,6 +278,18 @@ export function DetallePage() {
 
         <Paper variant="outlined" sx={{ flex: 1, p: 2, alignSelf: "flex-start", minWidth: 280 }}>
           <Typography variant="subtitle2" sx={{ mb: 1 }}>Datos</Typography>
+          {/* Solo aparece en subtareas: desde una subtarea siempre se acaba necesitando
+              volver a la tarea que la origino. */}
+          {item.idPadre !== null && (
+            <Box sx={{ display: "flex", justifyContent: "space-between", gap: 2, py: 0.5 }}>
+              <Typography variant="body2" color="text.secondary">Tarea padre</Typography>
+              <Link component={RouterLink} to={`/wi/${item.folioPadre}`} underline="hover"
+                variant="body2" sx={{ fontWeight: 600, textAlign: "right" }}
+                title={item.tituloPadre ?? undefined}>
+                {item.folioPadre} - {item.tituloPadre}
+              </Link>
+            </Box>
+          )}
           <Campo etiqueta="Asignado" valor={item.asignado ?? "-"} />
           <Campo etiqueta="Solicitante" valor={item.solicitante ?? "-"} />
           {item.usuarioSolicitante && (
@@ -266,7 +297,7 @@ export function DetallePage() {
           )}
           <Campo etiqueta="Prioridad" valor={item.prioridad} />
           <Campo etiqueta="Complejidad" valor={item.complejidad ?? "-"} />
-          <Campo etiqueta="Sprint" valor={item.sprint ?? "-"} />
+          <Campo etiqueta="Sprint" valor={item.folioSprint ?? item.sprint ?? "-"} />
           <Campo etiqueta="Compromiso" valor={formatearFecha(item.fechaCompromiso)} resaltar={item.esVencida} />
           <Campo etiqueta="Inicio" valor={formatearFecha(item.fechaInicio)} />
           <Campo etiqueta="Fin" valor={formatearFecha(item.fechaFin)} />

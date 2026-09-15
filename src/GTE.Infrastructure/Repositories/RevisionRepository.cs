@@ -56,7 +56,8 @@ public class RevisionRepository(FabricaContexto fabrica, AuditContext auditoria)
     }
 
     public async Task EstablecerCorregidoAsync(
-        int idRevision, bool corregido, CancellationToken cancellationToken = default)
+        int idRevision, bool corregido, bool esFalsoPositivo, string? motivoDescarte,
+        CancellationToken cancellationToken = default)
     {
         await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
 
@@ -66,12 +67,17 @@ public class RevisionRepository(FabricaContexto fabrica, AuditContext auditoria)
 
         entidad.Corregido = corregido;
         entidad.FechaCorreccion = corregido ? DateTime.Now : null;
+        // Reabrir limpia la marca de falso positivo: el hallazgo vuelve a estar en
+        // discusion y su descarte anterior ya no describe el estado actual.
+        entidad.EsFalsoPositivo = corregido && esFalsoPositivo;
+        entidad.MotivoDescarte = corregido && esFalsoPositivo ? motivoDescarte : null;
         entidad.UsuarioMovto = Auditoria.Usuario.Length > 50 ? Auditoria.Usuario[..50] : Auditoria.Usuario;
         entidad.FechaMovto = DateTime.Now;
 
         await contexto.SaveChangesAsync(cancellationToken);
-        await RegistrarBitacoraAsync("Revision", idRevision,
-            corregido ? "CORREGIR" : "REABRIR", null, cancellationToken);
+
+        var accion = corregido ? (esFalsoPositivo ? "DESCARTAR" : "CORREGIR") : "REABRIR";
+        await RegistrarBitacoraAsync("Revision", idRevision, accion, motivoDescarte, cancellationToken);
     }
 
     public async Task AplicarEfectosTransicionAsync(

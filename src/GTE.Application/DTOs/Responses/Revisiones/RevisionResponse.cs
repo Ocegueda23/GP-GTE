@@ -10,6 +10,11 @@ public class RevisionResponse
     public int IdEstatus { get; set; }
     public string Estatus { get; set; } = string.Empty;
     public bool Corregido { get; set; }
+
+    /// <summary>Cerrado como "No es un error" en vez de arreglado; la razon va en MotivoDescarte.</summary>
+    public bool EsFalsoPositivo { get; set; }
+    public string? MotivoDescarte { get; set; }
+
     public DateTime? FechaCorreccion { get; set; }
     public DateTime FechaRegistro { get; set; }
     public int? IdSeveridad { get; set; }

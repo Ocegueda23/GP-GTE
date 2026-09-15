@@ -69,13 +69,13 @@ export function ColumnaConfigEditor({ clave, columnas: columnasIniciales, onGuar
             </Stack>
 
             <Stack direction="row" sx={{ flexWrap: "wrap" }}>
-              <FormControlLabel label="Auto fecha (alta)"
+              <FormControlLabel label="Fecha registro auto"
                 control={<Checkbox checked={c.autoFechaAlta} onChange={(e) => actualizar(c.nombreColumna, { autoFechaAlta: e.target.checked })} />} />
-              <FormControlLabel label="Auto usuario (alta)"
+              <FormControlLabel label="Usuario registro auto"
                 control={<Checkbox checked={c.autoUsuarioAlta} onChange={(e) => actualizar(c.nombreColumna, { autoUsuarioAlta: e.target.checked })} />} />
-              <FormControlLabel label="Auto fecha (edicion)"
+              <FormControlLabel label="Fecha edicion auto"
                 control={<Checkbox checked={c.autoFechaEdicion} onChange={(e) => actualizar(c.nombreColumna, { autoFechaEdicion: e.target.checked })} />} />
-              <FormControlLabel label="Auto usuario (edicion)"
+              <FormControlLabel label="Usuario edicion auto"
                 control={<Checkbox checked={c.autoUsuarioEdicion} onChange={(e) => actualizar(c.nombreColumna, { autoUsuarioEdicion: e.target.checked })} />} />
             </Stack>
 

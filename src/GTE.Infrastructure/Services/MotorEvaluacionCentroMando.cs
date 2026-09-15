@@ -33,6 +33,13 @@ namespace GTE.Infrastructure.Services;
 /// IDEMPOTENTE: recalcular el mismo periodo borra el detalle y las causas previas de esa
 /// evaluacion y las reescribe; la fila de tblEvaluacionEquipo se reusa (hay UNIQUE por
 /// equipo/anio/mes). Las alertas se deduplican por Clave.
+///
+/// DOBLE PERTENENCIA: un usuario puede ser miembro activo de mas de un equipo a la vez (p. ej.
+/// dos lideres que se cruzan como miembro del equipo del otro). Tickets, tiempo registrado y
+/// capacidad se prorratean por tblEquipoMiembro.PorcentajeDedicacion de esa persona EN ESE
+/// EQUIPO (ver ContextoEquipo.DedicacionDe), para que su jornada/tickets no se cuenten al 100%
+/// en cada equipo al que pertenece. WorkItems no se prorratean porque se atribuyen por
+/// tblWorkItem.IdEquipo, no por membresia.
 /// </summary>
 public class MotorEvaluacionCentroMando(
     FabricaContexto fabrica,
@@ -52,9 +59,18 @@ public class MotorEvaluacionCentroMando(
         int? IdLider,
         string? Ambito,
         List<int> Miembros,
+        IReadOnlyDictionary<int, decimal> Dedicacion,
         List<int> Proyectos,
         DateTime Desde,
-        DateTime Hasta);
+        DateTime Hasta)
+    {
+        /// <summary>
+        /// Fraccion (0-1) de la capacidad/tiempo/tickets de un miembro que se atribuye a ESTE
+        /// equipo, segun tblEquipoMiembro.PorcentajeDedicacion. 1 si no hay fila explicita (el
+        /// lider agregado automaticamente sin ser miembro formal de su propio equipo).
+        /// </summary>
+        public decimal DedicacionDe(int idUsuario) => Dedicacion.GetValueOrDefault(idUsuario, 1m);
+    }
 
     public async Task<int> RecalcularPeriodoAsync(int anio, int mes, CancellationToken cancellationToken = default)
     {
@@ -82,14 +98,20 @@ public class MotorEvaluacionCentroMando(
 
         foreach (var equipo in equipos)
         {
-            var miembros = await contexto.TblEquipoMiembro.AsNoTracking()
+            var miembrosDb = await contexto.TblEquipoMiembro.AsNoTracking()
                 .Where(m => m.Activo && m.IdEquipo == equipo.IdEquipo)
-                .Select(m => m.IdUsuario)
+                .Select(m => new { m.IdUsuario, m.PorcentajeDedicacion })
                 .ToListAsync(cancellationToken);
+
+            var dedicacion = miembrosDb.ToDictionary(m => m.IdUsuario, m => m.PorcentajeDedicacion / 100m);
+            var miembros = miembrosDb.Select(m => m.IdUsuario).ToList();
 
             if (equipo.IdLider is { } lider && !miembros.Contains(lider))
             {
+                // Sin fila propia en tblEquipoMiembro: dedicacion completa a su equipo, igual
+                // que el comportamiento previo a prorratear por PorcentajeDedicacion.
                 miembros.Add(lider);
+                dedicacion[lider] = 1m;
             }
 
             var proyectos = await contexto.TblProyecto.AsNoTracking()
@@ -99,7 +121,7 @@ public class MotorEvaluacionCentroMando(
 
             var ctx = new ContextoEquipo(
                 equipo.IdEquipo, equipo.Nombre, equipo.IdLider, equipo.AmbitoCentroMando,
-                miembros, proyectos, desde, hasta);
+                miembros, dedicacion, proyectos, desde, hasta);
 
             var valores = await CalcularValoresAsync(contexto, ctx, cancellationToken);
 
@@ -230,27 +252,35 @@ public class MotorEvaluacionCentroMando(
         }
 
         // ---------- Bloque Soporte ----------
+        // Los ratios y promedios se ponderan por TicketMinimo.Peso (dedicacion del agente a
+        // este equipo): un ticket de alguien 100% dedicado pesa 1 (igual que antes); uno de
+        // alguien repartido entre dos equipos pesa menos, para no contarlo completo en ambos.
         if (ctx.Ambito == AmbitoCentroMando.Soporte)
         {
             var conSla = tickets.Where(t => t.FechaResolucion.HasValue && t.FechaLimiteResolucion.HasValue).ToList();
-            valores["sop.sla"] = conSla.Count > 0
-                ? Redondear(conSla.Count(t => t.FechaResolucion <= t.FechaLimiteResolucion) * 100m / conSla.Count)
+            var pesoConSla = conSla.Sum(t => t.Peso);
+            valores["sop.sla"] = pesoConSla > 0
+                ? Redondear(conSla.Where(t => t.FechaResolucion <= t.FechaLimiteResolucion).Sum(t => t.Peso) * 100m / pesoConSla)
                 : null;
 
             var conRespuesta = tickets.Where(t => t.FechaPrimeraRespuesta.HasValue).ToList();
-            valores["sop.primera.respuesta"] = conRespuesta.Count > 0
-                ? Redondear((decimal)conRespuesta.Average(t => (t.FechaPrimeraRespuesta!.Value - t.FechaRegistro).TotalMinutes))
+            var pesoRespuesta = conRespuesta.Sum(t => t.Peso);
+            valores["sop.primera.respuesta"] = pesoRespuesta > 0
+                ? Redondear(conRespuesta.Sum(t =>
+                    (decimal)(t.FechaPrimeraRespuesta!.Value - t.FechaRegistro).TotalMinutes * t.Peso) / pesoRespuesta)
                 : null;
 
             var resueltos = tickets.Where(t => t.FechaResolucion.HasValue).ToList();
-            valores["sop.tiempo.resolucion"] = resueltos.Count > 0
-                ? Redondear((decimal)resueltos.Average(t => (t.FechaResolucion!.Value - t.FechaRegistro).TotalHours))
+            var pesoResueltos = resueltos.Sum(t => t.Peso);
+            valores["sop.tiempo.resolucion"] = pesoResueltos > 0
+                ? Redondear(resueltos.Sum(t => (decimal)(t.FechaResolucion!.Value - t.FechaRegistro).TotalHours * t.Peso) / pesoResueltos)
                 : null;
 
             var abiertos = tickets.Where(t => t.IdEstatusTicket != EstatusTicket.Cerrado
                 && t.IdEstatusTicket != EstatusTicket.Resuelto).ToList();
-            valores["sop.vencidos"] = abiertos.Count > 0
-                ? Redondear(abiertos.Count(t => t.FechaLimiteResolucion < ctx.Hasta) * 100m / abiertos.Count)
+            var pesoAbiertos = abiertos.Sum(t => t.Peso);
+            valores["sop.vencidos"] = pesoAbiertos > 0
+                ? Redondear(abiertos.Where(t => t.FechaLimiteResolucion < ctx.Hasta).Sum(t => t.Peso) * 100m / pesoAbiertos)
                 : null;
 
             valores["sop.reabiertos"] = await CalcularTicketsReabiertosAsync(contexto, tickets, ct);
@@ -282,8 +312,15 @@ public class MotorEvaluacionCentroMando(
 
     private sealed record TicketMinimo(
         int IdTicket, int? IdAsignado, int IdEstatusTicket, DateTime FechaRegistro,
-        DateTime? FechaPrimeraRespuesta, DateTime? FechaResolucion, DateTime? FechaLimiteResolucion);
+        DateTime? FechaPrimeraRespuesta, DateTime? FechaResolucion, DateTime? FechaLimiteResolucion,
+        decimal Peso);
 
+    /// <summary>
+    /// Peso = dedicacion del agente asignado a ESTE equipo (ver ContextoEquipo.DedicacionDe).
+    /// Si el agente esta 100% dedicado, Peso = 1 y todas las formulas se comportan igual que
+    /// antes; si esta repartido entre dos equipos, cada ticket cuenta proporcional a su
+    /// dedicacion, para no atribuir el ticket completo a ambos equipos.
+    /// </summary>
     private static async Task<List<TicketMinimo>> ObtenerTicketsAsync(
         DbContextGTE contexto, ContextoEquipo ctx, CancellationToken ct)
     {
@@ -292,14 +329,22 @@ public class MotorEvaluacionCentroMando(
             return [];
         }
 
-        return await contexto.TblTicket.AsNoTracking()
+        var crudos = await contexto.TblTicket.AsNoTracking()
             .Where(t => t.Activo && t.IdAsignado != null && ctx.Miembros.Contains(t.IdAsignado.Value)
                 && t.FechaRegistro <= ctx.Hasta
                 && (t.FechaResolucion == null || t.FechaResolucion >= ctx.Desde))
-            .Select(t => new TicketMinimo(
+            .Select(t => new
+            {
                 t.IdTicket, t.IdAsignado, t.IdEstatusTicket, t.FechaRegistro,
-                t.FechaPrimeraRespuesta, t.FechaResolucion, t.FechaLimiteResolucion))
+                t.FechaPrimeraRespuesta, t.FechaResolucion, t.FechaLimiteResolucion,
+            })
             .ToListAsync(ct);
+
+        return crudos.Select(t => new TicketMinimo(
+            t.IdTicket, t.IdAsignado, t.IdEstatusTicket, t.FechaRegistro,
+            t.FechaPrimeraRespuesta, t.FechaResolucion, t.FechaLimiteResolucion,
+            ctx.DedicacionDe(t.IdAsignado!.Value)))
+            .ToList();
     }
 
     private sealed record IncidenteMinimo(
@@ -372,17 +417,19 @@ public class MotorEvaluacionCentroMando(
 
     private static decimal? Atencion(List<WorkItemMinimo> wi, List<TicketMinimo> tickets, ContextoEquipo ctx)
     {
+        // WorkItems cuentan completo (se atribuyen por IdEquipo directo); tickets se ponderan
+        // por Peso (dedicacion del agente a este equipo).
         var recibidos = wi.Count(w => w.FechaRegistro >= ctx.Desde)
-            + tickets.Count(t => t.FechaRegistro >= ctx.Desde);
-        if (recibidos == 0)
+            + tickets.Where(t => t.FechaRegistro >= ctx.Desde).Sum(t => t.Peso);
+        if (recibidos <= 0)
         {
             return null;
         }
 
         var atendidos = wi.Count(w => EsTerminadoEnPeriodo(w, ctx))
-            + tickets.Count(t => t.FechaResolucion.HasValue);
+            + tickets.Where(t => t.FechaResolucion.HasValue).Sum(t => t.Peso);
 
-        return Redondear(atendidos / (decimal)recibidos, 3);
+        return Redondear(atendidos / recibidos, 3);
     }
 
     /// <summary>
@@ -415,18 +462,31 @@ public class MotorEvaluacionCentroMando(
     private static async Task<decimal?> CalcularCsatAsync(
         DbContextGTE contexto, List<TicketMinimo> tickets, CancellationToken ct)
     {
-        var ids = tickets.Select(t => t.IdTicket).ToList();
-        if (ids.Count == 0)
+        if (tickets.Count == 0)
         {
             return null;
         }
 
+        var ids = tickets.Select(t => t.IdTicket).ToList();
         var calificaciones = await contexto.TblEncuestaSatisfaccion.AsNoTracking()
             .Where(e => ids.Contains(e.IdTicket))
-            .Select(e => (int)e.Calificacion)
+            .Select(e => new { e.IdTicket, Calificacion = (int)e.Calificacion })
             .ToListAsync(ct);
 
-        return calificaciones.Count == 0 ? null : Redondear((decimal)calificaciones.Average(), 2);
+        if (calificaciones.Count == 0)
+        {
+            return null;
+        }
+
+        var pesos = tickets.ToDictionary(t => t.IdTicket, t => t.Peso);
+        var pesoTotal = calificaciones.Sum(c => pesos.GetValueOrDefault(c.IdTicket, 1m));
+        if (pesoTotal <= 0)
+        {
+            return null;
+        }
+
+        var ponderado = calificaciones.Sum(c => c.Calificacion * pesos.GetValueOrDefault(c.IdTicket, 1m));
+        return Redondear(ponderado / pesoTotal, 2);
     }
 
     private static async Task<decimal?> CalcularObjetivosAsync(
@@ -462,9 +522,16 @@ public class MotorEvaluacionCentroMando(
         var desde = DateOnly.FromDateTime(ctx.Desde);
         var hasta = DateOnly.FromDateTime(ctx.Hasta);
 
-        var invertido = await contexto.TblRegistroTiempo.AsNoTracking()
+        // Agrupado por usuario para poder prorratear por su dedicacion a ESTE equipo antes de
+        // sumar (ver ContextoEquipo.DedicacionDe): quien reparte su jornada entre dos equipos
+        // no debe aportar el 100% de sus minutos a cada uno.
+        var porUsuario = await contexto.TblRegistroTiempo.AsNoTracking()
             .Where(r => r.Activo && ctx.Miembros.Contains(r.IdUsuario) && r.Fecha >= desde && r.Fecha <= hasta)
-            .SumAsync(r => (int?)r.Minutos, ct) ?? 0;
+            .GroupBy(r => r.IdUsuario)
+            .Select(g => new { IdUsuario = g.Key, Minutos = g.Sum(r => r.Minutos) })
+            .ToListAsync(ct);
+
+        var invertido = porUsuario.Sum(p => p.Minutos * ctx.DedicacionDe(p.IdUsuario));
 
         return (presupuesto, invertido);
     }
@@ -480,13 +547,17 @@ public class MotorEvaluacionCentroMando(
         var desde = DateOnly.FromDateTime(ctx.Desde);
         var hasta = DateOnly.FromDateTime(ctx.Hasta);
 
-        return await (
+        var porUsuario = await (
             from r in contexto.TblRegistroTiempo.AsNoTracking()
             join w in contexto.TblWorkItem.AsNoTracking() on r.IdWorkItem equals w.IdWorkItem
             where r.Activo && ctx.Miembros.Contains(r.IdUsuario)
                 && r.Fecha >= desde && r.Fecha <= hasta
                 && w.IdTipoWorkItem == idTipoWorkItem
-            select (int?)r.Minutos).SumAsync(ct) ?? 0;
+            group r by r.IdUsuario into g
+            select new { IdUsuario = g.Key, Minutos = g.Sum(r => r.Minutos) })
+            .ToListAsync(ct);
+
+        return porUsuario.Sum(p => p.Minutos * ctx.DedicacionDe(p.IdUsuario));
     }
 
     /// <summary>
@@ -505,19 +576,34 @@ public class MotorEvaluacionCentroMando(
         var desde = DateOnly.FromDateTime(ctx.Desde);
         var hasta = DateOnly.FromDateTime(ctx.Hasta);
 
-        return await (
+        var porUsuario = await (
             from r in contexto.TblRegistroTiempo.AsNoTracking()
             join t in contexto.TblTicket.AsNoTracking() on r.IdWorkItem equals t.IdWorkItemDerivado
             where r.Activo && t.Activo && ctx.Miembros.Contains(r.IdUsuario)
                 && r.Fecha >= desde && r.Fecha <= hasta
-            select (int?)r.Minutos).SumAsync(ct) ?? 0;
+            group r by r.IdUsuario into g
+            select new { IdUsuario = g.Key, Minutos = g.Sum(r => r.Minutos) })
+            .ToListAsync(ct);
+
+        return porUsuario.Sum(p => p.Minutos * ctx.DedicacionDe(p.IdUsuario));
     }
 
     private static async Task<decimal?> CalcularCumplimientoSprintAsync(
         DbContextGTE contexto, ContextoEquipo ctx, CancellationToken ct)
     {
+        // Sprint ya no se asigna por equipo: se toma el del lider que encabeza el equipo
+        // (TblEquipo.IdLider), ver ADR de Backlog/Sprint 2026-09-02.
+        var idLider = await contexto.TblEquipo.AsNoTracking()
+            .Where(e => e.IdEquipo == ctx.IdEquipo)
+            .Select(e => e.IdLider)
+            .FirstOrDefaultAsync(ct);
+        if (idLider is null)
+        {
+            return null;
+        }
+
         var sprints = await contexto.TblSprint.AsNoTracking()
-            .Where(s => s.Activo && s.IdEquipo == ctx.IdEquipo
+            .Where(s => s.Activo && s.IdLider == idLider
                 && s.FechaFin >= DateOnly.FromDateTime(ctx.Desde)
                 && s.FechaFin <= DateOnly.FromDateTime(ctx.Hasta))
             .Select(s => s.IdSprint)
@@ -589,25 +675,28 @@ public class MotorEvaluacionCentroMando(
     {
         var cerrados = tickets
             .Where(t => t.IdEstatusTicket is EstatusTicket.Cerrado or EstatusTicket.Resuelto)
-            .Select(t => t.IdTicket)
             .ToList();
+        var pesoCerrados = cerrados.Sum(t => t.Peso);
 
-        if (cerrados.Count == 0)
+        if (pesoCerrados <= 0)
         {
             return null;
         }
 
+        var idsCerrados = cerrados.Select(t => t.IdTicket).ToList();
+
         // Mismo criterio que en WorkItems: un tramo en Cerrado/Resuelto que ya cerro significa
         // que el ticket salio de ese estatus, es decir, el usuario lo reabrio.
-        var reabiertos = await contexto.TblHistorialEstatus.AsNoTracking()
-            .Where(h => h.Proceso == "Ticket" && cerrados.Contains(h.IdRegistro)
+        var idsReabiertos = await contexto.TblHistorialEstatus.AsNoTracking()
+            .Where(h => h.Proceso == "Ticket" && idsCerrados.Contains(h.IdRegistro)
                 && (h.IdEstatus == EstatusTicket.Cerrado || h.IdEstatus == EstatusTicket.Resuelto)
                 && h.FechaFin != null)
             .Select(h => h.IdRegistro)
             .Distinct()
-            .CountAsync(ct);
+            .ToListAsync(ct);
 
-        return Redondear(reabiertos * 100m / cerrados.Count);
+        var pesoReabiertos = cerrados.Where(t => idsReabiertos.Contains(t.IdTicket)).Sum(t => t.Peso);
+        return Redondear(pesoReabiertos * 100m / pesoCerrados);
     }
 
     /// <summary>
@@ -622,7 +711,7 @@ public class MotorEvaluacionCentroMando(
         }
 
         var porAgente = miembros
-            .Select(m => (decimal)tickets.Count(t => t.IdAsignado == m))
+            .Select(m => tickets.Where(t => t.IdAsignado == m).Sum(t => t.Peso))
             .ToList();
 
         var promedio = porAgente.Average();
@@ -652,14 +741,21 @@ public class MotorEvaluacionCentroMando(
 
         var desde = DateOnly.FromDateTime(ctx.Desde);
         var hasta = DateOnly.FromDateTime(ctx.Hasta);
-        var minutosEjecutados = ctx.Miembros.Count == 0
-            ? 0
-            : await contexto.TblRegistroTiempo.AsNoTracking()
+
+        decimal minutosEjecutados = 0m;
+        if (ctx.Miembros.Count > 0)
+        {
+            var porUsuario = await contexto.TblRegistroTiempo.AsNoTracking()
                 .Where(r => r.Activo && ctx.Miembros.Contains(r.IdUsuario) && r.Fecha >= desde && r.Fecha <= hasta)
-                .SumAsync(r => (int?)r.Minutos, ct) ?? 0;
+                .GroupBy(r => r.IdUsuario)
+                .Select(g => new { IdUsuario = g.Key, Minutos = g.Sum(r => r.Minutos) })
+                .ToListAsync(ct);
+
+            minutosEjecutados = porUsuario.Sum(p => p.Minutos * ctx.DedicacionDe(p.IdUsuario));
+        }
 
         var asignadas = Redondear(minutosAsignados / (decimal)MinutosPorHora, 1) ?? 0m;
-        var ejecutadas = Redondear(minutosEjecutados / (decimal)MinutosPorHora, 1) ?? 0m;
+        var ejecutadas = Redondear(minutosEjecutados / MinutosPorHora, 1) ?? 0m;
 
         var indice = horasDisponibles > 0 ? Redondear(asignadas * 100m / horasDisponibles) : null;
         return new CargaEquipo(horasDisponibles, asignadas, ejecutadas, indice);
@@ -679,31 +775,34 @@ public class MotorEvaluacionCentroMando(
             return 0m;
         }
 
-        var horarios = await contexto.TblUsuario.AsNoTracking()
+        var usuarios = await contexto.TblUsuario.AsNoTracking()
             .Where(u => ctx.Miembros.Contains(u.IdUsuario) && u.IdHorario != null)
-            .Select(u => u.IdHorario!.Value)
+            .Select(u => new { u.IdUsuario, IdHorario = u.IdHorario!.Value })
             .ToListAsync(ct);
 
-        if (horarios.Count == 0)
+        if (usuarios.Count == 0)
         {
             return 0m;
         }
 
         var cache = new Dictionary<int, int>();
-        var totalMinutos = 0;
+        var totalMinutos = 0m;
 
-        foreach (var idHorario in horarios)
+        foreach (var u in usuarios)
         {
-            if (!cache.TryGetValue(idHorario, out var minutos))
+            if (!cache.TryGetValue(u.IdHorario, out var minutos))
             {
-                minutos = await calendario.CalcularMinutosLaboralesAsync(ctx.Desde, ctx.Hasta, idHorario, ct);
-                cache[idHorario] = minutos;
+                minutos = await calendario.CalcularMinutosLaboralesAsync(ctx.Desde, ctx.Hasta, u.IdHorario, ct);
+                cache[u.IdHorario] = minutos;
             }
 
-            totalMinutos += minutos;
+            // Prorratea la jornada laboral del usuario por su dedicacion a ESTE equipo: quien
+            // esta repartido entre dos equipos no puede aportar el 100% de su capacidad a
+            // ambos a la vez.
+            totalMinutos += minutos * ctx.DedicacionDe(u.IdUsuario);
         }
 
-        return Redondear(totalMinutos / (decimal)MinutosPorHora, 1) ?? 0m;
+        return Redondear(totalMinutos / MinutosPorHora, 1) ?? 0m;
     }
 
     /// <summary>

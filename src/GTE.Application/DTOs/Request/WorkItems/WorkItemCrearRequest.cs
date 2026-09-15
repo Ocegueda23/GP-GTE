@@ -15,4 +15,7 @@ public class WorkItemCrearRequest
     public int? IdPadre { get; set; }
     public int? IdSolicitud { get; set; }
     public DateTime? FechaCompromiso { get; set; }
+
+    /// <summary>Sprint al que se compromete el elemento; null = queda en el backlog.</summary>
+    public int? IdSprint { get; set; }
 }
