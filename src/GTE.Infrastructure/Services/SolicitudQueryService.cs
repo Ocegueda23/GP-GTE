@@ -202,9 +202,9 @@ public class SolicitudQueryService(FabricaContexto fabrica) : ISolicitudQuerySer
                    IdSolicitanteInterno = s.IdSolicitante,
                    Proyecto = pr != null ? pr.Nombre : null,
                    IdProyecto = s.IdProyecto,
-                   FechaDeseada = s.FechaDeseada != null
-                       ? s.FechaDeseada.Value.ToDateTime(TimeOnly.MinValue)
-                       : null,
+                   FechaDeseada = s.FechaDeseada.HasValue
+                       ? s.FechaDeseada!.Value.ToDateTime(TimeOnly.MinValue)
+                       : (DateTime?)null,
                    JustificacionNegocio = s.JustificacionNegocio,
                    FechaRegistro = s.FechaRegistro,
                    DiasEspera = EF.Functions.DateDiffDay(s.FechaRegistro, DateTime.Now)

@@ -9,7 +9,7 @@ namespace GTE.Application.Entregas.Commands;
 /// <summary>
 /// Cadena de aprobacion de releases configurable por proyecto (Documento Maestro §7.2):
 /// una lista vacia significa "usar el default fijo" (GTE.Domain.Entregas.
-/// RolesAprobacion.Cadena = QA, Lider, Negocio) -- ver CambiarEstatusReleaseHandler.
+/// RolesAprobacion.Cadena, los seis firmantes del formato) -- ver CambiarEstatusReleaseHandler.
 /// Gateado por ADM.Workflows (mismo permiso del editor de procesos/transiciones, ya
 /// sembrado y sin mas consumidores hasta ahora): es configuracion de proceso, no de
 /// releases en si.

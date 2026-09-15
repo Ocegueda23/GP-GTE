@@ -69,6 +69,8 @@ public partial class TblUsuario
 
     public virtual ICollection<TblEjecucionPrueba> TblEjecucionPrueba { get; set; } = new List<TblEjecucionPrueba>();
 
+    public virtual ICollection<TblEvaluacionEquipo> TblEvaluacionEquipo { get; set; } = new List<TblEvaluacionEquipo>();
+
     public virtual ICollection<TblEquipo> TblEquipo { get; set; } = new List<TblEquipo>();
 
     public virtual ICollection<TblEquipoMiembro> TblEquipoMiembro { get; set; } = new List<TblEquipoMiembro>();

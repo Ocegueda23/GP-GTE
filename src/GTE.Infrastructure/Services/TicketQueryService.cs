@@ -1,13 +1,14 @@
 using GTE.Application.Common;
 using GTE.Application.DTOs.Responses.Soporte;
 using GTE.Application.Interfaces;
+using GTE.Domain.Calendario;
 using GTE.Domain.Soporte;
 using GTE.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace GTE.Infrastructure.Services;
 
-public class TicketQueryService(FabricaContexto fabrica) : ITicketQueryService
+public class TicketQueryService(FabricaContexto fabrica, ICalendarioLaboral calendario) : ITicketQueryService
 {
     public async Task<PagedResult<TicketResponse>> ObtenerBandejaAsync(
         FiltroBandejaTicket filtro, CancellationToken cancellationToken = default)
@@ -77,6 +78,8 @@ public class TicketQueryService(FabricaContexto fabrica) : ITicketQueryService
             .Take(pageSize)
             .ToListAsync(cancellationToken);
 
+        await RellenarTiempoAtencionAsync(contexto, items, cancellationToken);
+
         return new PagedResult<TicketResponse>
         {
             Items = items,
@@ -103,32 +106,109 @@ public class TicketQueryService(FabricaContexto fabrica) : ITicketQueryService
             consulta = consulta.Where(t => estatusArray.Contains(t.IdEstatus));
         }
 
-        return await consulta
+        var items = await consulta
             .OrderByDescending(t => t.IdTicket)
             .ToListAsync(cancellationToken);
+
+        await RellenarTiempoAtencionAsync(contexto, items, cancellationToken);
+        return items;
     }
 
     public async Task<TicketResponse?> ObtenerPorIdAsync(
         int idTicket, CancellationToken cancellationToken = default)
     {
         await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
-        return await Proyectar(contexto)
+        var ticket = await Proyectar(contexto)
             .FirstOrDefaultAsync(t => t.IdTicket == idTicket, cancellationToken);
+
+        if (ticket is not null) await RellenarTiempoAtencionAsync(contexto, [ticket], cancellationToken);
+        return ticket;
     }
 
     public async Task<TicketResponse?> ObtenerPorFolioAsync(
         string folio, CancellationToken cancellationToken = default)
     {
         await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
-        return await Proyectar(contexto)
+        var ticket = await Proyectar(contexto)
             .FirstOrDefaultAsync(t => t.Folio == folio, cancellationToken);
+
+        if (ticket is not null) await RellenarTiempoAtencionAsync(contexto, [ticket], cancellationToken);
+        return ticket;
     }
 
     private sealed class TicketProyeccion : TicketResponse
     {
         public int IdSolicitanteInterno { get; set; }
         public int? IdAsignadoInterno { get; set; }
+
+        /// <summary>Horario del SLA del ticket: es contra el que se mide el tiempo de atencion.</summary>
+        public int? IdHorarioSla { get; set; }
     }
+
+    /// <summary>
+    /// Llena MinutosAtencion de la pagina ya materializada. Los intervalos se leen de
+    /// dbo.tblHistorialEstatus (lo que materializa spCambiarEstatus) y se vuelven a medir
+    /// contra el calendario en vez de sumar la columna MinutosLaborales: esa columna es
+    /// NULL en todo el historial anterior a que el motor empezara a recibir el horario del
+    /// ticket, y ademas el intervalo abierto todavia no tiene minutos escritos -- sumarla
+    /// tal cual es justo lo que hacia que un ticket En Atencion se viera en cero.
+    /// </summary>
+    private async Task RellenarTiempoAtencionAsync(
+        DbContextGTE contexto, IReadOnlyList<TicketProyeccion> tickets, CancellationToken cancellationToken)
+    {
+        var conHorario = tickets.Where(t => t.IdHorarioSla.HasValue).ToList();
+        if (conHorario.Count == 0)
+        {
+            return;
+        }
+
+        var ids = conHorario.Select(t => t.IdTicket).ToList();
+        var intervalos = await contexto.TblHistorialEstatus.AsNoTracking()
+            .Where(h => h.Proceso == ProcesoTicket
+                        && ids.Contains(h.IdRegistro)
+                        && h.IdEstatus == EstatusTicket.EnAtencion)
+            .Select(h => new { h.IdRegistro, h.FechaInicio, h.FechaFin })
+            .ToListAsync(cancellationToken);
+
+        if (intervalos.Count == 0)
+        {
+            return;
+        }
+
+        var ahora = DateTime.Now;
+        var horarios = conHorario.ToDictionary(t => t.IdTicket, t => t.IdHorarioSla!.Value);
+        var intervalosConHorario = intervalos.Where(i => horarios.ContainsKey(i.IdRegistro)).ToList();
+        var solicitudes = intervalosConHorario
+            .Select((i, clave) => new TramoLaborableSolicitado(
+                clave, i.FechaInicio, i.FechaFin ?? ahora, horarios[i.IdRegistro]))
+            .ToList();
+
+        var minutos = await calendario.CalcularMinutosLaboralesLoteAsync(solicitudes, cancellationToken);
+
+        var acumulado = new Dictionary<int, int>();
+        var abiertos = new HashSet<int>();
+        var indice = 0;
+        foreach (var intervalo in intervalosConHorario)
+        {
+            if (minutos.TryGetValue(indice, out var minutosIntervalo))
+            {
+                acumulado[intervalo.IdRegistro] =
+                    acumulado.GetValueOrDefault(intervalo.IdRegistro) + minutosIntervalo;
+            }
+            if (intervalo.FechaFin is null) abiertos.Add(intervalo.IdRegistro);
+            indice++;
+        }
+
+        foreach (var ticket in conHorario)
+        {
+            if (!acumulado.TryGetValue(ticket.IdTicket, out var total)) continue;
+            ticket.MinutosAtencion = total;
+            ticket.AtencionEnCurso = abiertos.Contains(ticket.IdTicket);
+        }
+    }
+
+    /// <summary>Nombre del proceso en dbo.tblProceso / dbo.tblHistorialEstatus.</summary>
+    private const string ProcesoTicket = "Ticket";
 
     private static IQueryable<TicketProyeccion> Proyectar(DbContextGTE contexto)
     {
@@ -167,6 +247,7 @@ public class TicketQueryService(FabricaContexto fabrica) : ITicketQueryService
                    Asignado = a != null ? a.Nombre : null,
                    IdAsignadoInterno = t.IdAsignado,
                    Sla = sla != null ? sla.Nombre : null,
+                   IdHorarioSla = sla != null ? (int?)sla.IdHorario : null,
                    FechaLimiteRespuesta = t.FechaLimiteRespuesta,
                    FechaLimiteResolucion = t.FechaLimiteResolucion,
                    FechaPrimeraRespuesta = t.FechaPrimeraRespuesta,

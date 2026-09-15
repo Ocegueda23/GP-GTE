@@ -68,6 +68,7 @@ public class EntregaQueryService(FabricaContexto fabrica) : IEntregaQueryService
             Version = cabecera.Version,
             Folio = cabecera.Folio,
             NotasVersion = cabecera.NotasVersion,
+            InstruccionesImplementacion = cabecera.InstruccionesImplementacion,
             IdEstatus = cabecera.IdEstatus,
             Estatus = cabecera.Estatus,
             FechaPlan = cabecera.FechaPlan,
@@ -111,7 +112,8 @@ public class EntregaQueryService(FabricaContexto fabrica) : IEntregaQueryService
                 OrdenEjecucion = ra.OrdenEjecucion,
                 IdArtefactoRollback = ra.IdArtefactoRollback,
                 NombreRollback = ar != null ? ar.Nombre : null,
-                JustificacionIrreversible = ra.JustificacionIrreversible
+                JustificacionIrreversible = ra.JustificacionIrreversible,
+                InstruccionesImplementacion = ra.InstruccionesImplementacion
             }).ToListAsync(cancellationToken);
 
         // RN-GTE-032 evaluada para la interfaz: los scripts SQL necesitan rollback o justificacion
@@ -123,6 +125,19 @@ public class EntregaQueryService(FabricaContexto fabrica) : IEntregaQueryService
                 || !string.IsNullOrWhiteSpace(artefacto.JustificacionIrreversible);
         }
         detalle.Artefactos = artefactos;
+
+        detalle.Respaldos = await (
+            from rp in contexto.TblReleaseRespaldo.AsNoTracking()
+            join t in contexto.TblTipoRespaldo.AsNoTracking() on rp.IdTipoRespaldo equals t.Id
+            where rp.IdRelease == idRelease && rp.Activo
+            orderby t.Orden, rp.IdReleaseRespaldo
+            select new RespaldoResponse
+            {
+                IdReleaseRespaldo = rp.IdReleaseRespaldo,
+                IdTipoRespaldo = rp.IdTipoRespaldo,
+                Tipo = t.Nombre,
+                Descripcion = rp.Descripcion
+            }).ToListAsync(cancellationToken);
 
         detalle.Aprobaciones = await (
             from ap in contexto.TblAprobacion.AsNoTracking()
@@ -376,6 +391,7 @@ public class EntregaQueryService(FabricaContexto fabrica) : IEntregaQueryService
                    Version = r.Version,
                    Folio = r.Folio,
                    NotasVersion = r.NotasVersion,
+                   InstruccionesImplementacion = r.InstruccionesImplementacion,
                    IdEstatus = r.IdEstatusRelease,
                    Estatus = e.Descripcion,
                    FechaPlan = r.FechaPlan,

@@ -40,7 +40,7 @@ public class ExportadorExcelClosedXml : IExportadorExcel
                 celda.Value = string.Empty;
                 break;
             case string texto:
-                celda.Value = texto;
+                celda.Value = EscaparPosibleFormula(texto);
                 break;
             case bool booleano:
                 celda.Value = booleano;
@@ -67,5 +67,23 @@ public class ExportadorExcelClosedXml : IExportadorExcel
                 celda.Value = valor.ToString();
                 break;
         }
+    }
+
+    /// <summary>
+    /// Antepone un apostrofe cuando el texto empieza con un caracter que Excel puede interpretar
+    /// como inicio de formula (=, +, -, @) o de un comando DDE (tab, retorno de carro). Mitigacion
+    /// estandar de "CSV/Excel formula injection" para columnas con texto libre de usuario
+    /// (titulo, descripcion, etc.) que se exportan tal cual.
+    /// </summary>
+    private static string EscaparPosibleFormula(string texto)
+    {
+        if (texto.Length == 0)
+        {
+            return texto;
+        }
+
+        return texto[0] is '=' or '+' or '-' or '@' or '\t' or '\r'
+            ? "'" + texto
+            : texto;
     }
 }

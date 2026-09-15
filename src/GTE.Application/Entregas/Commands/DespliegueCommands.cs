@@ -57,14 +57,12 @@ public class CambiarEstatusReleaseHandler(
         if (command.Accion == AccionesRelease.SolicitarAprobacion)
         {
             await ValidarListoParaAprobacionAsync(command.IdRelease, cancellationToken);
-        }
 
-        await motor.EjecutarAccionAsync(
-            "Release", command.IdRelease, command.Accion, command.Motivo, null, cancellationToken);
-        await repositorio.AplicarEfectosTransicionAsync(command.IdRelease, command.Accion, cancellationToken);
-
-        if (command.Accion == AccionesRelease.SolicitarAprobacion)
-        {
+            // La cadena se crea ANTES de mover el estatus: si esto falla (usuario no
+            // resuelto, conflicto al guardar, etc.) el release se queda en En Preparacion,
+            // donde SOLICITAR_APROBACION se puede reintentar, en vez de avanzar a En
+            // Aprobacion sin firmantes y sin forma de arreglarlo desde la UI (REABRIR solo
+            // aplica desde Aprobado).
             var cadenaConfigurada = await repositorio.ObtenerCadenaAprobacionConfiguradaAsync(
                 release.IdProyecto, cancellationToken);
             await repositorio.CrearCadenaAprobacionAsync(
@@ -74,8 +72,14 @@ public class CambiarEstatusReleaseHandler(
         }
         else if (command.Accion == AccionesRelease.Reabrir)
         {
+            // Misma razon: invalidar la cadena vieja antes de mover el estatus, para no
+            // dejar un release en En Preparacion con firmas viejas todavia activas.
             await repositorio.InvalidarCadenaAprobacionAsync(command.IdRelease, cancellationToken);
         }
+
+        await motor.EjecutarAccionAsync(
+            "Release", command.IdRelease, command.Accion, command.Motivo, null, cancellationToken);
+        await repositorio.AplicarEfectosTransicionAsync(command.IdRelease, command.Accion, cancellationToken);
 
         return await consultas.ObtenerDetalleAsync(command.IdRelease, cancellationToken)
             ?? throw new NotFoundException("Release", command.IdRelease);
@@ -87,6 +91,17 @@ public class CambiarEstatusReleaseHandler(
         if (contenido.Count == 0)
         {
             throw new BusinessException("Un release sin contenido no se puede mandar a aprobacion.");
+        }
+
+        // La Solicitud de despliegue se manda a firmar diciendo que se respalda antes de
+        // tocar produccion; un release sin ningun respaldo capturado deja ese apartado en
+        // blanco y no hay a que responsabilizar si algo se tiene que revertir a mano.
+        var respaldos = await repositorio.ObtenerRespaldosAsync(idRelease, cancellationToken);
+        if (respaldos.Count == 0)
+        {
+            throw new BusinessException(
+                "Hay que capturar al menos un respaldo (base de datos, servicio, sitio o ubicacion) "
+                + "antes de mandar el release a aprobacion.");
         }
 
         // RN-GTE-032: scripts SQL sin rollback ni justificacion

@@ -110,6 +110,12 @@ builder.Services.AddScoped<GTE.Application.Interfaces.IMiDiaQueryService, GTE.In
 builder.Services.AddScoped<GTE.Domain.Interfaces.ISolicitudRepository, GTE.Infrastructure.Repositories.SolicitudRepository>();
 builder.Services.AddScoped<GTE.Application.Interfaces.ISolicitudQueryService, GTE.Infrastructure.Services.SolicitudQueryService>();
 
+// Modulo Ausencias (registro y aprobacion)
+builder.Services.AddScoped<GTE.Domain.Interfaces.IAusenciaRepository, GTE.Infrastructure.Repositories.AusenciaRepository>();
+builder.Services.AddScoped<GTE.Application.Interfaces.IAusenciaQueryService, GTE.Infrastructure.Services.AusenciaQueryService>();
+builder.Services.AddScoped<GTE.Domain.Interfaces.INotaVersionRepository, GTE.Infrastructure.Repositories.NotaVersionRepository>();
+builder.Services.AddScoped<GTE.Application.Interfaces.INotaVersionQueryService, GTE.Infrastructure.Services.NotaVersionQueryService>();
+
 // Modulo Tickets (Mesa de ayuda y SLA)
 builder.Services.AddScoped<GTE.Domain.Interfaces.ITicketRepository, GTE.Infrastructure.Repositories.TicketRepository>();
 builder.Services.AddScoped<GTE.Application.Interfaces.ITicketQueryService, GTE.Infrastructure.Services.TicketQueryService>();
@@ -121,6 +127,18 @@ builder.Services.AddScoped<GTE.Application.Interfaces.IIncidenteQueryService, GT
 // Modulo Base de conocimiento (P23; incluye el consumo anonimo /api/v1/publico/conocimiento)
 builder.Services.AddScoped<GTE.Domain.Interfaces.IConocimientoRepository, GTE.Infrastructure.Repositories.ConocimientoRepository>();
 builder.Services.AddScoped<GTE.Application.Interfaces.IConocimientoQueryService, GTE.Infrastructure.Services.ConocimientoQueryService>();
+// Documentos de ayuda que exigen permiso (Centro de Mando TI): se sirven por endpoint
+// autenticado, no como archivo estatico de la SPA.
+builder.Services.AddScoped<GTE.Application.Interfaces.IProveedorDocumentosAyuda, GTE.Infrastructure.Services.ProveedorDocumentosAyuda>();
+
+// Centro de Mando TI: evaluacion mensual de responsables, diagnostico de causa y alertas.
+builder.Services.AddScoped<GTE.Application.Interfaces.ICentroMandoQueryService, GTE.Infrastructure.Services.CentroMandoQueryService>();
+builder.Services.AddScoped<GTE.Application.Interfaces.ICentroMandoRepository, GTE.Infrastructure.Repositories.CentroMandoRepository>();
+builder.Services.AddScoped<GTE.Application.Interfaces.IMotorEvaluacionCentroMando, GTE.Infrastructure.Services.MotorEvaluacionCentroMando>();
+builder.Services.AddScoped<GTE.Application.Interfaces.IGeneradorAlertasCentroMando, GTE.Infrastructure.Services.GeneradorAlertasCentroMando>();
+builder.Services.AddScoped<GTE.Infrastructure.Services.GeneradorAlertasCentroMando>();
+builder.Services.AddScoped<GTE.Infrastructure.Services.EvaluacionCentroMandoJob>();
+
 builder.Services.AddScoped<GTE.Domain.Interfaces.IReglasNegocioRepository, GTE.Infrastructure.Repositories.ReglasNegocioRepository>();
 builder.Services.AddScoped<GTE.Application.Interfaces.IReglasNegocioQueryService, GTE.Infrastructure.Services.ReglasNegocioQueryService>();
 
@@ -254,6 +272,13 @@ if (!hangfireDeshabilitado)
         // ya no pueden adjuntarse a nada. 02:00, despues del snapshot.
         app.Services.GetRequiredService<IRecurringJobManager>().AddOrUpdate<PurgaArchivosBorradorJob>(
             "purga-archivos-borrador", job => job.EjecutarAsync(CancellationToken.None), Cron.Daily(2));
+
+        // Centro de Mando TI: evalua el mes YA CERRADO (no el vigente, que daria indicadores
+        // a medias). Dia 1 a las 03:00, despues de que el snapshot del ultimo dia del mes
+        // anterior ya corrio.
+        app.Services.GetRequiredService<IRecurringJobManager>().AddOrUpdate<EvaluacionCentroMandoJob>(
+            "evaluacion-centro-mando-mensual",
+            job => job.EjecutarAsync(CancellationToken.None), Cron.Monthly(1, 3));
     }
     catch (Exception ex)
     {
@@ -279,6 +304,26 @@ else
 }
 
 app.UseSerilogRequestLogging();
+
+// Cabeceras defensivas en toda respuesta (API, SPA y estaticos): sin CSP porque el SPA hoy
+// usa scripts/estilos inline generados por Vite y romperia sin una politica afinada por
+// nonce/hash -- queda pendiente para cuando se revise el build de produccion.
+app.Use(async (contexto, siguiente) =>
+{
+    contexto.Response.OnStarting(() =>
+    {
+        contexto.Response.Headers.Append("X-Content-Type-Options", "nosniff");
+        contexto.Response.Headers.Append("X-Frame-Options", "DENY");
+        contexto.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
+        if (contexto.Request.IsHttps)
+        {
+            contexto.Response.Headers.Append("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+        }
+        return Task.CompletedTask;
+    });
+    await siguiente();
+});
+
 app.UseMiddleware<GlobalExceptionMiddleware>();
 
 if (app.Environment.IsDevelopment())

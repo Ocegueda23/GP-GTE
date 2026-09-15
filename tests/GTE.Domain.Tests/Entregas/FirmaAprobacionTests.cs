@@ -33,9 +33,12 @@ public class FirmaAprobacionTests
     }
 
     [Fact]
-    public void CadenaDeAprobacion_TieneLosTresRolesEnOrden()
+    public void CadenaDeAprobacion_TieneLosSeisFirmantesEnOrden()
     {
-        Assert.Equal(["QA", "Lider", "Negocio"], RolesAprobacion.Cadena);
+        Assert.Equal([
+            "Gerente del area solicitante", "Solicitante", "Usuario que prueba",
+            "Gerente de TI", "Lider", "Ing. Soporte",
+        ], RolesAprobacion.Cadena);
     }
 
     [Fact]

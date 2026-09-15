@@ -18,7 +18,11 @@ import {
   type TransicionConfigGuardar, type TransicionWorkflow,
 } from "../../shared/api/workflow";
 
-const CADENA_DEFAULT = ["QA", "Lider", "Negocio"];
+/** Espejo de GTE.Domain.Entregas.RolesAprobacion.Cadena (el backend es la fuente de verdad). */
+const CADENA_DEFAULT = [
+  "Gerente del area solicitante", "Solicitante", "Usuario que prueba",
+  "Gerente de TI", "Lider", "Ing. Soporte",
+];
 
 /**
  * P21 - Editor de Workflows (permiso ADM.Workflows): lista de procesos -> ver el grafo

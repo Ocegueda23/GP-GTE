@@ -31,6 +31,7 @@ import { PortafolioPage } from "./features/portafolio/PortafolioPage";
 import { BacklogPage } from "./features/planeacion/BacklogPage";
 import { TableroPage } from "./features/planeacion/TableroPage";
 import { ReleasesPage } from "./features/entregas/ReleasesPage";
+import { SolicitudDesplieguePage } from "./features/entregas/SolicitudDesplieguePage";
 import { GuardiaSesion } from "./features/sesion/GuardiaSesion";
 import { DashboardEjecutivoPage } from "./features/dashboard/DashboardEjecutivoPage";
 import { IndicadoresEjecutivosPage } from "./features/indicadoresEjecutivos/IndicadoresEjecutivosPage";
@@ -41,6 +42,10 @@ import { WorkflowsPage } from "./features/admin/WorkflowsPage";
 import { CatalogosPage } from "./features/catalogos/CatalogosPage";
 import { CatalogosAdminPage } from "./features/catalogos/admin/CatalogosAdminPage";
 import { ManualUsuarioPage } from "./features/ayuda/ManualUsuarioPage";
+import { CentroMandoPage as AyudaCentroMandoPage } from "./features/ayuda/CentroMandoPage";
+import { CentroMandoPage } from "./features/centroMando/CentroMandoPage";
+import { EvaluacionResponsablePage } from "./features/centroMando/EvaluacionResponsablePage";
+import { CatalogoIndicadoresPage } from "./features/centroMando/CatalogoIndicadoresPage";
 import { ConocimientoPage } from "./features/conocimiento/ConocimientoPage";
 import { ReglasNegocioPage } from "./features/reglasNegocio/ReglasNegocioPage";
 import { DetalleReglaPage } from "./features/reglasNegocio/DetalleReglaPage";
@@ -263,6 +268,8 @@ const NAVEGACION: { ruta: string; etiqueta: string; permiso: string | string[] |
   { ruta: "/operacion/incidentes", etiqueta: "Incidentes", permiso: "INC.Gestionar" },
   { ruta: "/dashboard-ejecutivo", etiqueta: "Dashboard ejecutivo", permiso: null },
   { ruta: "/indicadores-ejecutivos", etiqueta: "Indicadores ejecutivos", permiso: ["DASH.Ejecutivo", "DASH.VerDepartamento"] },
+  { ruta: "/centro-mando", etiqueta: "Centro de Mando TI", permiso: "GES.Ver" },
+  { ruta: "/centro-mando/catalogo", etiqueta: "Indicadores de gestion", permiso: "GES.Administrar" },
   { ruta: "/portafolio", etiqueta: "Portafolio", permiso: ["POR.GestionarCosteo", "POR.GestionarOkr", "RPT.Costos"] },
   { ruta: "/reportes", etiqueta: "Reportes", permiso: ["RPT.Ver", "RPT.Costos", "RPT.Auditoria", "RPT.Actividad"] },
   { ruta: "/catalogos", etiqueta: "Catalogos", permiso: null },
@@ -273,6 +280,9 @@ const NAVEGACION: { ruta: string; etiqueta: string; permiso: string | string[] |
   { ruta: "/conocimiento", etiqueta: "Base de conocimiento", permiso: null },
   { ruta: "/reglas-negocio", etiqueta: "Reglas de negocio", permiso: "RGN.Ver" },
   { ruta: "/ayuda", etiqueta: "Ayuda", permiso: null },
+  // El Manual de usuario es para todos; el Centro de Mando TI describe como se evalua a
+  // cada responsable de area, asi que exige permiso (el backend tambien lo valida).
+  { ruta: "/ayuda/centro-mando", etiqueta: "Centro de Mando TI", permiso: "AYU.CentroMando" },
 ];
 
 function CampanaNotificaciones() {
@@ -549,6 +559,7 @@ function AplicacionAutenticada({ modo, alternarModo }: { modo: PaletteMode; alte
                 <Route path="/tablero" element={<TableroPage />} />
                 <Route path="/backlog" element={<BacklogPage />} />
                 <Route path="/releases" element={<ReleasesPage />} />
+                <Route path="/releases/:id/solicitud" element={<SolicitudDesplieguePage />} />
                 <Route path="/solicitudes" element={<PortalPage />} />
                 <Route path="/triage" element={<TriagePage />} />
                 <Route path="/tickets" element={<PortalTicketsPage />} />
@@ -570,6 +581,10 @@ function AplicacionAutenticada({ modo, alternarModo }: { modo: PaletteMode; alte
                 <Route path="/reglas-negocio" element={<ReglasNegocioPage />} />
                 <Route path="/reglas-negocio/:id" element={<DetalleReglaPage />} />
                 <Route path="/ayuda" element={<ManualUsuarioPage />} />
+                <Route path="/ayuda/centro-mando" element={<AyudaCentroMandoPage />} />
+                <Route path="/centro-mando" element={<CentroMandoPage />} />
+                <Route path="/centro-mando/equipos/:idEquipo" element={<EvaluacionResponsablePage />} />
+                <Route path="/centro-mando/catalogo" element={<CatalogoIndicadoresPage />} />
               </Routes>
             </Box>
           </Box>

@@ -79,6 +79,21 @@ public class EntregaRepository(FabricaContexto fabrica, AuditContext auditoria)
         await contexto.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task ActualizarInstruccionesAsync(
+        int idRelease, string? instrucciones, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
+        var entidad = await contexto.TblRelease
+            .FirstOrDefaultAsync(r => r.IdRelease == idRelease, cancellationToken)
+            ?? throw new InvalidOperationException($"Release {idRelease} no existe.");
+
+        entidad.InstruccionesImplementacion = instrucciones;
+        MarcarMovimiento(entidad);
+        await contexto.SaveChangesAsync(cancellationToken);
+
+        await RegistrarBitacoraAsync("Release", idRelease, "INSTRUCCIONES", null, cancellationToken);
+    }
+
     public async Task AplicarEfectosTransicionAsync(
         int idRelease, string accion, CancellationToken cancellationToken = default)
     {
@@ -230,6 +245,7 @@ public class EntregaRepository(FabricaContexto fabrica, AuditContext auditoria)
             OrdenEjecucion = datos.OrdenEjecucion,
             IdArtefactoRollback = datos.IdArtefactoRollback,
             JustificacionIrreversible = datos.JustificacionIrreversible,
+            InstruccionesImplementacion = datos.InstruccionesImplementacion,
             UsuarioRegistro = Auditoria.Usuario,
             Activo = true
         });
@@ -250,7 +266,67 @@ public class EntregaRepository(FabricaContexto fabrica, AuditContext auditoria)
             where ra.IdRelease == idRelease && ra.Activo
             select new ArtefactoRelease(
                 ra.IdReleaseArtefacto, a.IdArtefacto, a.Nombre, a.IdTipoArtefacto,
-                ra.OrdenEjecucion, ra.IdArtefactoRollback, ra.JustificacionIrreversible)
+                ra.OrdenEjecucion, ra.IdArtefactoRollback, ra.JustificacionIrreversible,
+                ra.InstruccionesImplementacion)
+            ).ToListAsync(cancellationToken);
+    }
+
+    /* ---------- Respaldos previos al despliegue ---------- */
+
+    public async Task<int> AgregarRespaldoAsync(
+        RespaldoNuevo datos, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
+
+        var respaldo = new TblReleaseRespaldo
+        {
+            IdRelease = datos.IdRelease,
+            IdTipoRespaldo = datos.IdTipoRespaldo,
+            Descripcion = datos.Descripcion,
+            UsuarioRegistro = Auditoria.Usuario,
+            Activo = true
+        };
+        contexto.TblReleaseRespaldo.Add(respaldo);
+        await contexto.SaveChangesAsync(cancellationToken);
+
+        await RegistrarBitacoraAsync("Release", datos.IdRelease, "AGREGAR_RESPALDO",
+            datos.Descripcion, cancellationToken);
+        return respaldo.IdReleaseRespaldo;
+    }
+
+    public async Task<bool> QuitarRespaldoAsync(
+        int idRelease, int idRespaldo, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
+
+        var respaldo = await contexto.TblReleaseRespaldo
+            .FirstOrDefaultAsync(
+                r => r.IdReleaseRespaldo == idRespaldo && r.IdRelease == idRelease && r.Activo,
+                cancellationToken);
+        if (respaldo is null)
+        {
+            return false;
+        }
+
+        // tblReleaseRespaldo no tiene columnas de movimiento; la baja queda en bitacora.
+        respaldo.Activo = false;
+        await contexto.SaveChangesAsync(cancellationToken);
+
+        await RegistrarBitacoraAsync("Release", idRelease, "QUITAR_RESPALDO",
+            respaldo.Descripcion, cancellationToken);
+        return true;
+    }
+
+    public async Task<IReadOnlyList<RespaldoRelease>> ObtenerRespaldosAsync(
+        int idRelease, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
+        return await (
+            from r in contexto.TblReleaseRespaldo.AsNoTracking()
+            join t in contexto.TblTipoRespaldo.AsNoTracking() on r.IdTipoRespaldo equals t.Id
+            where r.IdRelease == idRelease && r.Activo
+            orderby t.Orden, r.IdReleaseRespaldo
+            select new RespaldoRelease(r.IdReleaseRespaldo, r.IdTipoRespaldo, t.Nombre, r.Descripcion)
             ).ToListAsync(cancellationToken);
     }
 

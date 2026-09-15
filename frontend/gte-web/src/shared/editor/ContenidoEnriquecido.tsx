@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { Box } from "@mui/material";
 import { descargarArchivoBlob } from "../api/archivos";
+import { ESTILOS_TABLA } from "./estilosTabla";
 import { normalizarHtmlLegado } from "./textoPlano";
 
 interface Props {
@@ -74,6 +75,7 @@ export function ContenidoEnriquecido({ html, urlPublicaImagen }: Props) {
         "& p + p": { mt: 1 },
         "& .mencion": { color: "primary.main", fontWeight: 600 },
         "& img[data-guid]": { maxWidth: "100%", maxHeight: 320, borderRadius: 1, display: "block", mt: 0.5 },
+        ...ESTILOS_TABLA,
       }}
       dangerouslySetInnerHTML={{ __html: htmlNormalizado }}
     />

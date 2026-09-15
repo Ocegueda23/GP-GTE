@@ -76,6 +76,15 @@ public class ReleasesController(IMediator mediator) : ControllerBase
         return Ok(ApiResponse<object>.Exito(new { }, "Elemento retirado del release."));
     }
 
+    /// <summary>Instructivo de despliegue del release (HTML enriquecido) que se imprime en la Solicitud de despliegue.</summary>
+    [HttpPut("releases/{id:int}/instrucciones")]
+    public async Task<ActionResult<ApiResponse<ReleaseDetalleResponse>>> ActualizarInstrucciones(
+        int id, [FromBody] ActualizarInstruccionesRequest request, CancellationToken cancellationToken)
+    {
+        var resultado = await mediator.Send(new ActualizarInstruccionesCommand(id, request), cancellationToken);
+        return Ok(ApiResponse<ReleaseDetalleResponse>.Exito(resultado, "Instrucciones de implementacion guardadas."));
+    }
+
     [HttpDelete("releases/{id:int}/artefactos/{idArtefacto:int}")]
     public async Task<ActionResult<ApiResponse<object>>> QuitarArtefacto(
         int id, int idArtefacto, CancellationToken cancellationToken)
@@ -90,6 +99,23 @@ public class ReleasesController(IMediator mediator) : ControllerBase
     {
         var idArtefacto = await mediator.Send(new AgregarArtefactoCommand(id, request), cancellationToken);
         return Ok(ApiResponse<int>.Exito(idArtefacto, "Artefacto registrado."));
+    }
+
+    /// <summary>Respaldos previos al despliegue; se exige al menos uno para mandar a aprobacion.</summary>
+    [HttpPost("releases/{id:int}/respaldos")]
+    public async Task<ActionResult<ApiResponse<int>>> AgregarRespaldo(
+        int id, [FromBody] RespaldoAgregarRequest request, CancellationToken cancellationToken)
+    {
+        var idRespaldo = await mediator.Send(new AgregarRespaldoCommand(id, request), cancellationToken);
+        return Ok(ApiResponse<int>.Exito(idRespaldo, "Respaldo registrado."));
+    }
+
+    [HttpDelete("releases/{id:int}/respaldos/{idRespaldo:int}")]
+    public async Task<ActionResult<ApiResponse<object>>> QuitarRespaldo(
+        int id, int idRespaldo, CancellationToken cancellationToken)
+    {
+        await mediator.Send(new QuitarRespaldoCommand(id, idRespaldo), cancellationToken);
+        return Ok(ApiResponse<object>.Exito(new { }, "Respaldo retirado del release."));
     }
 
     /// <summary>Firma una aprobacion de la cadena; rechazar regresa el release a preparacion.</summary>

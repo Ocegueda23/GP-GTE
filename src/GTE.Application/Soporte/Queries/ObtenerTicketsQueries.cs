@@ -41,13 +41,24 @@ public class ObtenerMisTicketsHandler(
 /// <summary>Detalle por folio (ruta /tickets/:folio de la SPA, mismo patron que WorkItem).</summary>
 public record ObtenerTicketPorFolioQuery(string Folio) : IRequest<TicketResponse>;
 
-public class ObtenerTicketPorFolioHandler(ITicketQueryService consultas)
-    : IRequestHandler<ObtenerTicketPorFolioQuery, TicketResponse>
+/// <summary>El solicitante siempre puede ver su propio ticket; cualquier otro usuario necesita TKT.Atender.</summary>
+public class ObtenerTicketPorFolioHandler(
+    ITicketQueryService consultas,
+    IVerificadorPermisos permisos,
+    IProveedorUsuarioActual proveedorUsuario) : IRequestHandler<ObtenerTicketPorFolioQuery, TicketResponse>
 {
     public async Task<TicketResponse> Handle(ObtenerTicketPorFolioQuery query, CancellationToken cancellationToken)
     {
-        return await consultas.ObtenerPorFolioAsync(query.Folio, cancellationToken)
+        var ticket = await consultas.ObtenerPorFolioAsync(query.Folio, cancellationToken)
             ?? throw new NotFoundException("Ticket", query.Folio);
+
+        var usuarioActual = await proveedorUsuario.ObtenerAsync(cancellationToken);
+        if (usuarioActual?.IdUsuario != ticket.IdSolicitante)
+        {
+            await permisos.ExigirPermisoAsync(PermisosTicket.Atender, null, cancellationToken);
+        }
+
+        return ticket;
     }
 }
 

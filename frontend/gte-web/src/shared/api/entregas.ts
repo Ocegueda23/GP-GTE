@@ -18,8 +18,18 @@ export interface Artefacto {
   idArtefactoRollback: number | null;
   nombreRollback: string | null;
   justificacionIrreversible: string | null;
+  /** HTML enriquecido (formato, tablas e imagenes) con el instructivo propio del artefacto. */
+  instruccionesImplementacion: string | null;
   requiereRollback: boolean;
   cumpleRollback: boolean;
+}
+
+/** Respaldo previo al despliegue: la base, el servicio, el sitio o la ubicacion exacta. */
+export interface Respaldo {
+  idReleaseRespaldo: number;
+  idTipoRespaldo: number;
+  tipo: string;
+  descripcion: string;
 }
 
 export interface Aprobacion {
@@ -52,6 +62,8 @@ export interface Release {
   version: string;
   folio: string | null;
   notasVersion: string | null;
+  /** HTML enriquecido con el instructivo de despliegue; es lo que se imprime en la Solicitud de despliegue. */
+  instruccionesImplementacion: string | null;
   idEstatus: number;
   estatus: string;
   fechaPlan: string | null;
@@ -64,6 +76,7 @@ export interface Release {
 export interface ReleaseDetalle extends Release {
   items: ItemRelease[];
   artefactos: Artefacto[];
+  respaldos: Respaldo[];
   aprobaciones: Aprobacion[];
   despliegues: Despliegue[];
 }
@@ -153,8 +166,29 @@ export async function agregarArtefacto(idRelease: number, datos: {
   ordenEjecucion: number | null;
   idArtefactoRollback: number | null;
   justificacionIrreversible: string | null;
+  instruccionesImplementacion: string | null;
 }) {
   return enviar<number>("post", `/api/v1/releases/${idRelease}/artefactos`, datos);
+}
+
+export async function agregarRespaldo(idRelease: number, datos: {
+  idTipoRespaldo: number;
+  descripcion: string;
+}) {
+  return enviar<number>("post", `/api/v1/releases/${idRelease}/respaldos`, datos);
+}
+
+export async function quitarRespaldo(idRelease: number, idRespaldo: number) {
+  const { mensaje } = await enviar<object>(
+    "delete", `/api/v1/releases/${idRelease}/respaldos/${idRespaldo}`,
+  );
+  return { mensaje };
+}
+
+export async function actualizarInstrucciones(idRelease: number, html: string | null) {
+  return enviar<ReleaseDetalle>("put", `/api/v1/releases/${idRelease}/instrucciones`, {
+    instruccionesImplementacion: html,
+  });
 }
 
 export async function quitarArtefacto(idRelease: number, idArtefacto: number) {
@@ -206,6 +240,8 @@ export interface CatalogosEntregas {
   tiposArtefacto: { id: number; nombre: string }[];
   /** Id de "Script SQL": el unico tipo que pide justificacion si no hay reversa (RN-GTE-032). */
   idTipoArtefactoScriptSql: number;
+  /** Tipos de respaldo previos al despliegue (base de datos, servicio, sitio, ubicacion). */
+  tiposRespaldo: { id: number; nombre: string }[];
 }
 
 /**
