@@ -5,6 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>GTE.Infrastructure</RootNamespace>
+    <Version>2.25.0.0</Version>
   </PropertyGroup>
 
   <ItemGroup>

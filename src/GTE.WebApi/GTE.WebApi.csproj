@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>GTE.WebApi</RootNamespace>
+    <Version>2.25.0.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
