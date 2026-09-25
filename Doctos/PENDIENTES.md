@@ -3,6 +3,78 @@
 > Documento de continuidad. Sirve para retomar el proyecto en otra sesión sin
 > contexto previo. Actualizar al cerrar cada bloque de trabajo.
 >
+> **Bloque en curso (2026-09-25) — R16: Gantt de actividades en el catálogo de Reportes.**
+> Vista nueva en Reportes (`R16 - Gantt de actividades`, permiso `RPT.Ver`) con los tres
+> filtros que pidió el usuario **combinables entre sí**: proyecto, usuario y periodo. La
+> agrupación (`Ninguno`/`Proyecto`/`Usuario`) es aparte de los filtros: solo cambia el orden
+> y mete bandas de encabezado.
+>
+> **Sin cambios de esquema:** todo sale de columnas que ya existían en `tblWorkItem`
+> (`FechaInicio`/`FechaFin`/`IdProyecto`/`IdAsignado`), así que no se abrió carpeta
+> `NN_Scripts` ni hubo re-scaffold.
+>
+> Backend: `GET /api/v1/reportes/gantt-actividades` (+ `/exportar` a Excel) ->
+> `ObtenerGanttActividadesQuery` -> `ReportesQueryService.ObtenerGanttActividadesAsync`.
+> A diferencia del R15 (que corta por `FechaFin` y solo ve lo Terminado), el R16 trae lo que
+> **se traslapa** con el periodo y exige `FechaInicio != null` ("realizada" = ya arrancó), de
+> modo que lo que sigue abierto aparece con `FechaFin = null`. Pagina con `PagedResult<T>` y
+> **ordena por la llave de agrupación antes de paginar**, para que una página no parta un
+> grupo a la mitad; "Sin asignar" se manda al final ordenando primero por el bool
+> `IdAsignado == null`. El Excel no pagina: pide `pageSize = int.MaxValue` y el query service
+> lo recorta solo al `TopeRenglonesDetalle` (5000) que ya usaba el R15.
+>
+> Frontend: `features/reportes/DiagramaGantt.tsx`, **componente propio sin dependencia nueva**
+> (barras absolutas en porcentaje sobre un eje de tiempo, todo con MUI, así sigue al tema
+> claro/oscuro solo). Se descartó meter `gantt-task-react`/`frappe-gantt`: traían su propio
+> tema, su propio modelo de datos y riesgo de compatibilidad con React 19 a cambio de nada.
+> Densidad del eje automática (diario <= 31 d, semanal <= 220 d, mensual arriba), línea de
+> "hoy", barra difuminada a la derecha cuando no hay fecha de fin, extremos planos cuando la
+> actividad se sale del rango, encabezado y columna de etiquetas `sticky`, scroll horizontal
+> **dentro** del Paper (la página no se barre; verificado a 375 px), y estado vacío propio.
+>
+> **Verificación:** `dotnet build` y `npm run build`/`lint` limpios; suite completa en verde.
+> La traducción EF (lo único que revienta en tiempo de ejecución) se cubre con
+> `TraduccionConsultaR16Tests`, que llama al método REAL contra `Server=noexiste` y exige que
+> falle por `SqlException` y no por "could not be translated" — corre sin base de datos, a
+> diferencia de `ReportesGanttApiTests` (E2E completo) que **se auto-omite en esta máquina**
+> porque el LocalDB de aquí no tiene `bdsGTE`. El render se verificó con una página temporal
+> de preview (ya borrada) en claro, oscuro, móvil y con eje diario/semanal.
+>
+> **Despliegue (mismo día).** Se subió la versión a **1.26.0.0** en `Directory.Build.props`
+> (MEJORA: segundo dígito, resto a 0) y se corrió `publicar.bat C:\publicado\GTE_nuevo`, que
+> es la carpeta origen que espera el `desplegar_GTE.cmd` del servidor. El publish quedó con
+> 1.26.0.0 estampado en las dos mitades (DLL del API y bundle). **El swap al servicio no lo
+> hizo Claude**: el ACL del servicio (`sc sdshow GTE`) solo da arranque/paro a Administradores
+> y a SYSTEM, así que se entregó el comando para correrlo elevado.
+>
+> **Ojo con esto, el despliegue venía de un mes atrás:** el DLL instalado era del 2026-08-24
+> (commit `f47a3d3`), 12 commits y 25 scripts de esquema atrás. Se confirmó con el usuario que
+> `bdsGTE` ya tenía los scripts corridos antes de desplegar.
+>
+> **Hallazgo 1 — la sección 6 del manual borra adjuntos de usuarios.** Dice "borrar el
+> CONTENIDO COMPLETO de la carpeta instalada". Dentro de `C:\Servicios\GTE` viven
+> `ArchivosGte\` (el almacén de adjuntos ya subidos) y los `appsettings*.json` del servidor;
+> seguir el manual al pie de la letra los destruye. El `C:\publicado\desplegar_GTE.cmd` que ya
+> usa el equipo sí los excluye del `robocopy /MIR` — **ese es el procedimiento bueno**, y el
+> manual es el que hay que corregir.
+>
+> **Hallazgo 2 — la versión está declarada en dos lados que se contradicen.** El commit
+> `81a1b60` ("Registro de versión") metió `<Version>2.25.0.0</Version>` en los cuatro
+> `.csproj`, y un `<Version>` del propio proyecto GANA sobre `Directory.Build.props` — justo
+> lo que CLAUDE.md prohíbe ("es la ÚNICA fuente... nunca se escribe a mano en otro lado"). Hoy
+> no estorba porque `publicar.bat` pasa `-p:Version` por línea de comandos, que gana sobre
+> ambos; pero cualquier `dotnet publish` a mano estampa 2.25.0.0 y dispara el descuadre ámbar
+> de la barra superior. **No se tocaron esos cuatro archivos** porque ese "2" puede ser un
+> salto de PROYECTO intencional anotado en el lugar equivocado: es decisión del equipo.
+>
+> **Hallazgo 3 — `Doctos/NOTAS-VERSION.md` ya no existe.** El comentario de
+> `Directory.Build.props` todavía manda ahí, pero las notas se volvieron el módulo
+> `tblNotaVersion` y se capturan desde Administración > Notas de versión (`ADM.NotasVersion`).
+> **Las notas de la 1.26.0.0 están pendientes de capturar en la app.**
+>
+> **Falta:** capturar las notas de la 1.26.0.0 en la app, y correr el E2E
+> (`ReportesGanttApiTests`) en una máquina que sí tenga `bdsGTE` en LocalDB.
+>
 > **Bloque en curso (2026-09-14) — `GTE.Instalador`: WinForms en vez de scripts de consola
 > para la instalación inicial.** El usuario reportó que instalar GTE (varios `.bat`/`.ps1`
 > con parámetros posicionales, orden que ya había cambiado una vez, cuidado especial con

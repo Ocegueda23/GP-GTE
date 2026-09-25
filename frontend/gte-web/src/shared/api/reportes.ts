@@ -485,3 +485,47 @@ export async function obtenerReporteActividadesTerminadas(filtro: FiltroActivida
   return obtener<ActividadesTerminadasReporte>(
     "/api/v1/reportes/actividades-terminadas", armarParams({ ...filtro }));
 }
+
+// ---------- R16 Gantt de actividades ----------
+/** Espejo de GTE.Domain.Reportes.AgrupacionGantt (el back lo enlaza por nombre). */
+export type AgrupacionGantt = "Ninguno" | "Proyecto" | "Usuario";
+
+export interface GanttActividad {
+  idWorkItem: number;
+  folio: string;
+  tipo: string;
+  titulo: string;
+  descripcion: string | null;
+  idProyecto: number;
+  proyecto: string;
+  idAsignado: number | null;
+  asignado: string | null;
+  idEstatusWorkItem: number;
+  estatus: string;
+  fechaInicio: string;
+  /** null = la actividad sigue abierta; la barra se dibuja hasta hoy, no hasta el fin del rango. */
+  fechaFin: string | null;
+  fechaCompromiso: string | null;
+}
+
+export interface GanttActividadesReporte {
+  desde: string;
+  hasta: string;
+  pagina: ResultadoPaginado<GanttActividad>;
+  /** Del filtro completo, no solo de la pagina en pantalla. */
+  totalEnProgreso: number;
+}
+
+export interface FiltroGanttActividades {
+  desde: string;
+  hasta: string;
+  idProyecto: number | null;
+  idAsignado: number | null;
+  agruparPor: AgrupacionGantt;
+  page: number;
+  pageSize: number;
+}
+
+export async function obtenerReporteGanttActividades(filtro: FiltroGanttActividades) {
+  return obtener<GanttActividadesReporte>("/api/v1/reportes/gantt-actividades", armarParams({ ...filtro }));
+}

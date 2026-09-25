@@ -1,6 +1,7 @@
 using GTE.Application.DTOs.Responses.Reportes;
 using GTE.Application.Interfaces;
 using GTE.Application.Reportes.Queries;
+using GTE.Domain.Reportes;
 using GTE.WebApi.Models;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -354,6 +355,45 @@ public class ReportesController(IMediator mediator, IExportadorExcel exportador)
         }
 
         return ArchivoExcel("ActividadesTerminadas", encabezados, filas);
+    }
+
+    // ---------- R16 Gantt de actividades ----------
+    [HttpGet("gantt-actividades")]
+    public async Task<ActionResult<ApiResponse<GanttActividadesReporteResponse>>> ObtenerGanttActividades(
+        [FromQuery] DateOnly desde, [FromQuery] DateOnly hasta, [FromQuery] int? idProyecto,
+        [FromQuery] int? idAsignado, [FromQuery] AgrupacionGantt agruparPor = AgrupacionGantt.Ninguno,
+        [FromQuery] int page = 1, [FromQuery] int pageSize = 50, CancellationToken cancellationToken = default)
+    {
+        var resultado = await mediator.Send(
+            new ObtenerGanttActividadesQuery(desde, hasta, idProyecto, idAsignado, agruparPor, page, pageSize),
+            cancellationToken);
+        return Ok(ApiResponse<GanttActividadesReporteResponse>.Exito(resultado));
+    }
+
+    [HttpGet("gantt-actividades/exportar")]
+    public async Task<IActionResult> ExportarGanttActividades(
+        [FromQuery] DateOnly desde, [FromQuery] DateOnly hasta, [FromQuery] int? idProyecto,
+        [FromQuery] int? idAsignado, [FromQuery] AgrupacionGantt agruparPor = AgrupacionGantt.Ninguno,
+        CancellationToken cancellationToken = default)
+    {
+        // El Excel no se pagina: se pide todo y el query service recorta solo al tope de renglones.
+        var r = await mediator.Send(
+            new ObtenerGanttActividadesQuery(desde, hasta, idProyecto, idAsignado, agruparPor, 1, int.MaxValue),
+            cancellationToken);
+
+        var encabezados = new[]
+        {
+            "Folio", "Tipo", "Actividad", "Descripcion", "Proyecto", "Responsable", "Estatus",
+            "Fecha inicio", "Fecha fin", "Fecha compromiso", "Duracion (dias naturales)",
+        };
+        var filas = r.Pagina.Items.Select(a => (IReadOnlyList<object?>)
+        [
+            a.Folio, a.Tipo, a.Titulo, a.Descripcion, a.Proyecto, a.Asignado ?? "-", a.Estatus,
+            a.FechaInicio, a.FechaFin, a.FechaCompromiso,
+            // Sin fecha de fin la actividad sigue abierta: se mide contra hoy y se marca como tal.
+            Math.Round((decimal)((a.FechaFin ?? DateTime.Now) - a.FechaInicio).TotalDays, 2),
+        ]).ToList();
+        return ArchivoExcel("GanttActividades", encabezados, filas);
     }
 
     /// <summary>Los minutos se exportan como horas decimales para que Excel pueda sumarlas.</summary>

@@ -1,5 +1,6 @@
 using GTE.Application.Common;
 using GTE.Application.DTOs.Responses.Reportes;
+using GTE.Domain.Reportes;
 
 namespace GTE.Application.Interfaces;
 
@@ -70,4 +71,14 @@ public interface IReportesQueryService
     Task<ActividadesTerminadasReporteResponse> ObtenerActividadesTerminadasAsync(
         DateOnly desde, DateOnly hasta, int? idEquipo, int? idAsignado, int? idProyecto,
         int? idTipoWorkItem, string? folio, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// R16: actividades (work items ya iniciados) que se traslapan con el periodo, en forma de
+    /// barras para un diagrama de Gantt. Los tres filtros son combinables y ortogonales entre si;
+    /// la agrupacion solo cambia el orden de los renglones. Pagina porque un proyecto con miles de
+    /// actividades no se puede dibujar completo de un golpe.
+    /// </summary>
+    Task<GanttActividadesReporteResponse> ObtenerGanttActividadesAsync(
+        DateOnly desde, DateOnly hasta, int? idProyecto, int? idAsignado,
+        AgrupacionGantt agruparPor, int page, int pageSize, CancellationToken cancellationToken = default);
 }

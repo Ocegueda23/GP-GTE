@@ -252,3 +252,28 @@ public class ObtenerActividadesTerminadasHandler(IReportesQueryService consultas
             query.IdTipoWorkItem, query.Folio, cancellationToken);
     }
 }
+
+// ---------- R16 Gantt de actividades ----------
+
+/// <summary>
+/// Los tres filtros del Gantt son combinables: proyecto, usuario y periodo se aplican a la vez
+/// y cualquiera puede venir vacio. <paramref name="AgruparPor"/> no filtra nada, solo decide
+/// como se ordenan y se separan en bandas los renglones.
+/// </summary>
+public record ObtenerGanttActividadesQuery(
+    DateOnly Desde, DateOnly Hasta, int? IdProyecto, int? IdAsignado,
+    AgrupacionGantt AgruparPor, int Page, int PageSize) : IRequest<GanttActividadesReporteResponse>;
+
+public class ObtenerGanttActividadesHandler(IReportesQueryService consultas, IVerificadorPermisos permisos)
+    : IRequestHandler<ObtenerGanttActividadesQuery, GanttActividadesReporteResponse>
+{
+    public async Task<GanttActividadesReporteResponse> Handle(
+        ObtenerGanttActividadesQuery query, CancellationToken cancellationToken)
+    {
+        await permisos.ExigirPermisoAsync(PermisosReportes.Ver, null, cancellationToken);
+        ValidacionRangoFechas.Exigir(query.Desde, query.Hasta);
+        return await consultas.ObtenerGanttActividadesAsync(
+            query.Desde, query.Hasta, query.IdProyecto, query.IdAsignado,
+            query.AgruparPor, query.Page, query.PageSize, cancellationToken);
+    }
+}
