@@ -1,3 +1,5 @@
+using GTE.Application.Common;
+
 namespace GTE.Application.DTOs.Responses.Reportes;
 
 // ---------- R01 Productividad por persona/equipo ----------
@@ -461,4 +463,41 @@ public class ActividadesTerminadasReporteResponse
     /// </summary>
     public IReadOnlyList<string> AvisosTickets { get; set; } = [];
     public IReadOnlyList<string> AvisosIncidentes { get; set; } = [];
+}
+
+// ---------- R16 Gantt de actividades ----------
+
+/// <summary>
+/// Una barra del Gantt. FechaInicio nunca es nula (una actividad sin iniciar no se "realizo" y
+/// no entra al reporte); FechaFin nula significa que la actividad sigue abierta y el front
+/// dibuja la barra hasta hoy con el borde abierto.
+/// </summary>
+public class GanttActividadResponse
+{
+    public int IdWorkItem { get; set; }
+    public string Folio { get; set; } = string.Empty;
+    public string Tipo { get; set; } = string.Empty;
+    public string Titulo { get; set; } = string.Empty;
+    public string? Descripcion { get; set; }
+    public int IdProyecto { get; set; }
+    public string Proyecto { get; set; } = string.Empty;
+    public int? IdAsignado { get; set; }
+    public string? Asignado { get; set; }
+    public int IdEstatusWorkItem { get; set; }
+    public string Estatus { get; set; } = string.Empty;
+    public DateTime FechaInicio { get; set; }
+    public DateTime? FechaFin { get; set; }
+    public DateTime? FechaCompromiso { get; set; }
+}
+
+public class GanttActividadesReporteResponse
+{
+    public DateOnly Desde { get; set; }
+    public DateOnly Hasta { get; set; }
+
+    /// <summary>Renglones de la pagina en curso, ya ordenados por la llave de agrupacion pedida.</summary>
+    public PagedResult<GanttActividadResponse> Pagina { get; set; } = new();
+
+    /// <summary>Cuantas actividades del filtro completo (no solo de la pagina) siguen sin fecha de fin.</summary>
+    public int TotalEnProgreso { get; set; }
 }

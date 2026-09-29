@@ -5,6 +5,7 @@ using GTE.Domain.Entregas;
 using GTE.Domain.Exceptions;
 using GTE.Domain.Operacion;
 using GTE.Domain.Planeacion;
+using GTE.Domain.Reportes;
 using GTE.Domain.Solicitudes;
 using GTE.Domain.Soporte;
 using GTE.Domain.WorkItems;
@@ -1109,6 +1110,94 @@ public class ReportesQueryService(FabricaContexto fabrica, ICalendarioLaboral ca
         };
 
         return (items, totales, avisos);
+    }
+
+    /// <summary>
+    /// R16: barras de Gantt de las actividades ya iniciadas que se TRASLAPAN con el periodo.
+    /// A diferencia de R15 (que corta por FechaFin y solo ve lo Terminado), aqui entra tambien
+    /// lo que sigue abierto: una actividad que empezo antes del rango y no ha cerrado es parte
+    /// de lo que se trabajo en el periodo y tiene que aparecer en la grafica.
+    /// </summary>
+    public async Task<GanttActividadesReporteResponse> ObtenerGanttActividadesAsync(
+        DateOnly desde, DateOnly hasta, int? idProyecto, int? idAsignado,
+        AgrupacionGantt agruparPor, int page, int pageSize, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
+        var (inicio, fin) = RangoFechas(desde, hasta);
+
+        pageSize = Math.Clamp(pageSize, 1, TopeRenglonesDetalle);
+        // Un page absurdo escrito a mano en la URL desbordaria el int de (page - 1) * pageSize
+        // y el Skip negativo tiraria un 500 en vez de la pagina vacia que corresponde.
+        page = Math.Clamp(page, 1, int.MaxValue / pageSize);
+
+        // TRAMPA EF: se filtra y ordena sobre las entidades (columnas reales) y se proyecta hasta
+        // el final, ya paginado (mismo patron que PlaneacionQueryService.ConsultaBase).
+        // FechaInicio != null es la definicion de "realizada": lo que nunca arranco no tiene barra.
+        // El traslape es el clasico (inicioA <= finB && finA >= inicioB) con el extremo derecho
+        // abierto cuando no hay FechaFin.
+        var consulta = contexto.TblWorkItem.AsNoTracking()
+            .Where(w => w.Activo
+                && w.FechaInicio != null && w.FechaInicio <= fin
+                && (w.FechaFin == null || w.FechaFin >= inicio)
+                && (idProyecto == null || w.IdProyecto == idProyecto)
+                && (idAsignado == null || w.IdAsignado == idAsignado));
+
+        var total = await consulta.CountAsync(cancellationToken);
+        var enProgreso = await consulta.CountAsync(w => w.FechaFin == null, cancellationToken);
+
+        // El orden primario ES la llave de agrupacion: asi una pagina nunca parte un grupo a la
+        // mitad y las bandas del Gantt salen contiguas. Sin asignado se manda al final (el bool
+        // ordena false antes que true) en vez de encabezar la lista con los huerfanos.
+        var ordenada = agruparPor switch
+        {
+            AgrupacionGantt.Proyecto => consulta
+                .OrderBy(w => w.IdProyectoNavigation.Nombre)
+                .ThenBy(w => w.FechaInicio)
+                .ThenBy(w => w.IdWorkItem),
+            AgrupacionGantt.Usuario => consulta
+                .OrderBy(w => w.IdAsignado == null)
+                .ThenBy(w => w.IdAsignadoNavigation!.Nombre)
+                .ThenBy(w => w.FechaInicio)
+                .ThenBy(w => w.IdWorkItem),
+            _ => consulta
+                .OrderBy(w => w.FechaInicio)
+                .ThenBy(w => w.IdWorkItem),
+        };
+
+        var items = await ordenada
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(w => new GanttActividadResponse
+            {
+                IdWorkItem = w.IdWorkItem,
+                Folio = w.Folio,
+                Tipo = w.IdTipoWorkItemNavigation.Nombre,
+                Titulo = w.Titulo,
+                Descripcion = w.Descripcion,
+                IdProyecto = w.IdProyecto,
+                Proyecto = w.IdProyectoNavigation.Nombre,
+                IdAsignado = w.IdAsignado,
+                Asignado = w.IdAsignadoNavigation != null ? w.IdAsignadoNavigation.Nombre : null,
+                IdEstatusWorkItem = w.IdEstatusWorkItem,
+                Estatus = w.IdEstatusWorkItemNavigation.Descripcion,
+                // El filtro ya garantiza FechaInicio != null; el .Value es seguro y evita que el
+                // DTO cargue con una fecha nullable que el front tendria que volver a validar.
+                FechaInicio = w.FechaInicio!.Value,
+                FechaFin = w.FechaFin,
+                FechaCompromiso = w.FechaCompromiso,
+            })
+            .ToListAsync(cancellationToken);
+
+        return new GanttActividadesReporteResponse
+        {
+            Desde = desde,
+            Hasta = hasta,
+            Pagina = new PagedResult<GanttActividadResponse>
+            {
+                Items = items, Page = page, PageSize = pageSize, TotalItems = total,
+            },
+            TotalEnProgreso = enProgreso,
+        };
     }
 
     /// <summary>Tope de renglones del detalle: evita que un rango abierto tumbe la pagina y el Excel.</summary>

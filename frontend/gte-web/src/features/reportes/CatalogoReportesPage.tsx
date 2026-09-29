@@ -25,12 +25,15 @@ import {
   obtenerReporteAuditoria, obtenerReporteActividadesTerminadas,
   type TicketTerminado, type TicketsTerminadosTotales,
   type IncidenteTerminado, type IncidentesTerminadosTotales,
+  obtenerReporteGanttActividades,
+  type AgrupacionGantt, type FiltroGanttActividades,
 } from "../../shared/api/reportes";
+import { DiagramaGantt, LeyendaGantt } from "./DiagramaGantt";
 
 type ClaveReporte =
   | "productividad" | "horas" | "retrabajo" | "bugs" | "releases" | "riesgos"
   | "solicitantes" | "costos" | "rentabilidad" | "sla" | "kpis" | "carga" | "flujo" | "auditoria"
-  | "actividadesTerminadas";
+  | "actividadesTerminadas" | "gantt";
 
 /** Permiso 1:1 con el ExigirPermisoAsync de cada handler en GTE.Application.Reportes.Queries. */
 const REPORTES: { clave: ClaveReporte; titulo: string; permiso: string }[] = [
@@ -49,6 +52,7 @@ const REPORTES: { clave: ClaveReporte; titulo: string; permiso: string }[] = [
   { clave: "flujo", titulo: "R13 - Flujo (CFD)", permiso: "RPT.Ver" },
   { clave: "auditoria", titulo: "R14 - Auditoria", permiso: "RPT.Auditoria" },
   { clave: "actividadesTerminadas", titulo: "R15 - Actividades terminadas", permiso: "RPT.Ver" },
+  { clave: "gantt", titulo: "R16 - Gantt de actividades", permiso: "RPT.Ver" },
 ];
 
 function primerDiaMes(): string {
@@ -1119,6 +1123,136 @@ function formatearDuracion(diasNaturales: number | null, minutosLaborales: numbe
   return minutosLaborales === null ? natural : `${natural} / ${formatearMinutos(minutosLaborales)}`;
 }
 
+const TAMANOS_PAGINA_GANTT = [25, 50, 100];
+
+const OPCIONES_AGRUPACION: { valor: AgrupacionGantt; etiqueta: string }[] = [
+  { valor: "Ninguno", etiqueta: "Sin agrupar" },
+  { valor: "Proyecto", etiqueta: "Proyecto" },
+  { valor: "Usuario", etiqueta: "Usuario" },
+];
+
+/**
+ * R16: los tres niveles (proyecto, usuario y periodo) se combinan libremente -- son filtros
+ * independientes, no un arbol de "primero elige proyecto". La agrupacion es aparte: cambia
+ * como se ordenan y se separan las barras, no que se ve.
+ */
+function ReporteGantt() {
+  const [desde, setDesde] = useState(primerDiaMes());
+  const [hasta, setHasta] = useState(hoyIso());
+  const [idProyecto, setIdProyecto] = useState<number | "">("");
+  const [idAsignado, setIdAsignado] = useState<number | "">("");
+  const [agruparPor, setAgruparPor] = useState<AgrupacionGantt>("Proyecto");
+  const [pageSize, setPageSize] = useState(TAMANOS_PAGINA_GANTT[0]);
+  const [page, setPage] = useState(1);
+
+  const { opcionesProyecto } = useProyectosEquipos();
+  const catalogos = useQuery({ queryKey: ["catalogos-bandeja"], queryFn: obtenerCatalogosBandeja, staleTime: 5 * 60_000 });
+  const opcionesUsuario = useMemo(
+    () => [{ valor: "", etiqueta: "Todos" }, ...(catalogos.data?.usuarios ?? []).map((u) => ({ valor: u.id, etiqueta: u.nombre }))],
+    [catalogos.data],
+  );
+
+  const filtroBase = {
+    desde, hasta,
+    idProyecto: idProyecto === "" ? null : idProyecto,
+    idAsignado: idAsignado === "" ? null : idAsignado,
+    agruparPor,
+  };
+  const filtro: FiltroGanttActividades = { ...filtroBase, page, pageSize };
+
+  const consulta = useQuery({
+    queryKey: ["reporte-gantt-actividades", filtro],
+    queryFn: () => obtenerReporteGanttActividades(filtro),
+  });
+
+  // Cualquier cambio de filtro regresa a la pagina 1: quedarse en la 7 de un resultado que
+  // ahora tiene 2 paginas deja la pantalla vacia sin explicar por que.
+  function alFiltrar<T>(asignar: (valor: T) => void) {
+    return (valor: T) => { asignar(valor); setPage(1); };
+  }
+
+  function aplicarAtajo(atajo: "semana" | "mes" | "trimestre" | "anio") {
+    const hoy = new Date();
+    setPage(1);
+    if (atajo === "semana") { setDesde(lunesDeEstaSemana()); setHasta(hoyIso()); return; }
+    if (atajo === "mes") { setDesde(primerDiaMes()); setHasta(hoyIso()); return; }
+    if (atajo === "trimestre") {
+      const inicio = new Date(hoy.getFullYear(), hoy.getMonth() - 2, 1);
+      setDesde(`${inicio.getFullYear()}-${String(inicio.getMonth() + 1).padStart(2, "0")}-01`);
+      setHasta(hoyIso());
+      return;
+    }
+    setDesde(`${hoy.getFullYear()}-01-01`);
+    setHasta(hoyIso());
+  }
+
+  const pagina = consulta.data?.pagina;
+  const totalItems = pagina?.totalItems ?? 0;
+  const totalPaginas = pagina?.totalPages ?? 0;
+
+  return (
+    <Stack spacing={2}>
+      <Stack direction="row" spacing={1.5} sx={{ flexWrap: "wrap", alignItems: "center", gap: 1 }}>
+        <BarraFechas desde={desde} hasta={hasta}
+          onDesde={alFiltrar(setDesde)} onHasta={alFiltrar(setHasta)} />
+        <Stack direction="row" spacing={0.5}>
+          <Button size="small" variant="outlined" onClick={() => aplicarAtajo("semana")}>Semana</Button>
+          <Button size="small" variant="outlined" onClick={() => aplicarAtajo("mes")}>Mes</Button>
+          <Button size="small" variant="outlined" onClick={() => aplicarAtajo("trimestre")}>Trimestre</Button>
+          <Button size="small" variant="outlined" onClick={() => aplicarAtajo("anio")}>Año</Button>
+        </Stack>
+        <ComboBuscable label="Proyecto" value={idProyecto} sx={{ minWidth: { xs: "100%", sm: 220 } }}
+          opciones={opcionesProyecto} onChange={alFiltrar((v) => setIdProyecto(v as number | ""))} />
+        <ComboBuscable label="Usuario" value={idAsignado} sx={{ minWidth: { xs: "100%", sm: 200 } }}
+          opciones={opcionesUsuario} onChange={alFiltrar((v) => setIdAsignado(v as number | ""))} />
+        <ComboBuscable label="Agrupar por" value={agruparPor} sx={{ minWidth: { xs: "100%", sm: 160 } }}
+          opciones={OPCIONES_AGRUPACION} onChange={alFiltrar((v) => setAgruparPor(v as AgrupacionGantt))} />
+        <ComboBuscable label="Renglones" value={pageSize} sx={{ minWidth: { xs: "100%", sm: 120 } }}
+          opciones={TAMANOS_PAGINA_GANTT.map((n) => ({ valor: n, etiqueta: String(n) }))}
+          onChange={alFiltrar((v) => setPageSize(Number(v) || TAMANOS_PAGINA_GANTT[0]))} />
+        <BotonExportar ruta="gantt-actividades" filtro={filtroBase} nombreArchivo="GanttActividades.xlsx" />
+      </Stack>
+
+      {consulta.isLoading && <LinearProgress />}
+      {consulta.isError && <Alert severity="error">No se pudo cargar el reporte.</Alert>}
+      {totalItems > TOPE_RENGLONES && (
+        <Alert severity="info">
+          El filtro devuelve {totalItems.toLocaleString()} actividades. El diagrama se recorre por
+          paginas, pero la exportacion a Excel se corta en {TOPE_RENGLONES.toLocaleString()} renglones:
+          acota el periodo o filtra por proyecto o usuario si necesitas el detalle completo.
+        </Alert>
+      )}
+
+      {consulta.data && (
+        <>
+          <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1, alignItems: "center" }}>
+            <Chip size="small" label={`Actividades: ${totalItems}`} />
+            <Chip size="small" color={consulta.data.totalEnProgreso > 0 ? "success" : "default"}
+              label={`Sin cerrar: ${consulta.data.totalEnProgreso}`} />
+            {totalPaginas > 1 && (
+              <Chip size="small" variant="outlined"
+                label={`Mostrando ${pagina?.items.length ?? 0} de ${totalItems}`} />
+            )}
+          </Stack>
+
+          <DiagramaGantt actividades={pagina?.items ?? []} desde={consulta.data.desde}
+            hasta={consulta.data.hasta} agruparPor={agruparPor} />
+
+          {totalItems > 0 && <LeyendaGantt />}
+        </>
+      )}
+
+      {totalPaginas > 1 && (
+        <Stack direction="row" spacing={1}>
+          <Button size="small" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Anterior</Button>
+          <Typography variant="body2" sx={{ alignSelf: "center" }}>Pagina {page} de {totalPaginas}</Typography>
+          <Button size="small" disabled={page >= totalPaginas} onClick={() => setPage((p) => p + 1)}>Siguiente</Button>
+        </Stack>
+      )}
+    </Stack>
+  );
+}
+
 export function CatalogoReportesPage() {
   const { puede } = useSesion();
   const disponibles = REPORTES.filter((r) => puede(r.permiso));
@@ -1168,6 +1302,7 @@ export function CatalogoReportesPage() {
         {reporteActivo === "flujo" && <ReporteFlujo />}
         {reporteActivo === "auditoria" && <ReporteAuditoria />}
         {reporteActivo === "actividadesTerminadas" && <ReporteActividadesTerminadas />}
+        {reporteActivo === "gantt" && <ReporteGantt />}
       </Box>
     </Box>
   );
