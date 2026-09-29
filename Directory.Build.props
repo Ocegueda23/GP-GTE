@@ -16,11 +16,13 @@
     Las notas de lo que se libera en cada version NO van aqui: publicar.bat lee este
     archivo como XML, y lo rompe cualquier texto suelto fuera de las etiquetas o un
     comentario que contenga dos guiones seguidos (que es como se escriben las
-    vinetas). Van en Doctos/NOTAS-VERSION.md, que es lo que la aplicacion le muestra
-    al usuario.
+    vinetas). Viven en la base (tblNotaVersion / tblNotaVersionDetalle) y es lo que la
+    aplicacion le muestra al usuario al hacer click en el sello de version. Se
+    redactan en Administracion / Notas de version, o se siembran con un script al
+    estilo de DataBase/Scripts/06_Scripts/02_..._NotasVersionHistoricas.sql.
   -->
   <PropertyGroup>
-    <Version>1.26.0.0</Version>
+    <Version>1.26.1.0</Version>
   </PropertyGroup>
 
 </Project>

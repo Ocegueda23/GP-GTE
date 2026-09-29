@@ -1,3 +1,4 @@
+using GTE.Application.Common;
 using GTE.Application.DTOs.Responses.Reportes;
 using GTE.Application.Interfaces;
 using GTE.Application.Reportes.Queries;
@@ -312,7 +313,10 @@ public class ReportesController(IMediator mediator, IExportadorExcel exportador)
 
         var filas = r.Items.Select(i => (IReadOnlyList<object?>)
         [
-            i.Folio, i.Tipo, i.Titulo, i.Descripcion, i.Proyecto, i.Equipo, i.Asignado, i.Prioridad,
+            // Mismo caso que el R16: la descripcion es HTML del editor enriquecido y a la celda
+            // tiene que llegar como texto.
+            i.Folio, i.Tipo, i.Titulo, TextoPlano.DesdeHtml(i.Descripcion), i.Proyecto, i.Equipo,
+            i.Asignado, i.Prioridad,
             i.Sprint, i.Release, AHoras(i.MinutosInvertidos), AHoras(i.MinutosRegistrados),
             AHoras(i.DiferenciaMinutos), i.FechaCreacion, i.FechaInicio, i.FechaFin,
             i.FechaCompromiso, i.DiasNaturalesEspera, AHoras(i.MinutosLaboralesEspera),
@@ -388,12 +392,24 @@ public class ReportesController(IMediator mediator, IExportadorExcel exportador)
         };
         var filas = r.Pagina.Items.Select(a => (IReadOnlyList<object?>)
         [
-            a.Folio, a.Tipo, a.Titulo, a.Descripcion, a.Proyecto, a.Asignado ?? "-", a.Estatus,
+            // La descripcion se guarda como HTML del editor enriquecido: a la celda va el texto
+            // plano, si no el director lee las etiquetas en vez del contenido.
+            a.Folio, a.Tipo, a.Titulo, TextoPlano.DesdeHtml(a.Descripcion), a.Proyecto,
+            a.Asignado ?? "-", a.Estatus,
             a.FechaInicio, a.FechaFin, a.FechaCompromiso,
             // Sin fecha de fin la actividad sigue abierta: se mide contra hoy y se marca como tal.
             Math.Round((decimal)((a.FechaFin ?? DateTime.Now) - a.FechaInicio).TotalDays, 2),
         ]).ToList();
-        return ArchivoExcel("GanttActividades", encabezados, filas);
+
+        // El Excel del R16 no es una tabla de fechas: lleva el diagrama dibujado a la derecha,
+        // que es lo que se revisa en direccion. Las barras van en el mismo orden que las filas.
+        var barras = r.Pagina.Items
+            .Select(a => new BarraGanttExcel(a.FechaInicio, a.FechaFin, a.IdEstatusWorkItem))
+            .ToList();
+
+        var contenido = exportador.GenerarLibroGantt(
+            "GanttActividades", encabezados, filas, new GanttExcel(desde, hasta, barras));
+        return File(contenido, TipoContenidoXlsx, "GanttActividades.xlsx");
     }
 
     /// <summary>Los minutos se exportan como horas decimales para que Excel pueda sumarlas.</summary>
