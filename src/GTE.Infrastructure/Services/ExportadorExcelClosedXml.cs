@@ -41,40 +41,128 @@ public class ExportadorExcelClosedXml : IExportadorExcel
         using var libro = new XLWorkbook();
         var hoja = libro.Worksheets.Add(tituloHoja.Length > 31 ? tituloHoja[..31] : tituloHoja);
 
+        // Preambulo ANTES del encabezado: con que filtros se corrio y que significan los
+        // colores. Va arriba porque el archivo se abre y se imprime empezando por la primera
+        // pagina; al pie del listado la leyenda no la ve quien solo mira la hoja 1.
+        var filaEncabezado = EscribirPreambulo(hoja, gantt) + 1;
+
         for (var columna = 0; columna < encabezados.Count; columna++)
         {
-            var celda = hoja.Cell(1, columna + 1);
+            var celda = hoja.Cell(filaEncabezado, columna + 1);
             celda.Value = encabezados[columna];
             celda.Style.Font.Bold = true;
         }
 
+        var primeraFilaDatos = filaEncabezado + 1;
         for (var fila = 0; fila < filas.Count; fila++)
         {
             for (var columna = 0; columna < filas[fila].Count; columna++)
             {
-                EstablecerValor(hoja.Cell(fila + 2, columna + 1), filas[fila][columna]);
+                EstablecerValor(hoja.Cell(primeraFilaDatos + fila, columna + 1), filas[fila][columna]);
             }
         }
 
-        // El ancho automatico se aplica SOLO a las columnas de datos: si se dejara para toda la
-        // hoja, ensancharia tambien las del eje y la barra dejaria de leerse como una barra.
-        hoja.Columns(1, encabezados.Count).AdjustToContents();
+        AjustarColumnasDeDatos(hoja, encabezados.Count, filaEncabezado, filaEncabezado + filas.Count);
 
         var primeraColumnaEje = encabezados.Count + 1;
         var periodos = CalcularPeriodos(gantt.Desde, gantt.Hasta);
-        DibujarEje(hoja, primeraColumnaEje, periodos);
-        DibujarBarras(hoja, primeraColumnaEje, periodos, gantt.Barras);
-        DibujarLeyenda(hoja, filas.Count + 3);
+        DibujarEje(hoja, filaEncabezado, primeraColumnaEje, periodos);
+        DibujarBarras(hoja, primeraFilaDatos, primeraColumnaEje, periodos, gantt.Barras);
 
-        // Congelar la primera columna y el encabezado: al recorrer el Gantt a la derecha o hacia
-        // abajo se tiene que seguir viendo de que actividad es cada barra.
-        hoja.SheetView.FreezeRows(1);
+        // Congelar hasta el encabezado y la primera columna: al recorrer el Gantt a la derecha
+        // o hacia abajo se tiene que seguir viendo de que actividad es cada barra.
+        hoja.SheetView.FreezeRows(filaEncabezado);
         hoja.SheetView.FreezeColumns(1);
 
         using var flujo = new MemoryStream();
         libro.SaveAs(flujo);
         return flujo.ToArray();
     }
+
+    /// <summary>
+    /// Escribe filtros y leyenda arriba de todo y devuelve la ultima fila que ocupo.
+    ///
+    /// Todo el texto va en la MISMA columna (la B) y la A queda para las muestras de color:
+    /// si el titulo de una seccion se pusiera en A y sus renglones en B, el bloque se lee
+    /// escalonado; y si el texto se metiera en A, la muestra de color se lo comeria y el ancho
+    /// de esa columna lo cortaria.
+    /// </summary>
+    private static int EscribirPreambulo(IXLWorksheet hoja, GanttExcel gantt)
+    {
+        var fila = 1;
+
+        var titulo = hoja.Cell(fila, ColumnaTexto);
+        titulo.Value = "Gantt de actividades";
+        titulo.Style.Font.Bold = true;
+        titulo.Style.Font.FontSize = 13;
+        fila++;
+
+        foreach (var filtro in gantt.Filtros)
+        {
+            hoja.Cell(fila, ColumnaTexto).Value = filtro;
+            fila++;
+        }
+
+        fila++;   // renglon en blanco entre los filtros y la leyenda
+
+        var tituloLeyenda = hoja.Cell(fila, ColumnaTexto);
+        tituloLeyenda.Value = "Colores del diagrama";
+        tituloLeyenda.Style.Font.Bold = true;
+        fila++;
+
+        var entradas = new (int Estatus, string Nombre)[]
+        {
+            (2, "En proceso"), (3, "En pruebas"), (4, "Correccion"), (0, "Pendiente / Terminado"),
+        };
+
+        foreach (var (estatus, nombre) in entradas)
+        {
+            hoja.Cell(fila, ColumnaMuestra).Style.Fill.BackgroundColor = ColorEstatus(estatus);
+            hoja.Cell(fila, ColumnaTexto).Value = nombre;
+            fila++;
+        }
+
+        hoja.Cell(fila, ColumnaMuestra).Style.Fill.PatternType = XLFillPatternValues.LightUp;
+        hoja.Cell(fila, ColumnaMuestra).Style.Fill.BackgroundColor = ColorEstatus(2);
+        hoja.Cell(fila, ColumnaMuestra).Style.Fill.PatternColor = XLColor.White;
+        hoja.Cell(fila, ColumnaTexto).Value =
+            "Celda rayada = actividad sin fecha de fin (sigue en curso; la barra llega hasta hoy).";
+        fila++;
+
+        hoja.Cell(fila, ColumnaMuestra).Style.Fill.BackgroundColor = ColorHoy;
+        hoja.Cell(fila, ColumnaTexto).Value = "Encabezado en rojo = periodo que contiene la fecha de hoy.";
+
+        return fila + 1;   // un renglon en blanco antes del encabezado de la tabla
+    }
+
+    /// <summary>Columna de las muestras de color del preambulo (la misma que el primer dato).</summary>
+    private const int ColumnaMuestra = 1;
+
+    /// <summary>Columna unica donde cae TODO el texto del preambulo.</summary>
+    private const int ColumnaTexto = 2;
+
+    /// <summary>
+    /// Ancho automatico SOLO de las columnas de datos y midiendo SOLO el encabezado y los
+    /// renglones: si se midiera la hoja entera, los textos largos del preambulo estirarian la
+    /// columna B a lo ancho de la pantalla y el diagrama quedaria fuera de vista. El tope
+    /// evita lo mismo con una descripcion kilometrica.
+    /// </summary>
+    private static void AjustarColumnasDeDatos(
+        IXLWorksheet hoja, int columnas, int filaInicio, int filaFin)
+    {
+        for (var columna = 1; columna <= columnas; columna++)
+        {
+            var ancho = hoja.Column(columna).AdjustToContents(filaInicio, filaFin).Width;
+            if (ancho > AnchoMaximoColumnaDatos)
+            {
+                hoja.Column(columna).Width = AnchoMaximoColumnaDatos;
+            }
+        }
+    }
+
+    private const double AnchoMaximoColumnaDatos = 45;
+
+    private static readonly XLColor ColorHoy = XLColor.FromArgb(0xD3, 0x2F, 0x2F);
 
     /// <summary>Una columna del eje de tiempo: el tramo que cubre y la etiqueta de su encabezado.</summary>
     private sealed record Periodo(DateTime Inicio, DateTime Fin, string Etiqueta);
@@ -138,14 +226,15 @@ public class ExportadorExcelClosedXml : IExportadorExcel
         return periodos;
     }
 
-    private static void DibujarEje(IXLWorksheet hoja, int primeraColumna, List<Periodo> periodos)
+    private static void DibujarEje(
+        IXLWorksheet hoja, int filaEncabezado, int primeraColumna, List<Periodo> periodos)
     {
         var hoy = DateTime.Now;
 
         for (var i = 0; i < periodos.Count; i++)
         {
             var columna = primeraColumna + i;
-            var celda = hoja.Cell(1, columna);
+            var celda = hoja.Cell(filaEncabezado, columna);
             celda.Value = periodos[i].Etiqueta;
             celda.Style.Font.Bold = true;
             celda.Style.Font.FontSize = 8;
@@ -156,7 +245,7 @@ public class ExportadorExcelClosedXml : IExportadorExcel
             // diagrama de pantalla, que en una cuadricula no se puede dibujar entre columnas.
             if (hoy >= periodos[i].Inicio && hoy <= periodos[i].Fin)
             {
-                celda.Style.Fill.BackgroundColor = XLColor.FromArgb(0xD3, 0x2F, 0x2F);
+                celda.Style.Fill.BackgroundColor = ColorHoy;
                 celda.Style.Font.FontColor = XLColor.White;
             }
 
@@ -165,7 +254,8 @@ public class ExportadorExcelClosedXml : IExportadorExcel
     }
 
     private static void DibujarBarras(
-        IXLWorksheet hoja, int primeraColumna, List<Periodo> periodos, IReadOnlyList<BarraGanttExcel> barras)
+        IXLWorksheet hoja, int primeraFilaDatos, int primeraColumna, List<Periodo> periodos,
+        IReadOnlyList<BarraGanttExcel> barras)
     {
         var hoy = DateTime.Now;
 
@@ -188,7 +278,7 @@ public class ExportadorExcelClosedXml : IExportadorExcel
                     continue;
                 }
 
-                var celda = hoja.Cell(fila + 2, primeraColumna + i);
+                var celda = hoja.Cell(primeraFilaDatos + fila, primeraColumna + i);
                 celda.Style.Fill.BackgroundColor = color;
 
                 // Las actividades abiertas se rayan en diagonal: en blanco y negro, que es como
@@ -201,30 +291,6 @@ public class ExportadorExcelClosedXml : IExportadorExcel
                 }
             }
         }
-    }
-
-    private static void DibujarLeyenda(IXLWorksheet hoja, int fila)
-    {
-        var titulo = hoja.Cell(fila, 1);
-        titulo.Value = "Colores del diagrama";
-        titulo.Style.Font.Bold = true;
-
-        var entradas = new (int Estatus, string Nombre)[]
-        {
-            (2, "En proceso"), (3, "En pruebas"), (4, "Correccion"), (0, "Pendiente / Terminado"),
-        };
-
-        for (var i = 0; i < entradas.Length; i++)
-        {
-            var muestra = hoja.Cell(fila + 1 + i, 1);
-            muestra.Style.Fill.BackgroundColor = ColorEstatus(entradas[i].Estatus);
-            hoja.Cell(fila + 1 + i, 2).Value = entradas[i].Nombre;
-        }
-
-        hoja.Cell(fila + 1 + entradas.Length, 2).Value =
-            "Celda rayada = actividad sin fecha de fin (sigue en curso; la barra llega hasta hoy).";
-        hoja.Cell(fila + 2 + entradas.Length, 2).Value =
-            "Encabezado en rojo = periodo que contiene la fecha de hoy.";
     }
 
     /// <summary>

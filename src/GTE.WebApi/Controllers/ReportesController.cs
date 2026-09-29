@@ -408,8 +408,51 @@ public class ReportesController(IMediator mediator, IExportadorExcel exportador)
             .ToList();
 
         var contenido = exportador.GenerarLibroGantt(
-            "GanttActividades", encabezados, filas, new GanttExcel(desde, hasta, barras));
+            "GanttActividades", encabezados, filas,
+            new GanttExcel(desde, hasta, barras, DescribirFiltrosGantt(r, desde, hasta, idProyecto, idAsignado, agruparPor)));
         return File(contenido, TipoContenidoXlsx, "GanttActividades.xlsx");
+    }
+
+    /// <summary>
+    /// Con que se corrio el reporte, para imprimirlo arriba del Excel. El archivo circula por
+    /// correo fuera de la aplicacion: sin esto nadie puede saber si esta viendo un mes o un
+    /// anio, ni un proyecto o todos.
+    ///
+    /// El nombre del proyecto y del responsable se toman del primer renglon devuelto: cuando el
+    /// filtro esta puesto, TODOS los renglones comparten ese valor, asi que no hace falta ir a
+    /// buscar el catalogo. Si el filtro no dejo nada que mostrar se cae al id, que sigue siendo
+    /// mejor que no decir nada.
+    /// </summary>
+    private static List<string> DescribirFiltrosGantt(
+        GanttActividadesReporteResponse reporte, DateOnly desde, DateOnly hasta,
+        int? idProyecto, int? idAsignado, AgrupacionGantt agruparPor)
+    {
+        var primero = reporte.Pagina.Items.FirstOrDefault();
+
+        var proyecto = idProyecto is null
+            ? "Todos"
+            : primero?.Proyecto ?? $"#{idProyecto}";
+
+        var responsable = idAsignado is null
+            ? "Todos"
+            : primero?.Asignado ?? $"#{idAsignado}";
+
+        var agrupacion = agruparPor switch
+        {
+            AgrupacionGantt.Proyecto => "Proyecto",
+            AgrupacionGantt.Usuario => "Responsable",
+            _ => "Sin agrupar",
+        };
+
+        return
+        [
+            $"Periodo: {desde:dd/MM/yyyy} a {hasta:dd/MM/yyyy}",
+            $"Proyecto: {proyecto}",
+            $"Responsable: {responsable}",
+            $"Agrupado por: {agrupacion}",
+            $"Actividades: {reporte.Pagina.TotalItems} ({reporte.TotalEnProgreso} en curso)",
+            $"Generado: {DateTime.Now:dd/MM/yyyy HH:mm}",
+        ];
     }
 
     /// <summary>Los minutos se exportan como horas decimales para que Excel pueda sumarlas.</summary>
