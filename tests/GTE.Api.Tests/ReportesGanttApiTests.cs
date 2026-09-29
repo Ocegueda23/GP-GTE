@@ -29,6 +29,7 @@ public class ReportesGanttApiTests(WebApplicationFactory<Program> fabricaApp)
     private sealed record ActividadGantt(
         int IdWorkItem, string Folio, string Tipo, string Titulo, string? Descripcion,
         int IdProyecto, string Proyecto, int? IdAsignado, string? Asignado,
+        int? IdSprint, string? Sprint,
         int IdEstatusWorkItem, string Estatus,
         DateTime FechaInicio, DateTime? FechaFin, DateTime? FechaCompromiso);
 
@@ -239,6 +240,101 @@ public class ReportesGanttApiTests(WebApplicationFactory<Program> fabricaApp)
         finally
         {
             await BorrarAsync(fabricaDatos, idViva, idCancelada);
+        }
+    }
+
+    /// <summary>
+    /// El sprint es el agrupador con el que se planea el trabajo, asi que elegir uno tiene que
+    /// traer lo que se le cargo y nada mas. Se siembran dos actividades identicas salvo por el
+    /// sprint: la del sprint elegido entra, la otra no, aunque cumpla el resto de los filtros.
+    /// </summary>
+    [Fact]
+    public async Task Gantt_FiltraPorSprint()
+    {
+        if (!BaseDisponible())
+        {
+            return;
+        }
+
+        var fabricaDatos = CrearFabricaDatos();
+        var cliente = await FabricaApiAutenticada.CrearClienteAsync(fabricaApp, "aviramontes");
+
+        int idSprint, idDentro, idFuera;
+
+        await using (var contexto = fabricaDatos.ConectarContexto<DbContextGTE>())
+        {
+            var usuario = await contexto.TblUsuario.AsNoTracking().FirstAsync(u => u.Dominio == "aviramontes");
+            var proyecto = await contexto.TblProyecto.AsNoTracking().FirstAsync(p => p.Activo);
+            var prioridad = await contexto.TblPrioridad.AsNoTracking().Select(p => p.Id).FirstAsync();
+
+            var sprint = new TblSprint
+            {
+                Nombre = $"E2E Gantt sprint {Guid.NewGuid().ToString("N")[..6]}",
+                FechaInicio = DateOnly.FromDateTime(DateTime.Today.AddDays(-15)),
+                FechaFin = DateOnly.FromDateTime(DateTime.Today.AddDays(15)),
+                IdEstatusSprint = 1,
+                UsuarioRegistro = "e2e",
+                Activo = true,
+            };
+            contexto.TblSprint.Add(sprint);
+            await contexto.SaveChangesAsync();
+            idSprint = sprint.IdSprint;
+
+            TblWorkItem Nuevo(string titulo, int? idSprintItem) => new()
+            {
+                Folio = $"E2E-GANTT-SPR-{Guid.NewGuid().ToString("N")[..6].ToUpperInvariant()}",
+                IdTipoWorkItem = 4,
+                IdProyecto = proyecto.IdProyecto,
+                Titulo = titulo,
+                IdEstatusWorkItem = EstatusWorkItem.EnProceso,
+                IdPrioridad = prioridad,
+                IdAsignado = usuario.IdUsuario,
+                IdSprint = idSprintItem,
+                FechaInicio = DateTime.Today.AddDays(-8),
+                FechaRegistro = DateTime.Today.AddDays(-9),
+                UsuarioRegistro = "e2e",
+                Activo = true,
+            };
+
+            var dentro = Nuevo("E2E Gantt en el sprint", idSprint);
+            var fuera = Nuevo("E2E Gantt sin sprint", null);
+            contexto.TblWorkItem.AddRange(dentro, fuera);
+            await contexto.SaveChangesAsync();
+
+            idDentro = dentro.IdWorkItem;
+            idFuera = fuera.IdWorkItem;
+        }
+
+        try
+        {
+            var desde = DateTime.Today.AddDays(-20).ToString("yyyy-MM-dd");
+            var hasta = DateTime.Today.ToString("yyyy-MM-dd");
+
+            var reporte = await PedirAsync(cliente,
+                $"desde={desde}&hasta={hasta}&idSprint={idSprint}&agruparPor=Ninguno&page=1&pageSize=200");
+
+            Assert.Contains(reporte.Pagina.Items, i => i.IdWorkItem == idDentro);
+            Assert.DoesNotContain(reporte.Pagina.Items, i => i.IdWorkItem == idFuera);
+
+            // Todo lo devuelto es de ese sprint, y el nombre viaja en el renglon para que el
+            // Excel y la pantalla puedan decir de cual se trata sin otra consulta.
+            Assert.All(reporte.Pagina.Items, i =>
+            {
+                Assert.Equal(idSprint, i.IdSprint);
+                Assert.False(string.IsNullOrWhiteSpace(i.Sprint));
+            });
+        }
+        finally
+        {
+            await BorrarAsync(fabricaDatos, idDentro, idFuera);
+
+            await using var contexto = fabricaDatos.ConectarContexto<DbContextGTE>();
+            var sprint = await contexto.TblSprint.FirstOrDefaultAsync(s => s.IdSprint == idSprint);
+            if (sprint is not null)
+            {
+                contexto.TblSprint.Remove(sprint);
+                await contexto.SaveChangesAsync();
+            }
         }
     }
 

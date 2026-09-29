@@ -14,6 +14,7 @@ import { EncabezadoOrdenable } from "../../shared/components/EncabezadoOrdenable
 import { useOrdenTabla } from "../../shared/hooks/useOrdenTabla";
 import { useSesion } from "../../shared/api/sesion";
 import { formatearMinutos, obtenerCatalogosBandeja } from "../../shared/api/workitems";
+import { obtenerSprints } from "../../shared/api/planeacion";
 import { htmlATextoPlano } from "../../shared/editor/textoPlano";
 import { useColorSerie } from "../../shared/graficas/coloresGrafica";
 import {
@@ -1141,6 +1142,7 @@ function ReporteGantt() {
   const [hasta, setHasta] = useState(hoyIso());
   const [idProyecto, setIdProyecto] = useState<number | "">("");
   const [idAsignado, setIdAsignado] = useState<number | "">("");
+  const [idSprint, setIdSprint] = useState<number | "">("");
   const [agruparPor, setAgruparPor] = useState<AgrupacionGantt>("Proyecto");
   const [pageSize, setPageSize] = useState(TAMANOS_PAGINA_GANTT[0]);
   const [page, setPage] = useState(1);
@@ -1151,11 +1153,24 @@ function ReporteGantt() {
     () => [{ valor: "", etiqueta: "Todos" }, ...(catalogos.data?.usuarios ?? []).map((u) => ({ valor: u.id, etiqueta: u.nombre }))],
     [catalogos.data],
   );
+  // Los sprints NO salen de catalogos-bandeja: ese catalogo deja fuera los cerrados a
+  // proposito, porque la bandeja filtra trabajo vigente. Este reporte mira hacia atras y lo
+  // que mas se va a pedir es justo el sprint que acaba de cerrar.
+  const sprints = useQuery({
+    queryKey: ["sprints-reporte-gantt"],
+    queryFn: () => obtenerSprints({ soloAbiertos: false }),
+    staleTime: 5 * 60_000,
+  });
+  const opcionesSprint = useMemo(
+    () => [{ valor: "", etiqueta: "Todos" }, ...(sprints.data ?? []).map((s) => ({ valor: s.idSprint, etiqueta: s.nombre }))],
+    [sprints.data],
+  );
 
   const filtroBase = {
     desde, hasta,
     idProyecto: idProyecto === "" ? null : idProyecto,
     idAsignado: idAsignado === "" ? null : idAsignado,
+    idSprint: idSprint === "" ? null : idSprint,
     agruparPor,
   };
   const filtro: FiltroGanttActividades = { ...filtroBase, page, pageSize };
@@ -1205,6 +1220,8 @@ function ReporteGantt() {
           opciones={opcionesProyecto} onChange={alFiltrar((v) => setIdProyecto(v as number | ""))} />
         <ComboBuscable label="Usuario" value={idAsignado} sx={{ minWidth: { xs: "100%", sm: 200 } }}
           opciones={opcionesUsuario} onChange={alFiltrar((v) => setIdAsignado(v as number | ""))} />
+        <ComboBuscable label="Sprint" value={idSprint} sx={{ minWidth: { xs: "100%", sm: 200 } }}
+          opciones={opcionesSprint} onChange={alFiltrar((v) => setIdSprint(v as number | ""))} />
         <ComboBuscable label="Agrupar por" value={agruparPor} sx={{ minWidth: { xs: "100%", sm: 160 } }}
           opciones={OPCIONES_AGRUPACION} onChange={alFiltrar((v) => setAgruparPor(v as AgrupacionGantt))} />
         <ComboBuscable label="Renglones" value={pageSize} sx={{ minWidth: { xs: "100%", sm: 120 } }}

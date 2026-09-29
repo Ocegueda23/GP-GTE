@@ -500,6 +500,9 @@ export interface GanttActividad {
   proyecto: string;
   idAsignado: number | null;
   asignado: string | null;
+  /** null = la actividad esta en el backlog (sin sprint). */
+  idSprint: number | null;
+  sprint: string | null;
   idEstatusWorkItem: number;
   estatus: string;
   fechaInicio: string;
@@ -521,6 +524,7 @@ export interface FiltroGanttActividades {
   hasta: string;
   idProyecto: number | null;
   idAsignado: number | null;
+  idSprint: number | null;
   agruparPor: AgrupacionGantt;
   page: number;
   pageSize: number;

@@ -61,19 +61,19 @@ public class TraduccionConsultaR16Tests
         var hasta = DateOnly.FromDateTime(DateTime.Today);
 
         var error = await Record.ExceptionAsync(() => Servicio().ObtenerGanttActividadesAsync(
-            desde, hasta, idProyecto: null, idAsignado: null, agrupacion, page: 1, pageSize: 50));
+            desde, hasta, idProyecto: null, idAsignado: null, idSprint: null, agrupacion, page: 1, pageSize: 50));
 
         ExigirFalloDeConexionNoDeTraduccion(error);
     }
 
     [Fact]
-    public async Task GanttTraduceConLosTresFiltrosCombinados()
+    public async Task GanttTraduceConLosCuatroFiltrosCombinados()
     {
         var desde = DateOnly.FromDateTime(DateTime.Today.AddMonths(-3));
         var hasta = DateOnly.FromDateTime(DateTime.Today);
 
         var error = await Record.ExceptionAsync(() => Servicio().ObtenerGanttActividadesAsync(
-            desde, hasta, idProyecto: 1, idAsignado: 2, AgrupacionGantt.Usuario, page: 2, pageSize: 25));
+            desde, hasta, idProyecto: 1, idAsignado: 2, idSprint: 3, AgrupacionGantt.Usuario, page: 2, pageSize: 25));
 
         ExigirFalloDeConexionNoDeTraduccion(error);
     }

@@ -483,6 +483,12 @@ public class GanttActividadResponse
     public string Proyecto { get; set; } = string.Empty;
     public int? IdAsignado { get; set; }
     public string? Asignado { get; set; }
+
+    /// <summary>Sprint al que pertenece la actividad; null si esta en el backlog (sin sprint).</summary>
+    public int? IdSprint { get; set; }
+
+    public string? Sprint { get; set; }
+
     public int IdEstatusWorkItem { get; set; }
     public string Estatus { get; set; } = string.Empty;
     public DateTime FechaInicio { get; set; }
