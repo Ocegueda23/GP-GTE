@@ -41,17 +41,26 @@ public class ExportadorExcelClosedXml : IExportadorExcel
         using var libro = new XLWorkbook();
         var hoja = libro.Worksheets.Add(tituloHoja.Length > 31 ? tituloHoja[..31] : tituloHoja);
 
+        // Sin cuadricula: es el cambio que mas hace por el aspecto de una hoja que se presenta.
+        // Con ella, cualquier estilo compite con una retícula gris que llega hasta el infinito;
+        // sin ella, lo unico que se ve son los bloques que si se dibujaron.
+        hoja.ShowGridLines = false;
+
         // Preambulo ANTES del encabezado: con que filtros se corrio y que significan los
         // colores. Va arriba porque el archivo se abre y se imprime empezando por la primera
         // pagina; al pie del listado la leyenda no la ve quien solo mira la hoja 1.
         var filaEncabezado = EscribirPreambulo(hoja, gantt) + 1;
 
-        for (var columna = 0; columna < encabezados.Count; columna++)
-        {
-            var celda = hoja.Cell(filaEncabezado, columna + 1);
-            celda.Value = encabezados[columna];
-            celda.Style.Font.Bold = true;
-        }
+        var periodos = CalcularPeriodos(gantt.Desde, gantt.Hasta);
+        var primeraColumnaEje = encabezados.Count + 1;
+        var ultimaColumna = primeraColumnaEje + Math.Max(periodos.Count - 1, 0);
+
+        // La banda de meses va en el renglon de arriba del encabezado; se reserva antes de
+        // escribir nada para que el encabezado no se le encime.
+        var filaBanda = filaEncabezado;
+        filaEncabezado++;
+
+        EscribirEncabezado(hoja, filaEncabezado, encabezados);
 
         var primeraFilaDatos = filaEncabezado + 1;
         for (var fila = 0; fila < filas.Count; fila++)
@@ -62,11 +71,13 @@ public class ExportadorExcelClosedXml : IExportadorExcel
             }
         }
 
-        AjustarColumnasDeDatos(hoja, encabezados.Count, filaEncabezado, filaEncabezado + filas.Count);
+        var ultimaFila = primeraFilaDatos + Math.Max(filas.Count - 1, 0);
+        DarFormatoATabla(hoja, encabezados.Count, filaEncabezado, primeraFilaDatos, filas.Count);
+        AjustarColumnasDeDatos(hoja, encabezados.Count, filaEncabezado, ultimaFila);
 
-        var primeraColumnaEje = encabezados.Count + 1;
-        var periodos = CalcularPeriodos(gantt.Desde, gantt.Hasta);
+        DibujarBandaDePeriodos(hoja, filaBanda, primeraColumnaEje, periodos);
         DibujarEje(hoja, filaEncabezado, primeraColumnaEje, periodos);
+        DibujarFondoDelEje(hoja, primeraFilaDatos, ultimaFila, primeraColumnaEje, periodos, filas.Count);
         DibujarBarras(hoja, primeraFilaDatos, primeraColumnaEje, periodos, gantt.Barras);
 
         // Congelar hasta el encabezado y la primera columna: al recorrer el Gantt a la derecha
@@ -74,9 +85,222 @@ public class ExportadorExcelClosedXml : IExportadorExcel
         hoja.SheetView.FreezeRows(filaEncabezado);
         hoja.SheetView.FreezeColumns(1);
 
+        if (filas.Count > 0)
+        {
+            hoja.Range(filaEncabezado, 1, ultimaFila, encabezados.Count).SetAutoFilter();
+        }
+
+        PrepararImpresion(hoja, filaBanda, filaEncabezado, ultimaFila, ultimaColumna);
+
         using var flujo = new MemoryStream();
         libro.SaveAs(flujo);
         return flujo.ToArray();
+    }
+
+    /* ---------- Paleta ----------
+       Un solo lugar donde vive el color del reporte. Los tonos de estatus son los de la
+       paleta de MUI que el usuario ya vio en pantalla (ver ColorEstatus); el resto es la
+       gama neutra que los acompana sin pelearse con ellos. */
+
+    private static readonly XLColor Tinta = XLColor.FromArgb(0x1F, 0x3A, 0x5F);
+    private static readonly XLColor TintaSuave = XLColor.FromArgb(0x5A, 0x64, 0x72);
+    private static readonly XLColor Linea = XLColor.FromArgb(0xD0, 0xD7, 0xDE);
+    private static readonly XLColor FilaAlterna = XLColor.FromArgb(0xF5, 0xF7, 0xFA);
+    private static readonly XLColor FondoFinDeSemana = XLColor.FromArgb(0xEC, 0xEF, 0xF3);
+    private static readonly XLColor FondoHoy = XLColor.FromArgb(0xFB, 0xE9, 0xE9);
+    private static readonly XLColor ColorHoy = XLColor.FromArgb(0xD3, 0x2F, 0x2F);
+
+    private static void EscribirEncabezado(
+        IXLWorksheet hoja, int filaEncabezado, IReadOnlyList<string> encabezados)
+    {
+        for (var columna = 0; columna < encabezados.Count; columna++)
+        {
+            var celda = hoja.Cell(filaEncabezado, columna + 1);
+            celda.Value = encabezados[columna];
+            celda.Style.Font.Bold = true;
+            celda.Style.Font.FontColor = XLColor.White;
+            celda.Style.Fill.BackgroundColor = Tinta;
+            celda.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+            celda.Style.Alignment.WrapText = true;
+        }
+
+        hoja.Row(filaEncabezado).Height = 30;
+    }
+
+    /// <summary>
+    /// Bandas alternas, bordes finos y formato por tipo de dato. Las bandas no son decorado:
+    /// con veinte columnas de eje a la derecha, seguir un renglon con la vista de la actividad
+    /// a su barra es justo donde se pierde quien lee esto.
+    /// </summary>
+    private static void DarFormatoATabla(
+        IXLWorksheet hoja, int columnas, int filaEncabezado, int primeraFilaDatos, int totalFilas)
+    {
+        if (totalFilas == 0)
+        {
+            return;
+        }
+
+        var ultimaFila = primeraFilaDatos + totalFilas - 1;
+        var rango = hoja.Range(filaEncabezado, 1, ultimaFila, columnas);
+        rango.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
+        rango.Style.Border.InsideBorderColor = Linea;
+        rango.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+        rango.Style.Border.OutsideBorderColor = Linea;
+
+        for (var i = 0; i < totalFilas; i++)
+        {
+            var fila = primeraFilaDatos + i;
+            hoja.Row(fila).Height = 18;
+
+            if (i % 2 == 1)
+            {
+                hoja.Range(fila, 1, fila, columnas).Style.Fill.BackgroundColor = FilaAlterna;
+            }
+
+            for (var columna = 1; columna <= columnas; columna++)
+            {
+                var celda = hoja.Cell(fila, columna);
+                celda.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+
+                // El formato se decide por el tipo que quedo en la celda, no por el nombre de
+                // la columna: el exportador es generico y no sabe cual es cual.
+                if (celda.DataType == XLDataType.DateTime)
+                {
+                    celda.Style.DateFormat.Format = "dd/mm/yyyy";
+                    celda.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                }
+                else if (celda.DataType == XLDataType.Number)
+                {
+                    celda.Style.NumberFormat.Format = "#,##0.00";
+                    celda.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Banda de agrupacion arriba del eje: los dias se agrupan por mes y los meses por anio,
+    /// con la celda combinada y centrada. Es lo que convierte una hilera de numeros sueltos en
+    /// una linea de tiempo que se lee.
+    /// </summary>
+    private static void DibujarBandaDePeriodos(
+        IXLWorksheet hoja, int fila, int primeraColumna, List<Periodo> periodos)
+    {
+        if (periodos.Count == 0)
+        {
+            return;
+        }
+
+        var inicioGrupo = 0;
+        for (var i = 1; i <= periodos.Count; i++)
+        {
+            var mismoGrupo = i < periodos.Count
+                && EtiquetaDeGrupo(periodos[i]) == EtiquetaDeGrupo(periodos[inicioGrupo]);
+
+            if (mismoGrupo)
+            {
+                continue;
+            }
+
+            var desde = primeraColumna + inicioGrupo;
+            var hasta = primeraColumna + i - 1;
+            var rango = hoja.Range(fila, desde, fila, hasta);
+            if (desde != hasta) rango.Merge();
+
+            var celda = hoja.Cell(fila, desde);
+            celda.Value = EtiquetaDeGrupo(periodos[inicioGrupo]);
+            celda.Style.Font.Bold = true;
+            celda.Style.Font.FontSize = 9;
+            celda.Style.Font.FontColor = XLColor.White;
+            celda.Style.Fill.BackgroundColor = TintaSuave;
+            celda.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            celda.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+            rango.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+            rango.Style.Border.OutsideBorderColor = XLColor.White;
+
+            inicioGrupo = i;
+        }
+
+        hoja.Row(fila).Height = 16;
+    }
+
+    /// <summary>Mes y anio para la escala diaria y semanal; solo el anio para la mensual.</summary>
+    private static string EtiquetaDeGrupo(Periodo periodo)
+        => periodo.EsMensual ? $"{periodo.Inicio:yyyy}" : $"{periodo.Inicio:MMMM yyyy}";
+
+    /// <summary>
+    /// Fondo del area del diagrama: fines de semana en gris y la columna de hoy en rojo palido,
+    /// de arriba a abajo. Se pinta ANTES que las barras, que lo tapan donde hay actividad.
+    /// </summary>
+    private static void DibujarFondoDelEje(
+        IXLWorksheet hoja, int primeraFilaDatos, int ultimaFila, int primeraColumna,
+        List<Periodo> periodos, int totalFilas)
+    {
+        if (totalFilas == 0)
+        {
+            return;
+        }
+
+        var hoy = DateTime.Now;
+
+        for (var i = 0; i < periodos.Count; i++)
+        {
+            var periodo = periodos[i];
+            var columna = primeraColumna + i;
+
+            XLColor? fondo = null;
+            if (hoy >= periodo.Inicio && hoy <= periodo.Fin)
+            {
+                fondo = FondoHoy;
+            }
+            else if (periodo.EsDiario
+                && periodo.Inicio.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+            {
+                fondo = FondoFinDeSemana;
+            }
+
+            if (fondo is not null)
+            {
+                hoja.Range(primeraFilaDatos, columna, ultimaFila, columna)
+                    .Style.Fill.BackgroundColor = fondo;
+            }
+        }
+
+        var area = hoja.Range(primeraFilaDatos, primeraColumna, ultimaFila, primeraColumna + periodos.Count - 1);
+        area.Style.Border.InsideBorder = XLBorderStyleValues.Hair;
+        area.Style.Border.InsideBorderColor = Linea;
+        area.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+        area.Style.Border.OutsideBorderColor = Linea;
+    }
+
+    /// <summary>
+    /// Deja la hoja lista para imprimirse sin tocar nada: horizontal, ajustada al ancho de una
+    /// pagina y repitiendo el encabezado en cada hoja. Esto se lleva impreso a una junta, y sin
+    /// el ajuste al ancho un Gantt de treinta columnas sale partido en cuatro paginas sueltas.
+    /// </summary>
+    private static void PrepararImpresion(
+        IXLWorksheet hoja, int filaBanda, int filaEncabezado, int ultimaFila, int ultimaColumna)
+    {
+        hoja.PageSetup.PageOrientation = XLPageOrientation.Landscape;
+        hoja.PageSetup.PaperSize = XLPaperSize.LetterPaper;
+        hoja.PageSetup.FitToPages(1, 0);
+        hoja.PageSetup.Margins.Top = 0.5;
+        hoja.PageSetup.Margins.Bottom = 0.5;
+        hoja.PageSetup.Margins.Left = 0.4;
+        hoja.PageSetup.Margins.Right = 0.4;
+        hoja.PageSetup.SetRowsToRepeatAtTop(filaBanda, filaEncabezado);
+        hoja.PageSetup.CenterHorizontally = true;
+
+        hoja.PageSetup.Footer.Left.AddText("GTE - Gantt de actividades");
+        hoja.PageSetup.Footer.Right.AddText("Pagina ");
+        hoja.PageSetup.Footer.Right.AddText(XLHFPredefinedText.PageNumber);
+        hoja.PageSetup.Footer.Right.AddText(" de ");
+        hoja.PageSetup.Footer.Right.AddText(XLHFPredefinedText.NumberOfPages);
+
+        if (ultimaFila >= filaEncabezado && ultimaColumna >= 1)
+        {
+            hoja.PageSetup.PrintAreas.Add(1, 1, ultimaFila, ultimaColumna);
+        }
     }
 
     /// <summary>
@@ -94,12 +318,38 @@ public class ExportadorExcelClosedXml : IExportadorExcel
         var titulo = hoja.Cell(fila, ColumnaTexto);
         titulo.Value = "Gantt de actividades";
         titulo.Style.Font.Bold = true;
-        titulo.Style.Font.FontSize = 13;
+        titulo.Style.Font.FontSize = 18;
+        titulo.Style.Font.FontColor = Tinta;
+        hoja.Row(fila).Height = 26;
         fila++;
+
+        // Regla de color debajo del titulo: se dibuja pintando el fondo de un renglon bajito,
+        // que es la unica forma que hay en una hoja de calculo de trazar una linea gruesa.
+        // Arranca donde el titulo y mide lo mismo que los chips, para que el bloque quede
+        // alineado por la izquierda y por la derecha.
+        hoja.Range(fila, ColumnaTexto, fila, ColumnaTexto + CeldasPorChip - 1)
+            .Style.Fill.BackgroundColor = Tinta;
+        hoja.Row(fila).Height = 3;
+        fila += 2;
 
         foreach (var filtro in gantt.Filtros)
         {
-            hoja.Cell(fila, ColumnaTexto).Value = filtro;
+            // Texto enriquecido para que la etiqueta vaya en negritas y el valor no, SIN sacar
+            // el valor a otra columna: todo el bloque tiene que quedar en una sola.
+            var celda = hoja.Cell(fila, ColumnaTexto);
+            var corte = filtro.IndexOf(':');
+            if (corte > 0)
+            {
+                celda.GetRichText().AddText(filtro[..(corte + 1)]).SetBold().SetFontColor(TintaSuave);
+                celda.GetRichText().AddText(filtro[(corte + 1)..]).SetFontColor(TintaSuave);
+            }
+            else
+            {
+                celda.Value = filtro;
+                celda.Style.Font.FontColor = TintaSuave;
+            }
+
+            hoja.Row(fila).Height = 14;
             fila++;
         }
 
@@ -108,35 +358,91 @@ public class ExportadorExcelClosedXml : IExportadorExcel
         var tituloLeyenda = hoja.Cell(fila, ColumnaTexto);
         tituloLeyenda.Value = "Colores del diagrama";
         tituloLeyenda.Style.Font.Bold = true;
+        tituloLeyenda.Style.Font.FontColor = Tinta;
         fila++;
 
-        var entradas = new (int Estatus, string Nombre)[]
+        // Cada entrada es un "chip": el texto va DENTRO del color, no junto a una muestra
+        // aparte. Por eso las etiquetas son cortas -- una frase larga sobre un fondo de color
+        // no se puede leer, y ademas una celda con relleno ya no deja que el texto se derrame
+        // a la de al lado, asi que se cortaria a media palabra.
+        var entradas = new (XLColor Fondo, bool Rayada, string Texto)[]
         {
-            (2, "En proceso"), (3, "En pruebas"), (4, "Correccion"), (0, "Pendiente / Terminado"),
+            (ColorEstatus(2), false, "En proceso"),
+            (ColorEstatus(3), false, "En pruebas"),
+            (ColorEstatus(4), false, "Correccion"),
+            (ColorEstatus(0), false, "Pendiente / Terminado"),
+            (ColorEstatus(2), true, "Sin fecha de fin (en curso)"),
+            (FondoHoy, false, "Hoy"),
+            (FondoFinDeSemana, false, "Sabado y domingo"),
         };
 
-        foreach (var (estatus, nombre) in entradas)
+        foreach (var (fondo, rayada, texto) in entradas)
         {
-            hoja.Cell(fila, ColumnaMuestra).Style.Fill.BackgroundColor = ColorEstatus(estatus);
-            hoja.Cell(fila, ColumnaTexto).Value = nombre;
+            EscribirChip(hoja, fila, fondo, rayada, texto);
             fila++;
         }
 
-        hoja.Cell(fila, ColumnaMuestra).Style.Fill.PatternType = XLFillPatternValues.LightUp;
-        hoja.Cell(fila, ColumnaMuestra).Style.Fill.BackgroundColor = ColorEstatus(2);
-        hoja.Cell(fila, ColumnaMuestra).Style.Fill.PatternColor = XLColor.White;
-        hoja.Cell(fila, ColumnaTexto).Value =
-            "Celda rayada = actividad sin fecha de fin (sigue en curso; la barra llega hasta hoy).";
+        // Lo que no cabe en un chip va como nota suelta, SIN relleno: sin fondo el texto se
+        // derrama sobre las celdas vacias de al lado y se lee completo.
         fila++;
-
-        hoja.Cell(fila, ColumnaMuestra).Style.Fill.BackgroundColor = ColorHoy;
-        hoja.Cell(fila, ColumnaTexto).Value = "Encabezado en rojo = periodo que contiene la fecha de hoy.";
+        var nota = hoja.Cell(fila, ColumnaTexto);
+        nota.Value = "La barra rayada llega hasta hoy porque la actividad no tiene fecha de fin.";
+        nota.Style.Font.FontSize = 9;
+        nota.Style.Font.Italic = true;
+        nota.Style.Font.FontColor = TintaSuave;
 
         return fila + 1;   // un renglon en blanco antes del encabezado de la tabla
     }
 
-    /// <summary>Columna de las muestras de color del preambulo (la misma que el primer dato).</summary>
-    private const int ColumnaMuestra = 1;
+    /// <summary>
+    /// Entrada de la leyenda con el texto dentro del color. Se combinan varias celdas para que
+    /// el chip tenga ancho propio: la columna del texto se dimensiona contra la tabla, no
+    /// contra la leyenda, y sola se quedaria corta.
+    /// </summary>
+    private static void EscribirChip(
+        IXLWorksheet hoja, int fila, XLColor fondo, bool rayada, string texto)
+    {
+        var rango = hoja.Range(fila, ColumnaTexto, fila, ColumnaTexto + CeldasPorChip - 1);
+        rango.Merge();
+
+        var celda = hoja.Cell(fila, ColumnaTexto);
+        celda.Value = texto;
+        celda.Style.Fill.BackgroundColor = fondo;
+        celda.Style.Font.Bold = true;
+        celda.Style.Font.FontSize = 10;
+        celda.Style.Font.FontColor = ContrasteSobre(fondo);
+        celda.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+        celda.Style.Alignment.Indent = 1;
+        rango.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+        rango.Style.Border.OutsideBorderColor = XLColor.White;
+
+        if (rayada)
+        {
+            celda.Style.Fill.PatternType = XLFillPatternValues.LightUp;
+            celda.Style.Fill.PatternColor = XLColor.White;
+        }
+
+        hoja.Row(fila).Height = 16;
+    }
+
+    /// <summary>
+    /// Cuantas celdas ocupa un chip. Es un numero fijo y no calculado porque los anchos de las
+    /// columnas se fijan despues de escribir la leyenda; con siete alcanza para la etiqueta mas
+    /// larga sin invadir la zona del eje en un reporte de pocas columnas.
+    /// </summary>
+    private const int CeldasPorChip = 7;
+
+    /// <summary>
+    /// Blanco o tinta segun que tan oscuro sea el fondo, con la luminancia percibida (la vista
+    /// pesa mucho mas el verde que el azul). Sin esto, el chip gris claro de "Hoy" saldria con
+    /// texto blanco sobre rosa palido.
+    /// </summary>
+    private static XLColor ContrasteSobre(XLColor fondo)
+    {
+        var color = fondo.Color;
+        var luminancia = ((0.299 * color.R) + (0.587 * color.G) + (0.114 * color.B)) / 255;
+        return luminancia > 0.6 ? Tinta : XLColor.White;
+    }
 
     /// <summary>Columna unica donde cae TODO el texto del preambulo.</summary>
     private const int ColumnaTexto = 2;
@@ -162,10 +468,21 @@ public class ExportadorExcelClosedXml : IExportadorExcel
 
     private const double AnchoMaximoColumnaDatos = 45;
 
-    private static readonly XLColor ColorHoy = XLColor.FromArgb(0xD3, 0x2F, 0x2F);
 
-    /// <summary>Una columna del eje de tiempo: el tramo que cubre y la etiqueta de su encabezado.</summary>
-    private sealed record Periodo(DateTime Inicio, DateTime Fin, string Etiqueta);
+    /// <summary>
+    /// Una columna del eje de tiempo: el tramo que cubre, la etiqueta de su encabezado y en que
+    /// escala se genero. La escala la necesitan la banda de agrupacion (agrupa por mes o por
+    /// anio segun el caso) y el sombreado de fin de semana (que solo tiene sentido si la
+    /// columna es un dia).
+    /// </summary>
+    private sealed record Periodo(DateTime Inicio, DateTime Fin, string Etiqueta, EscalaEje Escala)
+    {
+        public bool EsDiario => Escala == EscalaEje.Diaria;
+
+        public bool EsMensual => Escala == EscalaEje.Mensual;
+    }
+
+    private enum EscalaEje { Diaria, Semanal, Mensual }
 
     /// <summary>
     /// Tope de columnas del eje. Un rango de varios anios en escala diaria haria una hoja
@@ -173,7 +490,9 @@ public class ExportadorExcelClosedXml : IExportadorExcel
     /// </summary>
     private const int TopeColumnasEje = 400;
 
-    private const int AnchoColumnaEje = 3;
+    private const int AnchoColumnaDia = 3;
+
+    private const int AnchoColumnaPeriodo = 6;
 
     /// <summary>
     /// Densidad del eje segun el ancho del periodo: diaria hasta un mes, semanal hasta unos
@@ -189,6 +508,10 @@ public class ExportadorExcelClosedXml : IExportadorExcel
         }
 
         var dias = hasta.DayNumber - desde.DayNumber + 1;
+        var escala = dias <= 31 ? EscalaEje.Diaria
+            : dias <= 220 ? EscalaEje.Semanal
+            : EscalaEje.Mensual;
+
         var periodos = new List<Periodo>();
         var cursor = desde;
 
@@ -197,12 +520,12 @@ public class ExportadorExcelClosedXml : IExportadorExcel
             DateOnly finPeriodo;
             string etiqueta;
 
-            if (dias <= 31)
+            if (escala == EscalaEje.Diaria)
             {
                 finPeriodo = cursor;
                 etiqueta = cursor.Day.ToString();
             }
-            else if (dias <= 220)
+            else if (escala == EscalaEje.Semanal)
             {
                 finPeriodo = cursor.AddDays(6);
                 etiqueta = $"{cursor.Day}/{cursor.Month}";
@@ -210,7 +533,7 @@ public class ExportadorExcelClosedXml : IExportadorExcel
             else
             {
                 finPeriodo = new DateOnly(cursor.Year, cursor.Month, 1).AddMonths(1).AddDays(-1);
-                etiqueta = $"{cursor:MMM yy}";
+                etiqueta = $"{cursor:MMM}";
             }
 
             if (finPeriodo > hasta) finPeriodo = hasta;
@@ -218,7 +541,8 @@ public class ExportadorExcelClosedXml : IExportadorExcel
             periodos.Add(new Periodo(
                 cursor.ToDateTime(TimeOnly.MinValue),
                 finPeriodo.ToDateTime(TimeOnly.MaxValue),
-                etiqueta));
+                etiqueta,
+                escala));
 
             cursor = finPeriodo.AddDays(1);
         }
@@ -233,23 +557,35 @@ public class ExportadorExcelClosedXml : IExportadorExcel
 
         for (var i = 0; i < periodos.Count; i++)
         {
+            var periodo = periodos[i];
             var columna = primeraColumna + i;
             var celda = hoja.Cell(filaEncabezado, columna);
-            celda.Value = periodos[i].Etiqueta;
+
+            celda.Value = periodo.Etiqueta;
             celda.Style.Font.Bold = true;
             celda.Style.Font.FontSize = 8;
+            celda.Style.Font.FontColor = XLColor.White;
+            celda.Style.Fill.BackgroundColor = Tinta;
             celda.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-            celda.Style.Alignment.TextRotation = 90;
+            celda.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+            celda.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+            celda.Style.Border.OutsideBorderColor = XLColor.White;
 
-            // La columna que contiene hoy se marca en el encabezado: es la "linea de hoy" del
-            // diagrama de pantalla, que en una cuadricula no se puede dibujar entre columnas.
-            if (hoy >= periodos[i].Inicio && hoy <= periodos[i].Fin)
+            // La columna que contiene hoy se marca de rojo en el encabezado y el sombreado baja
+            // por toda la tabla (DibujarFondoDelEje): es la "linea de hoy" del diagrama de
+            // pantalla, que en una cuadricula no se puede trazar entre dos columnas.
+            if (hoy >= periodo.Inicio && hoy <= periodo.Fin)
             {
                 celda.Style.Fill.BackgroundColor = ColorHoy;
-                celda.Style.Font.FontColor = XLColor.White;
+            }
+            else if (periodo.EsDiario && periodo.Inicio.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+            {
+                celda.Style.Fill.BackgroundColor = TintaSuave;
             }
 
-            hoja.Column(columna).Width = AnchoColumnaEje;
+            // La escala diaria cabe en una columna angosta con el numero de pie; la semanal y la
+            // mensual llevan texto y necesitan aire, si no Excel lo corta.
+            hoja.Column(columna).Width = periodo.EsDiario ? AnchoColumnaDia : AnchoColumnaPeriodo;
         }
     }
 

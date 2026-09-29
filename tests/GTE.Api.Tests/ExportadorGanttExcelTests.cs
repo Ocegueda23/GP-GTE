@@ -76,15 +76,19 @@ public class ExportadorGanttExcelTests
             new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 30),
             new BarraGanttExcel(Dia(10), Dia(12), 2)), "WI-1");
 
-        // Una celda sin pintar vuelve del archivo con el color automatico, no con NoColor: lo
-        // que distingue pintada de vacia es el patron de relleno, no el color.
-        // Dia 9 (columna 11) fuera; dias 10, 11 y 12 (columnas 12, 13, 14) dentro; dia 13 fuera.
-        Assert.Equal(XLFillPatternValues.None, hoja.Cell(datos, 11).Style.Fill.PatternType);
+        // El area del diagrama ya no esta en blanco: los fines de semana y la columna de hoy
+        // llevan su propio sombreado. Lo que distingue una barra de un hueco es entonces el
+        // color, no el hecho de tener relleno -- y se compara contra la propia barra en vez de
+        // contra una constante, para que un cambio de paleta no rompa la prueba.
+        var colorBarra = hoja.Cell(datos, 13).Style.Fill.BackgroundColor;
+
+        // Dias 10, 11 y 12 (columnas 12, 13, 14) dentro; el 9 y el 13 fuera.
         foreach (var columna in new[] { 12, 13, 14 })
         {
-            Assert.NotEqual(XLFillPatternValues.None, hoja.Cell(datos, columna).Style.Fill.PatternType);
+            Assert.Equal(colorBarra, hoja.Cell(datos, columna).Style.Fill.BackgroundColor);
         }
-        Assert.Equal(XLFillPatternValues.None, hoja.Cell(datos, 15).Style.Fill.PatternType);
+        Assert.NotEqual(colorBarra, hoja.Cell(datos, 11).Style.Fill.BackgroundColor);
+        Assert.NotEqual(colorBarra, hoja.Cell(datos, 15).Style.Fill.BackgroundColor);
     }
 
     /// <summary>Cada estatus lleva su color, el mismo que el usuario ya vio en pantalla.</summary>
@@ -121,8 +125,12 @@ public class ExportadorGanttExcelTests
         // Columna del dia de hoy: es el sexto dia del rango, o sea la columna 3 + 5.
         Assert.Equal(XLFillPatternValues.LightUp, hoja.Cell(datos, 8).Style.Fill.PatternType);
 
-        // Y no sigue pintando despues de hoy: eso seria inventar trabajo futuro.
-        Assert.Equal(XLFillPatternValues.None, hoja.Cell(datos, 9).Style.Fill.PatternType);
+        // Y no sigue pintando despues de hoy: eso seria inventar trabajo futuro. El dia
+        // siguiente puede traer el sombreado de fin de semana, pero nunca la trama de la barra.
+        Assert.NotEqual(XLFillPatternValues.LightUp, hoja.Cell(datos, 9).Style.Fill.PatternType);
+        Assert.NotEqual(
+            hoja.Cell(datos, 8).Style.Fill.BackgroundColor,
+            hoja.Cell(datos, 9).Style.Fill.BackgroundColor);
     }
 
     /// <summary>Una actividad que se sale del rango se recorta al eje en vez de desbordarlo.</summary>
@@ -133,10 +141,11 @@ public class ExportadorGanttExcelTests
             new DateOnly(2026, 9, 10), new DateOnly(2026, 9, 20),
             new BarraGanttExcel(Dia(1), Dia(30), 2)), "WI-1");
 
-        // Los 11 dias del eje (columnas 3 a 13) quedan pintados y no hay una columna 14.
+        // Los 11 dias del eje (columnas 3 a 13) quedan cubiertos por la barra y no hay columna 14.
+        var colorBarra = hoja.Cell(datos, 3).Style.Fill.BackgroundColor;
         for (var columna = 3; columna <= 13; columna++)
         {
-            Assert.NotEqual(XLFillPatternValues.None, hoja.Cell(datos, columna).Style.Fill.PatternType);
+            Assert.Equal(colorBarra, hoja.Cell(datos, columna).Style.Fill.BackgroundColor);
         }
         Assert.True(hoja.Cell(encabezado, 14).IsEmpty());
     }
@@ -149,10 +158,53 @@ public class ExportadorGanttExcelTests
             new DateOnly(2025, 1, 1), new DateOnly(2026, 12, 31),
             new BarraGanttExcel(new DateTime(2025, 3, 1), new DateTime(2025, 4, 30), 2)), "WI-1");
 
-        // 24 meses, no 730 dias.
-        Assert.Equal("ene 25", hoja.Cell(encabezado, 3).GetString().ToLowerInvariant());
+        // 24 meses, no 730 dias. El anio ya no va en cada columna: lo pone la banda de arriba.
+        Assert.Equal("ene", hoja.Cell(encabezado, 3).GetString().ToLowerInvariant());
         Assert.False(hoja.Cell(encabezado, 26).IsEmpty());
         Assert.True(hoja.Cell(encabezado, 27).IsEmpty());
+    }
+
+    /// <summary>
+    /// La banda de arriba agrupa las columnas del eje: por mes cuando son dias y por anio
+    /// cuando son meses. Es lo que convierte una hilera de numeros sueltos en una linea de
+    /// tiempo que se lee de un vistazo.
+    /// </summary>
+    [Fact]
+    public void AgrupaLasColumnasDelEjeEnUnaBandaSuperior()
+    {
+        var (hojaMeses, encabezadoMeses, _) = Generar(Rango(
+            new DateOnly(2025, 1, 1), new DateOnly(2026, 12, 31),
+            new BarraGanttExcel(new DateTime(2025, 3, 1), new DateTime(2025, 4, 30), 2)), "WI-1");
+
+        // Escala mensual: la banda dice el anio, y los 12 meses de 2025 quedan bajo una sola
+        // celda combinada que arranca en la primera columna del eje.
+        Assert.Equal("2025", hojaMeses.Cell(encabezadoMeses - 1, 3).GetString());
+        Assert.Equal("2026", hojaMeses.Cell(encabezadoMeses - 1, 15).GetString());
+
+        var (hojaDias, encabezadoDias, _) = Generar(Rango(
+            new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 30),
+            new BarraGanttExcel(Dia(10), Dia(12), 2)), "WI-1");
+
+        // Escala diaria: la banda dice el mes.
+        Assert.Contains("2026", hojaDias.Cell(encabezadoDias - 1, 3).GetString());
+    }
+
+    /// <summary>
+    /// Sabado y domingo van sombreados en la escala diaria. Sin eso, una barra de dos semanas y
+    /// una de diez dias habiles se ven igual de largas y nadie puede juzgar el avance real.
+    /// </summary>
+    [Fact]
+    public void SombreaLosFinesDeSemanaEnLaEscalaDiaria()
+    {
+        // Septiembre de 2026 arranca en martes, asi que el primer sabado es el dia 5: columna
+        // 3 + 4 = 7, y el domingo 6 en la 8. El lunes 7 (columna 9) ya no.
+        var (hoja, _, datos) = Generar(Rango(
+            new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 30),
+            new BarraGanttExcel(Dia(20), Dia(22), 2)), "WI-1");
+
+        var sabado = hoja.Cell(datos, 7).Style.Fill.BackgroundColor;
+        Assert.Equal(sabado, hoja.Cell(datos, 8).Style.Fill.BackgroundColor);
+        Assert.NotEqual(sabado, hoja.Cell(datos, 9).Style.Fill.BackgroundColor);
     }
 
     /// <summary>Los datos se siguen escribiendo: el diagrama se agrega, no sustituye a la tabla.</summary>
@@ -201,10 +253,35 @@ public class ExportadorGanttExcelTests
         Assert.True(titulo is not null, "No se imprimio el titulo de la leyenda");
         Assert.True(titulo!.RowNumber() < encabezado, "La leyenda quedo debajo del encabezado");
 
-        // Y su muestra de color esta a la izquierda del texto, no encima.
+        // El texto va DENTRO del color: la celda que lo contiene es la que esta pintada, y no
+        // hay una muestra aparte en la columna de al lado.
         var enProceso = hoja.RowsUsed().First(r => r.Cell(ColumnaTexto).GetString() == "En proceso");
-        Assert.NotEqual(XLFillPatternValues.None, enProceso.Cell(ColumnaMuestra).Style.Fill.PatternType);
-        Assert.Equal(string.Empty, enProceso.Cell(ColumnaMuestra).GetString());
+        var chip = enProceso.Cell(ColumnaTexto);
+
+        Assert.NotEqual(XLFillPatternValues.None, chip.Style.Fill.PatternType);
+        Assert.True(chip.IsMerged(), "El chip se combina para tener ancho propio");
+        Assert.Equal(string.Empty, enProceso.Cell(1).GetString());
+        Assert.Equal(XLFillPatternValues.None, enProceso.Cell(1).Style.Fill.PatternType);
+    }
+
+    /// <summary>
+    /// El texto del chip tiene que contrastar con su fondo: blanco sobre los colores oscuros de
+    /// estatus y tinta sobre los sombreados palidos de hoy y fin de semana.
+    /// </summary>
+    [Fact]
+    public void AjustaElColorDeLetraAlFondoDelChip()
+    {
+        var (hoja, _, _) = Generar(Rango(
+            new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 30),
+            new BarraGanttExcel(Dia(10), Dia(12), 2)), "WI-1");
+
+        XLColor Letra(string texto) => hoja.RowsUsed()
+            .First(r => r.Cell(ColumnaTexto).GetString() == texto)
+            .Cell(ColumnaTexto).Style.Font.FontColor;
+
+        Assert.Equal(XLColor.White, Letra("En proceso"));
+        Assert.NotEqual(XLColor.White, Letra("Hoy"));
+        Assert.NotEqual(XLColor.White, Letra("Sabado y domingo"));
     }
 
     /// <summary>
@@ -218,11 +295,16 @@ public class ExportadorGanttExcelTests
             new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 30),
             new BarraGanttExcel(Dia(10), Dia(12), 2)), "WI-1");
 
+        // Solo se miran las columnas de la tabla: mas a la derecha, arriba del encabezado, vive
+        // la banda de meses del eje, que por fuerza reparte texto entre varias columnas.
         foreach (var fila in hoja.RowsUsed().Where(r => r.RowNumber() < encabezado))
         {
-            foreach (var celda in fila.CellsUsed(c => !string.IsNullOrEmpty(c.GetString())))
+            for (var columna = 1; columna <= Encabezados.Length; columna++)
             {
-                Assert.True(celda.Address.ColumnNumber == ColumnaTexto,
+                var celda = fila.Cell(columna);
+                if (string.IsNullOrEmpty(celda.GetString())) continue;
+
+                Assert.True(columna == ColumnaTexto,
                     $"Texto fuera de la columna {ColumnaTexto} en {celda.Address}: {celda.GetString()}");
             }
         }
@@ -246,6 +328,24 @@ public class ExportadorGanttExcelTests
             $"La columna del texto quedo en {hoja.Column(ColumnaTexto).Width}");
     }
 
-    private const int ColumnaMuestra = 1;
+    /// <summary>
+    /// Un filtro sin resultados es un caso real (la API responde 200 con cero renglones) y aqui
+    /// pasa por toda la aritmetica de filas y columnas del preambulo, la banda y el eje. Tiene
+    /// que salir un archivo abrible con su encabezado, no una excepcion.
+    /// </summary>
+    [Fact]
+    public void GeneraUnLibroValidoSinNingunaActividad()
+    {
+        var bytes = new ExportadorExcelClosedXml().GenerarLibroGantt(
+            "GanttActividades", Encabezados, [],
+            new GanttExcel(new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 30), [], Filtros));
+
+        var hoja = new XLWorkbook(new MemoryStream(bytes)).Worksheet(1);
+        var encabezado = hoja.RowsUsed().First(r => r.Cell(1).GetString() == "Folio").RowNumber();
+
+        Assert.Equal("Actividad", hoja.Cell(encabezado, 2).GetString());
+        Assert.Equal("1", hoja.Cell(encabezado, 3).GetString());
+    }
+
     private const int ColumnaTexto = 2;
 }
