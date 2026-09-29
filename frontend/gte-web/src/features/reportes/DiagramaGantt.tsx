@@ -307,6 +307,9 @@ function FilaBarra({ barra, anchoEtiqueta, ahora }: { barra: Barra; anchoEtiquet
       )}
       <Typography variant="caption" sx={{ display: "block", mt: 0.5 }}>Responsable: {responsable}</Typography>
       <Typography variant="caption" sx={{ display: "block" }}>Proyecto: {actividad.proyecto}</Typography>
+      <Typography variant="caption" sx={{ display: "block" }}>
+        Sprint: {actividad.sprint ?? "sin sprint"}
+      </Typography>
       <Typography variant="caption" sx={{ display: "block" }}>Tipo: {actividad.tipo} - {actividad.estatus}</Typography>
       <Typography variant="caption" sx={{ display: "block" }}>Inicio: {fechaCorta(inicio)}</Typography>
       <Typography variant="caption" sx={{ display: "block" }}>

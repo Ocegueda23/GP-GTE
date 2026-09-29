@@ -74,11 +74,12 @@ public interface IReportesQueryService
 
     /// <summary>
     /// R16: actividades (work items ya iniciados) que se traslapan con el periodo, en forma de
-    /// barras para un diagrama de Gantt. Los tres filtros son combinables y ortogonales entre si;
-    /// la agrupacion solo cambia el orden de los renglones. Pagina porque un proyecto con miles de
-    /// actividades no se puede dibujar completo de un golpe.
+    /// barras para un diagrama de Gantt. Los cuatro filtros (proyecto, usuario, sprint y periodo)
+    /// son combinables y ortogonales entre si; la agrupacion solo cambia el orden de los
+    /// renglones. Pagina porque un proyecto con miles de actividades no se puede dibujar completo
+    /// de un golpe.
     /// </summary>
     Task<GanttActividadesReporteResponse> ObtenerGanttActividadesAsync(
-        DateOnly desde, DateOnly hasta, int? idProyecto, int? idAsignado,
+        DateOnly desde, DateOnly hasta, int? idProyecto, int? idAsignado, int? idSprint,
         AgrupacionGantt agruparPor, int page, int pageSize, CancellationToken cancellationToken = default);
 }

@@ -29,7 +29,16 @@ public interface IExportadorExcel
 /// Una por renglon y EN EL MISMO ORDEN: el exportador las empareja por indice con
 /// <c>filas</c>, no por folio.
 /// </param>
-public record GanttExcel(DateOnly Desde, DateOnly Hasta, IReadOnlyList<BarraGanttExcel> Barras);
+/// <param name="Filtros">
+/// Con que se corrio el reporte, ya redactado ("Proyecto: Todos"). Se imprime arriba del
+/// encabezado: el archivo circula por correo fuera de la aplicacion y sin esto nadie puede
+/// saber si esta viendo un mes o un ano, ni un proyecto o todos.
+/// </param>
+public record GanttExcel(
+    DateOnly Desde,
+    DateOnly Hasta,
+    IReadOnlyList<BarraGanttExcel> Barras,
+    IReadOnlyList<string> Filtros);
 
 /// <summary>
 /// Tramo a pintar de un renglon. <paramref name="Fin"/> nulo = actividad todavia abierta: la

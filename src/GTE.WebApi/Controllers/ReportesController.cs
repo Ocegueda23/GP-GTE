@@ -365,11 +365,12 @@ public class ReportesController(IMediator mediator, IExportadorExcel exportador)
     [HttpGet("gantt-actividades")]
     public async Task<ActionResult<ApiResponse<GanttActividadesReporteResponse>>> ObtenerGanttActividades(
         [FromQuery] DateOnly desde, [FromQuery] DateOnly hasta, [FromQuery] int? idProyecto,
-        [FromQuery] int? idAsignado, [FromQuery] AgrupacionGantt agruparPor = AgrupacionGantt.Ninguno,
+        [FromQuery] int? idAsignado, [FromQuery] int? idSprint,
+        [FromQuery] AgrupacionGantt agruparPor = AgrupacionGantt.Ninguno,
         [FromQuery] int page = 1, [FromQuery] int pageSize = 50, CancellationToken cancellationToken = default)
     {
         var resultado = await mediator.Send(
-            new ObtenerGanttActividadesQuery(desde, hasta, idProyecto, idAsignado, agruparPor, page, pageSize),
+            new ObtenerGanttActividadesQuery(desde, hasta, idProyecto, idAsignado, idSprint, agruparPor, page, pageSize),
             cancellationToken);
         return Ok(ApiResponse<GanttActividadesReporteResponse>.Exito(resultado));
     }
@@ -377,17 +378,18 @@ public class ReportesController(IMediator mediator, IExportadorExcel exportador)
     [HttpGet("gantt-actividades/exportar")]
     public async Task<IActionResult> ExportarGanttActividades(
         [FromQuery] DateOnly desde, [FromQuery] DateOnly hasta, [FromQuery] int? idProyecto,
-        [FromQuery] int? idAsignado, [FromQuery] AgrupacionGantt agruparPor = AgrupacionGantt.Ninguno,
+        [FromQuery] int? idAsignado, [FromQuery] int? idSprint,
+        [FromQuery] AgrupacionGantt agruparPor = AgrupacionGantt.Ninguno,
         CancellationToken cancellationToken = default)
     {
         // El Excel no se pagina: se pide todo y el query service recorta solo al tope de renglones.
         var r = await mediator.Send(
-            new ObtenerGanttActividadesQuery(desde, hasta, idProyecto, idAsignado, agruparPor, 1, int.MaxValue),
+            new ObtenerGanttActividadesQuery(desde, hasta, idProyecto, idAsignado, idSprint, agruparPor, 1, int.MaxValue),
             cancellationToken);
 
         var encabezados = new[]
         {
-            "Folio", "Tipo", "Actividad", "Descripcion", "Proyecto", "Responsable", "Estatus",
+            "Folio", "Tipo", "Actividad", "Descripcion", "Proyecto", "Sprint", "Responsable", "Estatus",
             "Fecha inicio", "Fecha fin", "Fecha compromiso", "Duracion (dias naturales)",
         };
         var filas = r.Pagina.Items.Select(a => (IReadOnlyList<object?>)
@@ -395,7 +397,7 @@ public class ReportesController(IMediator mediator, IExportadorExcel exportador)
             // La descripcion se guarda como HTML del editor enriquecido: a la celda va el texto
             // plano, si no el director lee las etiquetas en vez del contenido.
             a.Folio, a.Tipo, a.Titulo, TextoPlano.DesdeHtml(a.Descripcion), a.Proyecto,
-            a.Asignado ?? "-", a.Estatus,
+            a.Sprint ?? "Sin sprint", a.Asignado ?? "-", a.Estatus,
             a.FechaInicio, a.FechaFin, a.FechaCompromiso,
             // Sin fecha de fin la actividad sigue abierta: se mide contra hoy y se marca como tal.
             Math.Round((decimal)((a.FechaFin ?? DateTime.Now) - a.FechaInicio).TotalDays, 2),
@@ -408,8 +410,57 @@ public class ReportesController(IMediator mediator, IExportadorExcel exportador)
             .ToList();
 
         var contenido = exportador.GenerarLibroGantt(
-            "GanttActividades", encabezados, filas, new GanttExcel(desde, hasta, barras));
+            "GanttActividades", encabezados, filas,
+            new GanttExcel(desde, hasta, barras,
+                DescribirFiltrosGantt(r, desde, hasta, idProyecto, idAsignado, idSprint, agruparPor)));
         return File(contenido, TipoContenidoXlsx, "GanttActividades.xlsx");
+    }
+
+    /// <summary>
+    /// Con que se corrio el reporte, para imprimirlo arriba del Excel. El archivo circula por
+    /// correo fuera de la aplicacion: sin esto nadie puede saber si esta viendo un mes o un
+    /// anio, ni un proyecto o todos.
+    ///
+    /// El nombre del proyecto y del responsable se toman del primer renglon devuelto: cuando el
+    /// filtro esta puesto, TODOS los renglones comparten ese valor, asi que no hace falta ir a
+    /// buscar el catalogo. Si el filtro no dejo nada que mostrar se cae al id, que sigue siendo
+    /// mejor que no decir nada.
+    /// </summary>
+    private static List<string> DescribirFiltrosGantt(
+        GanttActividadesReporteResponse reporte, DateOnly desde, DateOnly hasta,
+        int? idProyecto, int? idAsignado, int? idSprint, AgrupacionGantt agruparPor)
+    {
+        var primero = reporte.Pagina.Items.FirstOrDefault();
+
+        var proyecto = idProyecto is null
+            ? "Todos"
+            : primero?.Proyecto ?? $"#{idProyecto}";
+
+        var responsable = idAsignado is null
+            ? "Todos"
+            : primero?.Asignado ?? $"#{idAsignado}";
+
+        var sprint = idSprint is null
+            ? "Todos"
+            : primero?.Sprint ?? $"#{idSprint}";
+
+        var agrupacion = agruparPor switch
+        {
+            AgrupacionGantt.Proyecto => "Proyecto",
+            AgrupacionGantt.Usuario => "Responsable",
+            _ => "Sin agrupar",
+        };
+
+        return
+        [
+            $"Periodo: {desde:dd/MM/yyyy} a {hasta:dd/MM/yyyy}",
+            $"Proyecto: {proyecto}",
+            $"Sprint: {sprint}",
+            $"Responsable: {responsable}",
+            $"Agrupado por: {agrupacion}",
+            $"Actividades: {reporte.Pagina.TotalItems} ({reporte.TotalEnProgreso} en curso)",
+            $"Generado: {DateTime.Now:dd/MM/yyyy HH:mm}",
+        ];
     }
 
     /// <summary>Los minutos se exportan como horas decimales para que Excel pueda sumarlas.</summary>

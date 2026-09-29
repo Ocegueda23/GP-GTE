@@ -1119,7 +1119,7 @@ public class ReportesQueryService(FabricaContexto fabrica, ICalendarioLaboral ca
     /// de lo que se trabajo en el periodo y tiene que aparecer en la grafica.
     /// </summary>
     public async Task<GanttActividadesReporteResponse> ObtenerGanttActividadesAsync(
-        DateOnly desde, DateOnly hasta, int? idProyecto, int? idAsignado,
+        DateOnly desde, DateOnly hasta, int? idProyecto, int? idAsignado, int? idSprint,
         AgrupacionGantt agruparPor, int page, int pageSize, CancellationToken cancellationToken = default)
     {
         await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
@@ -1144,7 +1144,10 @@ public class ReportesQueryService(FabricaContexto fabrica, ICalendarioLaboral ca
                 && w.FechaInicio != null && w.FechaInicio <= fin
                 && (w.FechaFin == null || w.FechaFin >= inicio)
                 && (idProyecto == null || w.IdProyecto == idProyecto)
-                && (idAsignado == null || w.IdAsignado == idAsignado));
+                && (idAsignado == null || w.IdAsignado == idAsignado)
+                // El sprint es el agrupador natural del trabajo: elegir uno trae todo lo que
+                // se le cargo, sin importar de que proyecto o de quien sea.
+                && (idSprint == null || w.IdSprint == idSprint));
 
         var total = await consulta.CountAsync(cancellationToken);
         var enProgreso = await consulta.CountAsync(w => w.FechaFin == null, cancellationToken);
@@ -1182,6 +1185,8 @@ public class ReportesQueryService(FabricaContexto fabrica, ICalendarioLaboral ca
                 Proyecto = w.IdProyectoNavigation.Nombre,
                 IdAsignado = w.IdAsignado,
                 Asignado = w.IdAsignadoNavigation != null ? w.IdAsignadoNavigation.Nombre : null,
+                IdSprint = w.IdSprint,
+                Sprint = w.IdSprintNavigation != null ? w.IdSprintNavigation.Nombre : null,
                 IdEstatusWorkItem = w.IdEstatusWorkItem,
                 Estatus = w.IdEstatusWorkItemNavigation.Descripcion,
                 // El filtro ya garantiza FechaInicio != null; el .Value es seguro y evita que el

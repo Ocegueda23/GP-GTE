@@ -261,7 +261,7 @@ public class ObtenerActividadesTerminadasHandler(IReportesQueryService consultas
 /// como se ordenan y se separan en bandas los renglones.
 /// </summary>
 public record ObtenerGanttActividadesQuery(
-    DateOnly Desde, DateOnly Hasta, int? IdProyecto, int? IdAsignado,
+    DateOnly Desde, DateOnly Hasta, int? IdProyecto, int? IdAsignado, int? IdSprint,
     AgrupacionGantt AgruparPor, int Page, int PageSize) : IRequest<GanttActividadesReporteResponse>;
 
 public class ObtenerGanttActividadesHandler(IReportesQueryService consultas, IVerificadorPermisos permisos)
@@ -273,7 +273,7 @@ public class ObtenerGanttActividadesHandler(IReportesQueryService consultas, IVe
         await permisos.ExigirPermisoAsync(PermisosReportes.Ver, null, cancellationToken);
         ValidacionRangoFechas.Exigir(query.Desde, query.Hasta);
         return await consultas.ObtenerGanttActividadesAsync(
-            query.Desde, query.Hasta, query.IdProyecto, query.IdAsignado,
+            query.Desde, query.Hasta, query.IdProyecto, query.IdAsignado, query.IdSprint,
             query.AgruparPor, query.Page, query.PageSize, cancellationToken);
     }
 }
