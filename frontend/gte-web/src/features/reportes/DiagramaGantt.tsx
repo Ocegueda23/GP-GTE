@@ -380,7 +380,11 @@ function FilaBarra({ barra, anchoEtiqueta, ahora }: { barra: Barra; anchoEtiquet
   );
 }
 
-/** Leyenda de colores: el mismo mapa de estatus que usan los chips de las bandejas. */
+/**
+ * Leyenda de colores: el mismo mapa de estatus que usan los chips de las bandejas.
+ * Cancelado no se lista porque el R16 lo excluye de la consulta: una actividad cancelada no
+ * es trabajo entregado y pintarle una barra infla el periodo.
+ */
 export function LeyendaGantt() {
   const tema = useTheme();
   const entradas = [
@@ -388,7 +392,6 @@ export function LeyendaGantt() {
     { id: 2, nombre: "En proceso" },
     { id: 3, nombre: "En pruebas" },
     { id: 4, nombre: "Correccion" },
-    { id: 7, nombre: "Cancelado" },
   ];
 
   return (

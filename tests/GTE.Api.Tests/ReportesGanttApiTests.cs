@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using GTE.Domain.WorkItems;
 using GTE.Infrastructure.Modelos.bdsGTE;
 using GTE.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -159,6 +160,85 @@ public class ReportesGanttApiTests(WebApplicationFactory<Program> fabricaApp)
         finally
         {
             await BorrarAsync(fabricaDatos, idCerrada, idAbierta);
+        }
+    }
+
+    /// <summary>
+    /// Una actividad cancelada cumple todas las condiciones del traslape (arranco y su rango
+    /// cae dentro del periodo), asi que sin la exclusion explicita se cuela al diagrama y pinta
+    /// una barra por trabajo que no se entrego. Se siembran dos gemelas que solo difieren en el
+    /// estatus: la cancelada no debe salir, ni en los renglones ni en el total.
+    /// </summary>
+    [Fact]
+    public async Task Gantt_NoDevuelveActividadesCanceladas()
+    {
+        if (!BaseDisponible())
+        {
+            return;
+        }
+
+        var fabricaDatos = CrearFabricaDatos();
+        var cliente = await FabricaApiAutenticada.CrearClienteAsync(fabricaApp, "aviramontes");
+
+        int idViva;
+        int idCancelada;
+        int idProyecto;
+        int idAsignado;
+
+        await using (var contexto = fabricaDatos.ConectarContexto<DbContextGTE>())
+        {
+            var usuario = await contexto.TblUsuario.AsNoTracking().FirstAsync(u => u.Dominio == "aviramontes");
+            var proyecto = await contexto.TblProyecto.AsNoTracking().FirstAsync(p => p.Activo);
+            var prioridad = await contexto.TblPrioridad.AsNoTracking().Select(p => p.Id).FirstAsync();
+
+            TblWorkItem Nuevo(string titulo, int idEstatus) => new()
+            {
+                Folio = $"E2E-GANTT-CAN-{Guid.NewGuid().ToString("N")[..6].ToUpperInvariant()}",
+                IdTipoWorkItem = 4,
+                IdProyecto = proyecto.IdProyecto,
+                Titulo = titulo,
+                IdEstatusWorkItem = idEstatus,
+                IdPrioridad = prioridad,
+                IdAsignado = usuario.IdUsuario,
+                FechaInicio = DateTime.Today.AddDays(-8),
+                FechaFin = DateTime.Today.AddDays(-2),
+                FechaRegistro = DateTime.Today.AddDays(-9),
+                UsuarioRegistro = "e2e",
+                Activo = true,
+            };
+
+            var viva = Nuevo("E2E Gantt terminada", EstatusWorkItem.Terminado);
+            var cancelada = Nuevo("E2E Gantt cancelada", EstatusWorkItem.Cancelado);
+
+            contexto.TblWorkItem.AddRange(viva, cancelada);
+            await contexto.SaveChangesAsync();
+
+            idViva = viva.IdWorkItem;
+            idCancelada = cancelada.IdWorkItem;
+            idProyecto = proyecto.IdProyecto;
+            idAsignado = usuario.IdUsuario;
+        }
+
+        try
+        {
+            var desde = DateTime.Today.AddDays(-20).ToString("yyyy-MM-dd");
+            var hasta = DateTime.Today.ToString("yyyy-MM-dd");
+
+            var reporte = await PedirAsync(cliente,
+                $"desde={desde}&hasta={hasta}&idProyecto={idProyecto}&idAsignado={idAsignado}" +
+                "&agruparPor=Ninguno&page=1&pageSize=200");
+
+            // La gemela viva confirma que la siembra si entro al rango: sin ella, un reporte
+            // vacio por cualquier otra razon haria pasar la prueba sin probar nada.
+            Assert.Contains(reporte.Pagina.Items, i => i.IdWorkItem == idViva);
+            Assert.DoesNotContain(reporte.Pagina.Items, i => i.IdWorkItem == idCancelada);
+
+            // Y ningun renglon, sembrado o no, viene cancelado.
+            Assert.All(reporte.Pagina.Items, i => Assert.NotEqual(EstatusWorkItem.Cancelado, i.IdEstatusWorkItem));
+        }
+        finally
+        {
+            await BorrarAsync(fabricaDatos, idViva, idCancelada);
         }
     }
 

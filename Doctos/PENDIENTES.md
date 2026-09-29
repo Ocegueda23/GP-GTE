@@ -3,7 +3,30 @@
 > Documento de continuidad. Sirve para retomar el proyecto en otra sesión sin
 > contexto previo. Actualizar al cerrar cada bloque de trabajo.
 >
-> **Bloque en curso (2026-09-25) — R16: Gantt de actividades en el catálogo de Reportes.**
+> **Correcciones al R16 (2026-09-28) — version 1.26.1.0.** Tres defectos reportados sobre el
+> Gantt ya liberado. Sin cambios de esquema; falta desplegar y verificar en el servidor real.
+> La nota de version se siembra con `DataBase/Scripts/14_Scripts/01_..._NotaVersion1_26_1.sql`
+> y queda como BORRADOR: publicarla desde Administracion / Notas de version al liberar.
+>
+> - **Canceladas fuera.** `ObtenerGanttActividadesAsync` excluye `EstatusWorkItem.Cancelado`.
+>   Se filtra en la consulta, no al dibujar, para que el conteo, la paginación y el Excel
+>   concuerden. La leyenda de pantalla ya no lista "Cancelado".
+> - **El Excel ya trae el diagrama.** Era una tabla de fechas sin barras, que es justo lo que
+>   dirección abre. `IExportadorExcel.GenerarLibroGantt` agrega a la derecha de los datos una
+>   columna por periodo y pinta las celdas del tramo con el color del estatus. La escala
+>   (día / semana / mes) usa el mismo criterio que `DiagramaGantt.calcularTicks` para que
+>   pantalla y Excel no cuenten la misma historia con escalas distintas. Las actividades sin
+>   fecha de fin van rayadas — impreso en blanco y negro el color solo no distingue "cerrada"
+>   de "en curso" — y el encabezado del periodo con hoy va en rojo, que es como se representa
+>   en una cuadrícula la línea de "hoy" del diagrama.
+> - **Descripción sin etiquetas.** La columna salía con el HTML crudo del editor enriquecido
+>   ("los símbolos del xml"). Nuevo `GTE.Application.Common.TextoPlano.DesdeHtml`, gemelo del
+>   `htmlATextoPlano` del front. Cuidado al tocarlo: decodifica entidades **después** de
+>   borrar etiquetas, porque al revés un `&lt;b&gt;` escrito como texto por el usuario se
+>   volvería etiqueta real y desaparecería. Se aplicó también al R15, que tenía el mismo
+>   defecto en la misma columna.
+>
+> **Bloque anterior (2026-09-25) — R16: Gantt de actividades en el catálogo de Reportes.**
 > Vista nueva en Reportes (`R16 - Gantt de actividades`, permiso `RPT.Ver`) con los tres
 > filtros que pidió el usuario **combinables entre sí**: proyecto, usuario y periodo. La
 > agrupación (`Ninguno`/`Proyecto`/`Usuario`) es aparte de los filtros: solo cambia el orden

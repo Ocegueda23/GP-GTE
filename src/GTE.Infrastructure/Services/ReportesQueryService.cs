@@ -1135,8 +1135,12 @@ public class ReportesQueryService(FabricaContexto fabrica, ICalendarioLaboral ca
         // FechaInicio != null es la definicion de "realizada": lo que nunca arranco no tiene barra.
         // El traslape es el clasico (inicioA <= finB && finA >= inicioB) con el extremo derecho
         // abierto cuando no hay FechaFin.
+        // Lo cancelado queda fuera: el Gantt es lo que se trabajo en el periodo, y una actividad
+        // cancelada pinta una barra por trabajo que no se entrego. Se excluye aqui, en la
+        // consulta, y no al dibujar, para que el conteo, la paginacion y el Excel concuerden.
         var consulta = contexto.TblWorkItem.AsNoTracking()
             .Where(w => w.Activo
+                && w.IdEstatusWorkItem != EstatusWorkItem.Cancelado
                 && w.FechaInicio != null && w.FechaInicio <= fin
                 && (w.FechaFin == null || w.FechaFin >= inicio)
                 && (idProyecto == null || w.IdProyecto == idProyecto)
