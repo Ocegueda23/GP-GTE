@@ -123,14 +123,15 @@ public class EntregaRepository(FabricaContexto fabrica, AuditContext auditoria)
         await RegistrarBitacoraAsync("Release", idRelease, accion, null, cancellationToken);
     }
 
-    public async Task MarcarLiberadoAsync(int idRelease, CancellationToken cancellationToken = default)
+    public async Task MarcarLiberadoAsync(
+        int idRelease, DateTime fechaLiberacion, CancellationToken cancellationToken = default)
     {
         await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
         var entidad = await contexto.TblRelease
             .FirstOrDefaultAsync(r => r.IdRelease == idRelease, cancellationToken)
             ?? throw new InvalidOperationException($"Release {idRelease} no existe.");
 
-        entidad.FechaLiberacion = DateTime.Now;
+        entidad.FechaLiberacion = fechaLiberacion;
         MarcarMovimiento(entidad);
         await contexto.SaveChangesAsync(cancellationToken);
     }
@@ -607,8 +608,8 @@ public class EntregaRepository(FabricaContexto fabrica, AuditContext auditoria)
             IdRelease = datos.IdRelease,
             IdAmbiente = datos.IdAmbiente,
             IdEstatusDespliegue = EstatusDespliegue.Exitoso,
-            FechaInicio = DateTime.Now,
-            FechaFin = DateTime.Now,
+            FechaInicio = datos.FechaDespliegue,
+            FechaFin = datos.FechaDespliegue,
             IdEjecutor = datos.IdEjecutor,
             EsRollback = datos.EsRollback,
             Bitacora = datos.Bitacora,
@@ -626,7 +627,7 @@ public class EntregaRepository(FabricaContexto fabrica, AuditContext auditoria)
                 ? "Rollback de release"
                 : "Despliegue de release",
             Usuario = Auditoria.Usuario,
-            Fecha = DateTime.Now
+            Fecha = datos.FechaDespliegue
         });
         await contexto.SaveChangesAsync(cancellationToken);
 

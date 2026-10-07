@@ -41,6 +41,8 @@ public class RegistrarTiempoHandler(
             throw new BusinessException("No se puede registrar tiempo en un elemento cancelado o eliminado.");
         }
 
+        await CandadoRelease.ExigirNoCongeladoAsync(repositorio, command.IdWorkItem, cancellationToken);
+
         // RN-GTE-012: registrar tiempo en un item ajeno (asignado a otra persona O SIN
         // asignar) tambien cuenta como "modificar" el elemento -- mismo gate que
         // ActualizarWorkItemCommand y CambiarEstatusWorkItemCommand. Sin asignar cuenta

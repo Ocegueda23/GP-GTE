@@ -4,7 +4,7 @@ import {
 } from "@mui/material";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
-import { formatearMinutos, obtenerTiempos, registrarTiempo } from "../../shared/api/workitems";
+import { formatearMinutos, obtenerTiempos, registrarTiempo, invalidarVistasDeTrabajo } from "../../shared/api/workitems";
 import { useEsMovil } from "../../shared/hooks/useEsMovil";
 
 interface Props {
@@ -46,7 +46,7 @@ export function ModalTiempo({ abierto, item, alCerrar, alExito, alError }: Props
       alCerrar();
       setDescripcion("");
       setMinutos("60");
-      await clienteQuery.invalidateQueries({ queryKey: ["bandeja"] });
+      await invalidarVistasDeTrabajo(clienteQuery);
       await clienteQuery.invalidateQueries({ queryKey: ["tiempos", item.idWorkItem] });
     } catch (error) {
       alError(error instanceof ErrorApi ? error.message : "Error al registrar el tiempo.");

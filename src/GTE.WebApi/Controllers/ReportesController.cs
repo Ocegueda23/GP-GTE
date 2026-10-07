@@ -10,7 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace GTE.WebApi.Controllers;
 
 /// <summary>
-/// Catalogo de reportes R01-R14 (Doctos/GTE-DocumentoMaestro.md seccion 13): lectura, sin
+/// Catalogo de reportes R01-R17 (Doctos/GTE-DocumentoMaestro.md seccion 13): lectura, sin
 /// comandos de escritura. Permisos: RPT.Ver (general), RPT.Costos (R08/R09), RPT.Auditoria
 /// (R14), RPT.Actividad (reporte previo de actividad diaria). Cada reporte tiene su
 /// endpoint de exportacion a Excel gemelo bajo "/exportar" (ClosedXML, mismos filtros).
@@ -414,6 +414,76 @@ public class ReportesController(IMediator mediator, IExportadorExcel exportador)
             new GanttExcel(desde, hasta, barras,
                 DescribirFiltrosGantt(r, desde, hasta, idProyecto, idAsignado, idSprint, agruparPor)));
         return File(contenido, TipoContenidoXlsx, "GanttActividades.xlsx");
+    }
+
+    // ---------- R17 Trabajo pendiente ----------
+    [HttpGet("trabajo-pendiente")]
+    public async Task<ActionResult<ApiResponse<TrabajoPendienteReporteResponse>>> ObtenerTrabajoPendiente(
+        [FromQuery] int? idEquipo, [FromQuery] int? idAsignado, [FromQuery] int? idProyecto,
+        [FromQuery] int? idTipoWorkItem, [FromQuery] string? folio, [FromQuery] bool incluirSuspendidos = true,
+        CancellationToken cancellationToken = default)
+    {
+        var resultado = await mediator.Send(
+            new ObtenerTrabajoPendienteQuery(idEquipo, idAsignado, idProyecto, idTipoWorkItem, folio, incluirSuspendidos),
+            cancellationToken);
+        return Ok(ApiResponse<TrabajoPendienteReporteResponse>.Exito(resultado));
+    }
+
+    [HttpGet("trabajo-pendiente/exportar")]
+    public async Task<IActionResult> ExportarTrabajoPendiente(
+        [FromQuery] int? idEquipo, [FromQuery] int? idAsignado, [FromQuery] int? idProyecto,
+        [FromQuery] int? idTipoWorkItem, [FromQuery] string? folio, [FromQuery] bool incluirSuspendidos = true,
+        CancellationToken cancellationToken = default)
+    {
+        var r = await mediator.Send(
+            new ObtenerTrabajoPendienteQuery(idEquipo, idAsignado, idProyecto, idTipoWorkItem, folio, incluirSuspendidos),
+            cancellationToken);
+
+        var encabezados = new[]
+        {
+            "Folio", "Tipo", "Titulo", "Descripcion", "Proyecto", "Equipo", "Asignado", "Prioridad",
+            "Estatus", "Sprint", "Horas presupuesto", "Horas en proceso", "Fecha creacion", "Fecha inicio",
+            "Fecha compromiso", "Dias abierto", "Vencida", "Revisiones pendientes",
+        };
+
+        var filas = r.Items.Select(i => (IReadOnlyList<object?>)
+        [
+            i.Folio, i.Tipo, i.Titulo, TextoPlano.DesdeHtml(i.Descripcion), i.Proyecto, i.Equipo,
+            i.Asignado ?? "Sin asignar", i.Prioridad, i.Estatus, i.Sprint ?? "Sin sprint",
+            AHoras(i.MinutosPresupuesto), AHoras(i.MinutosInvertidos), i.FechaCreacion, i.FechaInicio,
+            i.FechaCompromiso, i.DiasAbierto, i.EsVencida ? "Si" : "No", i.RevisionesPendientes,
+        ]).ToList();
+
+        // Mismo formato que R15: las tres secciones en una sola hoja, separadas por un titulo.
+        if (r.Tickets.Count > 0)
+        {
+            filas.Add([]);
+            filas.Add(["TICKETS ABIERTOS"]);
+            filas.Add(["Folio", "Categoria", "Titulo", "Solicitante", "Asignado", "Prioridad", "Estatus",
+                "Horas en atencion", "Fecha creacion", "Primera respuesta", "Limite resolucion",
+                "Dias abierto", "SLA vencido"]);
+            filas.AddRange(r.Tickets.Select(t => (IReadOnlyList<object?>)
+            [
+                t.Folio, t.Categoria, t.Titulo, t.Solicitante, t.Asignado ?? "Sin asignar", t.Prioridad, t.Estatus,
+                AHoras(t.MinutosEnAtencion), t.FechaCreacion, t.FechaPrimeraRespuesta, t.FechaLimiteResolucion,
+                t.DiasAbierto, t.SlaVencido == null ? "-" : t.SlaVencido.Value ? "Si" : "No",
+            ]));
+        }
+
+        if (r.Incidentes.Count > 0)
+        {
+            filas.Add([]);
+            filas.Add(["INCIDENTES ABIERTOS"]);
+            filas.Add(["Folio", "Severidad", "Titulo", "Proyecto", "Estatus", "Horas en atencion",
+                "Horas de indisponibilidad", "Fecha ocurrencia", "Fecha deteccion", "Dias abierto"]);
+            filas.AddRange(r.Incidentes.Select(i => (IReadOnlyList<object?>)
+            [
+                i.Folio, i.Severidad, i.Titulo, i.Proyecto, i.Estatus, AHoras(i.MinutosEnAtencion),
+                AHoras(i.MinutosIndisponibilidad), i.FechaOcurrencia, i.FechaDeteccion, i.DiasAbierto,
+            ]));
+        }
+
+        return ArchivoExcel("TrabajoPendiente", encabezados, filas);
     }
 
     /// <summary>

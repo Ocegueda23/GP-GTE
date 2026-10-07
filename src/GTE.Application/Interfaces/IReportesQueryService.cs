@@ -82,4 +82,13 @@ public interface IReportesQueryService
     Task<GanttActividadesReporteResponse> ObtenerGanttActividadesAsync(
         DateOnly desde, DateOnly hasta, int? idProyecto, int? idAsignado, int? idSprint,
         AgrupacionGantt agruparPor, int page, int pageSize, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// R17: foto del trabajo abierto al momento de correrlo -- work items que no estan
+    /// Terminados ni Cancelados, y tickets e incidentes que no estan Resueltos ni Cerrados.
+    /// Mismas reglas de filtros por seccion que R15.
+    /// </summary>
+    Task<TrabajoPendienteReporteResponse> ObtenerTrabajoPendienteAsync(
+        int? idEquipo, int? idAsignado, int? idProyecto, int? idTipoWorkItem, string? folio,
+        bool incluirSuspendidos, CancellationToken cancellationToken = default);
 }

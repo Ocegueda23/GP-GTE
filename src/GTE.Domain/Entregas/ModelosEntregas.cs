@@ -73,7 +73,8 @@ public record AprobacionRelease(
     int IdAprobador,
     string? Comentario);
 
-public record DespliegueNuevo(int IdRelease, int IdAmbiente, int IdEjecutor, bool EsRollback, string? Bitacora);
+public record DespliegueNuevo(
+    int IdRelease, int IdAmbiente, int IdEjecutor, bool EsRollback, string? Bitacora, DateTime FechaDespliegue);
 
 /// <summary>Elemento candidato a entrar al release (RN-GTE-031 exige Terminado y revisado).</summary>
 public record CandidatoRelease(int IdWorkItem, string Folio, string Titulo, int IdEstatus, bool Revisado, int RevisionesPendientes);

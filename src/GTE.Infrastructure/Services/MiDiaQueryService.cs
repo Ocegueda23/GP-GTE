@@ -24,6 +24,12 @@ public class MiDiaQueryService(
         EstatusWorkItem.Correccion, EstatusWorkItem.Suspendido
     ];
 
+    /// <summary>Trabajo ya tomado que no esta En Proceso: va en la seccion "En proceso ahora".</summary>
+    private static readonly int[] EstatusEnCurso =
+    [
+        EstatusWorkItem.EnPruebas, EstatusWorkItem.Correccion, EstatusWorkItem.Suspendido
+    ];
+
     private static readonly int[] EstatusSolicitudPendiente =
     [
         EstatusSolicitud.Enviada, EstatusSolicitud.EnAnalisis, EstatusSolicitud.Aprobada
@@ -87,7 +93,10 @@ public class MiDiaQueryService(
 
         var hoy = DateTime.Today;
         var enProceso = abiertos.FirstOrDefault(i => i.IdEstatus == EstatusWorkItem.EnProceso);
-        var resto = abiertos.Where(i => i.IdWorkItem != enProceso?.IdWorkItem).ToList();
+        var enCurso = abiertos.Where(i => EstatusEnCurso.Contains(i.IdEstatus)).ToList();
+        var resto = abiertos
+            .Where(i => i.IdWorkItem != enProceso?.IdWorkItem && !EstatusEnCurso.Contains(i.IdEstatus))
+            .ToList();
 
         var minutosHoy = await contexto.TblRegistroTiempo.AsNoTracking()
             .Where(t => t.IdUsuario == idUsuario && t.Fecha == DateOnly.FromDateTime(hoy) && t.Activo)
@@ -111,6 +120,7 @@ public class MiDiaQueryService(
             Usuario = nombreUsuario,
             Fecha = hoy,
             EnProceso = enProceso,
+            EnCurso = enCurso,
             Vencidas = resto.Where(i => i.FechaCompromiso.HasValue
                                         && i.FechaCompromiso.Value.Date < hoy).ToList(),
             ParaHoy = resto.Where(i => i.FechaCompromiso.HasValue

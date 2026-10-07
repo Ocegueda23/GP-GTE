@@ -6,7 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
 import { useEsMovil } from "../../shared/hooks/useEsMovil";
 import {
-  cambiarEstatus, obtenerAcciones, type AccionDisponible,
+  cambiarEstatus, invalidarVistasDeTrabajo, obtenerAcciones, type AccionDisponible,
 } from "../../shared/api/workitems";
 
 interface Props {
@@ -39,7 +39,7 @@ export function BotonesAcciones({ idWorkItem, folio, alExito, alError }: Props) 
       await Promise.all([
         clienteQuery.invalidateQueries({ queryKey: ["workitem", folio] }),
         clienteQuery.invalidateQueries({ queryKey: ["acciones", idWorkItem] }),
-        clienteQuery.invalidateQueries({ queryKey: ["bandeja"] }),
+        invalidarVistasDeTrabajo(clienteQuery),
       ]);
     } catch (error) {
       if (error instanceof ErrorApi) {

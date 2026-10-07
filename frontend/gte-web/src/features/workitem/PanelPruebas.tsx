@@ -13,7 +13,7 @@ import { ErrorApi } from "../../shared/api/http";
 import { ComboBuscable } from "../../shared/components/ComboBuscable";
 import { EditorEnriquecido } from "../../shared/editor/EditorEnriquecido";
 import { subirArchivoRevision } from "../../shared/api/archivos";
-import { obtenerCatalogosBandeja } from "../../shared/api/workitems";
+import { obtenerCatalogosBandeja, invalidarVistasDeTrabajo } from "../../shared/api/workitems";
 import {
   RESULTADOS, asignarCasoExistente, crearCasoYAsignar, obtenerCasosAsignados,
   obtenerCasosDisponibles, registrarEjecucion, retirarAsignacion,
@@ -23,13 +23,15 @@ import {
 interface Props {
   idWorkItem: number;
   idProyecto: number;
+  /** Elemento congelado por un release Aprobado/Liberado: solo se consulta. */
+  soloLectura?: boolean;
   alExito: (mensaje: string) => void;
   alError: (mensaje: string) => void;
 }
 
 /** Pruebas: casos asignados a este WorkItem, del catalogo del proyecto o creados aqui mismo.
  * Una falla crea un hallazgo (ver pestana Revisiones) sobre este mismo item, no un ticket nuevo. */
-export function PanelPruebas({ idWorkItem, idProyecto, alExito, alError }: Props) {
+export function PanelPruebas({ idWorkItem, idProyecto, soloLectura = false, alExito, alError }: Props) {
   const [modalAsignar, setModalAsignar] = useState(false);
   const [idCasoAsignar, setIdCasoAsignar] = useState<number | "">("");
   const [modalNuevo, setModalNuevo] = useState(false);
@@ -67,7 +69,7 @@ export function PanelPruebas({ idWorkItem, idProyecto, alExito, alError }: Props
     clienteQuery.invalidateQueries({ queryKey: ["casos-asignados", idWorkItem] }),
     clienteQuery.invalidateQueries({ queryKey: ["casos-disponibles", idProyecto] }),
     clienteQuery.invalidateQueries({ queryKey: ["revisiones", idWorkItem] }),
-    clienteQuery.invalidateQueries({ queryKey: ["bandeja"] }),
+    invalidarVistasDeTrabajo(clienteQuery),
   ]);
 
   const manejarError = (error: unknown, respaldo: string) => {
@@ -165,12 +167,14 @@ export function PanelPruebas({ idWorkItem, idProyecto, alExito, alError }: Props
     <Box>
       <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", mb: 1 }}>
         <Typography variant="subtitle2">Pruebas</Typography>
-        <Stack direction="row" spacing={1}>
-          <Button size="small" onClick={() => setModalAsignar(true)}>Usar caso existente</Button>
-          <Button size="small" variant="contained" startIcon={<AddIcon />} onClick={() => setModalNuevo(true)}>
-            Nuevo caso
-          </Button>
-        </Stack>
+        {!soloLectura && (
+          <Stack direction="row" spacing={1}>
+            <Button size="small" onClick={() => setModalAsignar(true)}>Usar caso existente</Button>
+            <Button size="small" variant="contained" startIcon={<AddIcon />} onClick={() => setModalNuevo(true)}>
+              Nuevo caso
+            </Button>
+          </Stack>
+        )}
       </Stack>
 
       {casos.data?.length === 0 && (
@@ -197,6 +201,7 @@ export function PanelPruebas({ idWorkItem, idProyecto, alExito, alError }: Props
                     : <Typography variant="caption" color="text.secondary">sin ejecutar</Typography>}
                 </TableCell>
                 <TableCell align="right">
+                  {!soloLectura && (
                   <Stack direction="row" spacing={0.5} sx={{ justifyContent: "flex-end" }}>
                     <Tooltip title="Registrar resultado">
                       <IconButton size="small" onClick={() => abrirRegistrarResultado(caso)}>
@@ -209,6 +214,7 @@ export function PanelPruebas({ idWorkItem, idProyecto, alExito, alError }: Props
                       </IconButton>
                     </Tooltip>
                   </Stack>
+                  )}
                 </TableCell>
               </TableRow>
             );

@@ -1,8 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Alert, Box, Container, LinearProgress } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
 import { registrarManejadorSesionInvalida } from "../../shared/api/http";
-import { hayToken, obtenerSesion, useSesion } from "../../shared/api/sesion";
+import { hayToken, obtenerSesion, recuperarSesionDeOtraPestana, useSesion } from "../../shared/api/sesion";
 import { LoginPage } from "./LoginPage";
 
 /**
@@ -11,15 +11,27 @@ import { LoginPage } from "./LoginPage";
  */
 export function GuardiaSesion({ children }: { children: React.ReactNode }) {
   const { sesion, establecer } = useSesion();
+  // Pestana abierta con Ctrl+Click: nace sin token (sessionStorage es por pestana) y antes
+  // de mostrar el login se intenta recuperar la sesion de otra pestana o de la cookie.
+  const [recuperando, setRecuperando] = useState(() => !hayToken());
 
   useEffect(() => {
     registrarManejadorSesionInvalida(() => establecer(null));
   }, [establecer]);
 
+  useEffect(() => {
+    if (!recuperando) return;
+    let vigente = true;
+    void recuperarSesionDeOtraPestana().finally(() => {
+      if (vigente) setRecuperando(false);
+    });
+    return () => { vigente = false; };
+  }, [recuperando]);
+
   const consulta = useQuery({
     queryKey: ["sesion"],
     queryFn: obtenerSesion,
-    enabled: sesion === null && hayToken(),
+    enabled: sesion === null && !recuperando && hayToken(),
     retry: false,
   });
 
@@ -29,7 +41,7 @@ export function GuardiaSesion({ children }: { children: React.ReactNode }) {
     }
   }, [consulta.data, establecer]);
 
-  if (sesion === null && hayToken() && consulta.isLoading) {
+  if (sesion === null && (recuperando || (hayToken() && consulta.isLoading))) {
     return <Box sx={{ p: 4 }}><LinearProgress /></Box>;
   }
 

@@ -40,6 +40,9 @@ public class CambiarEstatusWorkItemHandler(
         var estado = await repositorio.ObtenerEstadoAsync(command.IdWorkItem, cancellationToken)
             ?? throw new NotFoundException("WorkItem", command.IdWorkItem);
 
+        // Cubre REVERTIR (que si no reabriria lo ya liberado) y MoverTarjeta, que entra por aqui
+        await CandadoRelease.ExigirNoCongeladoAsync(repositorio, command.IdWorkItem, cancellationToken);
+
         var usuarioActual = await proveedorUsuario.ObtenerAsync(cancellationToken);
 
         // RN-GTE-028/05: aprobar (TERMINAR) o rechazar (RECHAZAR_QA) la fase de pruebas

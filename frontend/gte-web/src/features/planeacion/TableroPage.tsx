@@ -13,7 +13,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
 import { ComboBuscable } from "../../shared/components/ComboBuscable";
 import { moverTarjeta, obtenerTablero, type ColumnaTablero } from "../../shared/api/planeacion";
-import { obtenerCatalogosBandeja, type BandejaItem } from "../../shared/api/workitems";
+import { invalidarVistasDeTrabajo, obtenerCatalogosBandeja, type BandejaItem } from "../../shared/api/workitems";
 import { useSesion } from "../../shared/api/sesion";
 import { NuevoItemModal } from "../trabajo/NuevoItemModal";
 
@@ -186,8 +186,7 @@ export function TableroPage() {
         mensaje: error instanceof ErrorApi ? error.message : "No se pudo mover la tarjeta.",
       });
     } finally {
-      await clienteQuery.invalidateQueries({ queryKey: ["tablero"] });
-      await clienteQuery.invalidateQueries({ queryKey: ["bandeja"] });
+      await invalidarVistasDeTrabajo(clienteQuery);
     }
   };
 

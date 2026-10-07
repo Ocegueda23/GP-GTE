@@ -54,12 +54,16 @@ public class ReleasesController(IMediator mediator) : ControllerBase
         return Ok(ApiResponse<ReleaseDetalleResponse>.Exito(resultado, $"El release paso a {resultado.Estatus}."));
     }
 
-    /// <summary>Lo que puede entrar al release: terminados del proyecto y sin release todavia.</summary>
+    /// <summary>
+    /// Lo que puede entrar al release: terminados sin release todavia, del proyecto del
+    /// release o del que se indique en idProyecto.
+    /// </summary>
     [HttpGet("releases/{id:int}/candidatos")]
     public async Task<ActionResult<ApiResponse<IReadOnlyList<CandidatoContenidoResponse>>>> ObtenerCandidatos(
-        int id, CancellationToken cancellationToken)
+        int id, [FromQuery] int? idProyecto, CancellationToken cancellationToken)
     {
-        var resultado = await mediator.Send(new ObtenerCandidatosContenidoQuery(id), cancellationToken);
+        var resultado = await mediator.Send(
+            new ObtenerCandidatosContenidoQuery(id, idProyecto), cancellationToken);
         return Ok(ApiResponse<IReadOnlyList<CandidatoContenidoResponse>>.Exito(resultado));
     }
 

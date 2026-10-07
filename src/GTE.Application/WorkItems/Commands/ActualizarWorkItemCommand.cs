@@ -39,6 +39,9 @@ public class ActualizarWorkItemHandler(
         var estado = await repositorio.ObtenerEstadoAsync(command.IdWorkItem, cancellationToken)
             ?? throw new NotFoundException("WorkItem", command.IdWorkItem);
 
+        // Va antes que RN-GTE-012: ni WI.ModificarTerminado abre un elemento ya liberado
+        await CandadoRelease.ExigirNoCongeladoAsync(repositorio, command.IdWorkItem, cancellationToken);
+
         // RN-GTE-012: item terminado solo con permiso
         if (estado.IdEstatus == EstatusWorkItem.Terminado)
         {

@@ -29,6 +29,12 @@ public class MiDiaResponse
     /// <summary>El unico item En Proceso del usuario (RN-GTE-008); null si no esta trabajando en nada.</summary>
     public MiDiaItemResponse? EnProceso { get; set; }
 
+    /// <summary>
+    /// Trabajo ya tomado que no esta En Proceso: En Pruebas, Correccion o Suspendido. Se
+    /// muestra junto al En Proceso y por eso NO se repite en Vencidas/ParaHoy/Proximas.
+    /// </summary>
+    public IReadOnlyList<MiDiaItemResponse> EnCurso { get; set; } = [];
+
     public IReadOnlyList<MiDiaItemResponse> Vencidas { get; set; } = [];
     public IReadOnlyList<MiDiaItemResponse> ParaHoy { get; set; } = [];
     public IReadOnlyList<MiDiaItemResponse> Proximas { get; set; } = [];

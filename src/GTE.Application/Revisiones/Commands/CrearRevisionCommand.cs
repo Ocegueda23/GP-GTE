@@ -3,6 +3,7 @@ using FluentValidation;
 using GTE.Application.DTOs.Request.Revisiones;
 using GTE.Application.DTOs.Responses.Revisiones;
 using GTE.Application.Interfaces;
+using GTE.Application.WorkItems;
 using GTE.Domain.Calidad;
 using GTE.Domain.Exceptions;
 using GTE.Domain.Archivos;
@@ -54,6 +55,10 @@ public class CrearRevisionHandler(
         {
             throw new BusinessException("No se pueden reportar hallazgos en un elemento cancelado o eliminado.");
         }
+
+        // Un S1/S2 sobre un terminado lo reabriria a Correccion: en un elemento ya liberado
+        // eso deshace lo que se entrego. El defecto se reporta como un elemento nuevo.
+        await CandadoRelease.ExigirNoCongeladoAsync(workItems, command.IdWorkItem, cancellationToken);
 
         var comentarios = sanitizador.Sanitizar(command.Datos.Comentarios);
         var textoSinEtiquetas = Regex.Replace(comentarios, "<[^>]*>", string.Empty).Trim();

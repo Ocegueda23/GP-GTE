@@ -81,8 +81,19 @@ export function registrarManejadorSesionInvalida(handler: () => void) {
 /** Un solo refresh en vuelo aunque varias peticiones truenen con 401 al mismo tiempo. */
 let refrescoEnCurso: Promise<string | null> | null = null;
 
-async function intentarRefrescar(): Promise<string | null> {
-  refrescoEnCurso ??= (async () => {
+/**
+ * Serializa el refresh entre PESTANAS, no solo dentro de una: el backend rota el refresh
+ * token y trata el reuso de uno ya rotado como robo (revoca todas las sesiones del
+ * usuario), asi que dos pestanas refrescando con la misma cookie al mismo tiempo sacaban
+ * al usuario de todas. navigator.locks solo existe en contexto seguro (HTTPS o
+ * localhost); sobre HTTP plano se refresca sin candado, como antes.
+ */
+function conCandadoEntrePestanas<T>(tarea: () => Promise<T>): Promise<T> {
+  return navigator.locks ? navigator.locks.request("gte.refresh", tarea) : tarea();
+}
+
+export async function intentarRefrescar(): Promise<string | null> {
+  refrescoEnCurso ??= conCandadoEntrePestanas(async () => {
     try {
       const { data } = await http.post<ApiResponse<{ token: string }>>("/api/v1/auth/refresh");
       if (!data.success || !data.response) return null;
@@ -93,7 +104,7 @@ async function intentarRefrescar(): Promise<string | null> {
     } finally {
       refrescoEnCurso = null;
     }
-  })();
+  });
   return refrescoEnCurso;
 }
 

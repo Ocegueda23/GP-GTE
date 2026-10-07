@@ -2,6 +2,7 @@ using FluentValidation;
 using GTE.Application.DTOs.Request.Revisiones;
 using GTE.Application.DTOs.Responses.Revisiones;
 using GTE.Application.Interfaces;
+using GTE.Application.WorkItems;
 using GTE.Domain.Exceptions;
 using GTE.Domain.Interfaces;
 using GTE.Domain.Revisiones;
@@ -56,6 +57,8 @@ public class CorregirRevisionHandler(
 
         var estadoItem = await workItems.ObtenerEstadoAsync(estado.IdWorkItem, cancellationToken)
             ?? throw new NotFoundException("WorkItem", estado.IdWorkItem);
+
+        await CandadoRelease.ExigirNoCongeladoAsync(workItems, estado.IdWorkItem, cancellationToken);
 
         if (command.Datos.Corregido && command.Datos.EsFalsoPositivo)
         {

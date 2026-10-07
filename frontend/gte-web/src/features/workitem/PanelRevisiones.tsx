@@ -13,7 +13,7 @@ import { EditorEnriquecido } from "../../shared/editor/EditorEnriquecido";
 import {
   descargarArchivoBlob, formatearTamano, obtenerArchivosRevision, subirArchivoRevision,
 } from "../../shared/api/archivos";
-import { obtenerCatalogosBandeja } from "../../shared/api/workitems";
+import { obtenerCatalogosBandeja, invalidarVistasDeTrabajo } from "../../shared/api/workitems";
 import {
   corregirRevision, crearRevision, obtenerRevisiones, type Revision,
 } from "../../shared/api/workitems";
@@ -21,6 +21,8 @@ import {
 interface Props {
   idWorkItem: number;
   folio: string;
+  /** Elemento congelado por un release Aprobado/Liberado: solo se consulta. */
+  soloLectura?: boolean;
   alExito: (mensaje: string) => void;
   alError: (mensaje: string) => void;
 }
@@ -32,7 +34,9 @@ function formatearFecha(iso: string | null): string {
 }
 
 /** Adjuntos de un hallazgo puntual: lista compacta + boton para agregar mas despues. */
-function AdjuntosRevision({ idRevision, alError }: { idRevision: number; alError: (mensaje: string) => void }) {
+function AdjuntosRevision({ idRevision, soloLectura, alError }: {
+  idRevision: number; soloLectura: boolean; alError: (mensaje: string) => void;
+}) {
   const inputRef = useRef<HTMLInputElement>(null);
   const clienteQuery = useQueryClient();
   const archivos = useQuery({
@@ -80,13 +84,15 @@ function AdjuntosRevision({ idRevision, alError }: { idRevision: number; alError
           evento.target.value = "";
           if (archivo) void subir(archivo);
         }} />
-      <Button size="small" onClick={() => inputRef.current?.click()}>+ Adjuntar</Button>
+      {!soloLectura && (
+        <Button size="small" onClick={() => inputRef.current?.click()}>+ Adjuntar</Button>
+      )}
     </Stack>
   );
 }
 
 /** Hallazgos de QA y code review: la severidad decide si bloquean el cierre (S1/S2) o solo quedan registrados. */
-export function PanelRevisiones({ idWorkItem, folio, alExito, alError }: Props) {
+export function PanelRevisiones({ idWorkItem, folio, soloLectura = false, alExito, alError }: Props) {
   const [modalNuevo, setModalNuevo] = useState(false);
   const [comentarios, setComentarios] = useState("");
   const [comentariosVacio, setComentariosVacio] = useState(true);
@@ -114,7 +120,7 @@ export function PanelRevisiones({ idWorkItem, folio, alExito, alError }: Props) 
     clienteQuery.invalidateQueries({ queryKey: ["revisiones", idWorkItem] }),
     clienteQuery.invalidateQueries({ queryKey: ["workitem", folio] }),
     clienteQuery.invalidateQueries({ queryKey: ["acciones", idWorkItem] }),
-    clienteQuery.invalidateQueries({ queryKey: ["bandeja"] }),
+    invalidarVistasDeTrabajo(clienteQuery),
   ]);
 
   const manejarError = (error: unknown, respaldo: string) => {
@@ -201,9 +207,11 @@ export function PanelRevisiones({ idWorkItem, folio, alExito, alError }: Props) 
     <Box>
       <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", mb: 1 }}>
         <Typography variant="subtitle2">Hallazgos de revision</Typography>
-        <Button size="small" variant="contained" onClick={() => { setModalNuevo(true); setIdSeveridad(""); setArchivosPendientes([]); }}>
-          Reportar hallazgo
-        </Button>
+        {!soloLectura && (
+          <Button size="small" variant="contained" onClick={() => { setModalNuevo(true); setIdSeveridad(""); setArchivosPendientes([]); }}>
+            Reportar hallazgo
+          </Button>
+        )}
       </Stack>
 
       {pendientesBloqueantes > 0 && (
@@ -250,13 +258,14 @@ export function PanelRevisiones({ idWorkItem, folio, alExito, alError }: Props) 
                       Razon del descarte: {revision.motivoDescarte}
                     </Typography>
                   )}
-                  <AdjuntosRevision idRevision={revision.idRevision} alError={alError} />
+                  <AdjuntosRevision idRevision={revision.idRevision} soloLectura={soloLectura}
+                    alError={alError} />
                 </Stack>
               }
               secondary={`${revision.revisor} - reportado ${formatearFecha(revision.fechaRegistro)}`
                 + (revision.corregido ? ` - corregido ${formatearFecha(revision.fechaCorreccion)}` : "")}
             />
-            {revision.corregido ? (
+            {soloLectura ? null : revision.corregido ? (
               <Button size="small" color="warning" sx={{ flexShrink: 0 }}
                 onClick={() => setReabrir(revision)}>
                 Reabrir

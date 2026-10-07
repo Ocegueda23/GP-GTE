@@ -1,3 +1,4 @@
+import type { QueryClient } from "@tanstack/react-query";
 import { enviar, obtener, type ResultadoPaginado } from "./http";
 import type { Ticket } from "./tickets";
 import type { Incidente } from "./incidentes";
@@ -122,6 +123,21 @@ export async function obtenerAcciones(idWorkItem: number) {
   return obtener<AccionDisponible[]>(`/api/v1/workitems/${idWorkItem}/acciones`);
 }
 
+/**
+ * Invalida TODAS las vistas que listan work items (bandeja, tablero y Mi dia). Cada pantalla
+ * invalidaba solo la suya y, con el staleTime global de 30 s, las demas seguian mostrando
+ * la cache vieja al volver a ellas: cambiar un estatus desde el detalle no se veia en el
+ * tablero ni en Mi dia hasta un F5. Usarlo en todo lo que cambie estatus, asignado,
+ * fechas o tiempo de un work item.
+ */
+export function invalidarVistasDeTrabajo(clienteQuery: QueryClient) {
+  return Promise.all([
+    clienteQuery.invalidateQueries({ queryKey: ["bandeja"] }),
+    clienteQuery.invalidateQueries({ queryKey: ["tablero"] }),
+    clienteQuery.invalidateQueries({ queryKey: ["mi-dia"] }),
+  ]);
+}
+
 export async function cambiarEstatus(idWorkItem: number, accion: string, motivo?: string) {
   return enviar<EstatusCambiado>("put", `/api/v1/workitems/${idWorkItem}/estatus`, {
     accion,
@@ -194,6 +210,11 @@ export interface WorkItemDetalle {
   fechaRegistro: string;
   esVencida: boolean;
   revisionesPendientes: number;
+  /** Release al que pertenece (folio o version); nulo si no esta en ninguno. */
+  idRelease: number | null;
+  release: string | null;
+  /** El release ya esta Aprobado o Liberado: el elemento es de solo lectura. */
+  congeladoPorRelease: boolean;
   /** Tarea padre si este elemento es una subtarea; nulo si es de primer nivel. */
   idPadre: number | null;
   folioPadre: string | null;
@@ -296,6 +317,8 @@ export interface MiDia {
   usuario: string;
   fecha: string;
   enProceso: MiDiaItem | null;
+  /** En Pruebas, Correccion o Suspendido; no se repiten en vencidas/paraHoy/proximas. */
+  enCurso: MiDiaItem[];
   vencidas: MiDiaItem[];
   paraHoy: MiDiaItem[];
   proximas: MiDiaItem[];

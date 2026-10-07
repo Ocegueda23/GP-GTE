@@ -43,7 +43,8 @@ public class ArchivoRepository(FabricaContexto fabrica, AuditContext auditoria)
         await RegistrarBitacoraAsync(datos.Entidad, datos.IdEntidad, "ADJUNTAR", datos.NombreArchivo, cancellationToken);
 
         return new EstadoArchivoVinculo(
-            vinculo.IdArchivoVinculo, archivo.IdArchivo, archivo.GuidArchivo, vinculo.UsuarioRegistro, vinculo.Activo);
+            vinculo.IdArchivoVinculo, archivo.IdArchivo, archivo.GuidArchivo, vinculo.UsuarioRegistro, vinculo.Activo,
+            vinculo.Entidad, vinculo.IdEntidad);
     }
 
     public async Task CrearBorradorAsync(ArchivoBorrador datos, CancellationToken cancellationToken = default)
@@ -123,7 +124,8 @@ public class ArchivoRepository(FabricaContexto fabrica, AuditContext auditoria)
         return await contexto.TblArchivoVinculo.AsNoTracking()
             .Where(v => v.IdArchivoVinculo == idArchivoVinculo)
             .Select(v => new EstadoArchivoVinculo(
-                v.IdArchivoVinculo, v.IdArchivo, v.IdArchivoNavigation.GuidArchivo, v.UsuarioRegistro, v.Activo))
+                v.IdArchivoVinculo, v.IdArchivo, v.IdArchivoNavigation.GuidArchivo, v.UsuarioRegistro, v.Activo,
+                v.Entidad, v.IdEntidad))
             .FirstOrDefaultAsync(cancellationToken);
     }
 

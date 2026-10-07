@@ -17,7 +17,9 @@ public record EstadoArchivoVinculo(
     int IdArchivo,
     Guid GuidArchivo,
     string UsuarioRegistro,
-    bool Activo);
+    bool Activo,
+    string Entidad,
+    int IdEntidad);
 
 /// <summary>Metadatos minimos para servir una descarga por streaming.</summary>
 public record ArchivoDescarga(Guid GuidArchivo, string NombreArchivo, string? Extension);

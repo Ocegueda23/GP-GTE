@@ -277,3 +277,27 @@ public class ObtenerGanttActividadesHandler(IReportesQueryService consultas, IVe
             query.AgruparPor, query.Page, query.PageSize, cancellationToken);
     }
 }
+
+// ---------- R17 Trabajo pendiente ----------
+
+/// <summary>
+/// Foto del trabajo abierto (work items, tickets e incidentes) al momento de correrlo: no
+/// tiene periodo. <paramref name="IncluirSuspendidos"/> deja fuera los work items en
+/// Suspendido cuando se quiere ver solo lo que esta en flujo.
+/// </summary>
+public record ObtenerTrabajoPendienteQuery(
+    int? IdEquipo, int? IdAsignado, int? IdProyecto, int? IdTipoWorkItem, string? Folio,
+    bool IncluirSuspendidos) : IRequest<TrabajoPendienteReporteResponse>;
+
+public class ObtenerTrabajoPendienteHandler(IReportesQueryService consultas, IVerificadorPermisos permisos)
+    : IRequestHandler<ObtenerTrabajoPendienteQuery, TrabajoPendienteReporteResponse>
+{
+    public async Task<TrabajoPendienteReporteResponse> Handle(
+        ObtenerTrabajoPendienteQuery query, CancellationToken cancellationToken)
+    {
+        await permisos.ExigirPermisoAsync(PermisosReportes.Ver, null, cancellationToken);
+        return await consultas.ObtenerTrabajoPendienteAsync(
+            query.IdEquipo, query.IdAsignado, query.IdProyecto, query.IdTipoWorkItem, query.Folio,
+            query.IncluirSuspendidos, cancellationToken);
+    }
+}

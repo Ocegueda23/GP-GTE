@@ -1,6 +1,7 @@
 using FluentValidation;
 using GTE.Application.DTOs.Responses.Archivos;
 using GTE.Application.Interfaces;
+using GTE.Application.WorkItems;
 using GTE.Domain.Archivos;
 using GTE.Domain.Exceptions;
 using GTE.Domain.Interfaces;
@@ -32,6 +33,7 @@ public class SubirArchivoRevisionHandler(
     IArchivoRepository repositorio,
     IArchivoQueryService consultas,
     IRevisionRepository revisiones,
+    IWorkItemRepository workItems,
     IAlmacenArchivos almacen) : IRequestHandler<SubirArchivoRevisionCommand, ArchivoResponse>
 {
     public async Task<ArchivoResponse> Handle(SubirArchivoRevisionCommand command, CancellationToken cancellationToken)
@@ -43,6 +45,8 @@ public class SubirArchivoRevisionHandler(
         {
             throw new BusinessException("No se pueden adjuntar archivos a un hallazgo eliminado.");
         }
+
+        await CandadoRelease.ExigirNoCongeladoAsync(workItems, estado.IdWorkItem, cancellationToken);
 
         var guardado = await almacen.GuardarAsync(command.Contenido, command.NombreArchivo, cancellationToken);
 

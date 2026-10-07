@@ -1209,6 +1209,247 @@ public class ReportesQueryService(FabricaContexto fabrica, ICalendarioLaboral ca
         };
     }
 
+    /// <summary>
+    /// R17: foto del trabajo abierto. No tiene periodo: entra todo lo que hoy sigue sin
+    /// terminar, sin importar cuando se creo. Las secciones de tickets e incidentes siguen las
+    /// mismas reglas de filtro que R15 (un filtro que la entidad no puede honrar vacia la
+    /// seccion con aviso, en vez de devolver algo que no lo respeta).
+    /// </summary>
+    public async Task<TrabajoPendienteReporteResponse> ObtenerTrabajoPendienteAsync(
+        int? idEquipo, int? idAsignado, int? idProyecto, int? idTipoWorkItem, string? folio,
+        bool incluirSuspendidos, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
+        var corte = DateTime.Now;
+        var folioFiltro = string.IsNullOrWhiteSpace(folio) ? null : folio.Trim();
+
+        // TRAMPA EF: mismo patron que R15 -- entidades sin proyectar, filtro y orden por
+        // columnas reales, proyeccion al final.
+        var consulta =
+            from w in contexto.TblWorkItem.AsNoTracking()
+            join v in contexto.VwBandejaTrabajo.AsNoTracking() on w.IdWorkItem equals v.IdWorkItem
+            where w.Activo
+                && w.IdEstatusWorkItem != EstatusWorkItem.Terminado
+                && w.IdEstatusWorkItem != EstatusWorkItem.Cancelado
+                && (incluirSuspendidos || w.IdEstatusWorkItem != EstatusWorkItem.Suspendido)
+                && (idEquipo == null || w.IdEquipo == idEquipo)
+                && (idAsignado == null || w.IdAsignado == idAsignado)
+                && (idProyecto == null || w.IdProyecto == idProyecto)
+                && (idTipoWorkItem == null || w.IdTipoWorkItem == idTipoWorkItem)
+                && (folioFiltro == null || w.Folio.Contains(folioFiltro))
+            // Lo vencido primero, luego por compromiso (sin compromiso al final) y prioridad
+            // (1 = Critica en el seed de tblPrioridad).
+            orderby v.EsVencida descending,
+                w.FechaCompromiso == null,
+                w.FechaCompromiso,
+                w.IdPrioridad,
+                w.IdWorkItem
+            select new
+            {
+                w.IdWorkItem, w.Folio, w.Titulo, w.Descripcion, w.IdEstatusWorkItem,
+                Tipo = w.IdTipoWorkItemNavigation.Nombre,
+                Proyecto = w.IdProyectoNavigation.Nombre,
+                Equipo = w.IdEquipoNavigation != null ? w.IdEquipoNavigation.Nombre : null,
+                Asignado = w.IdAsignadoNavigation != null ? w.IdAsignadoNavigation.Nombre : null,
+                Prioridad = w.IdPrioridadNavigation.Nombre,
+                v.Estatus,
+                Sprint = v.FolioSprint,
+                w.MinutosPresupuesto,
+                MinutosInvertidos = v.MinutosInvertidos ?? 0,
+                EsVencida = v.EsVencida ?? false,
+                RevisionesPendientes = v.RevisionesPendientes ?? 0,
+                w.FechaRegistro, w.FechaInicio, w.FechaCompromiso,
+            };
+
+        var crudos = await consulta.Take(TopeRenglonesDetalle + 1).ToListAsync(cancellationToken);
+        var truncado = crudos.Count > TopeRenglonesDetalle;
+        if (truncado)
+        {
+            crudos = crudos.Take(TopeRenglonesDetalle).ToList();
+        }
+
+        var items = crudos.Select(c => new WorkItemPendienteResponse
+        {
+            IdWorkItem = c.IdWorkItem,
+            Folio = c.Folio,
+            Tipo = c.Tipo,
+            Titulo = c.Titulo,
+            Descripcion = c.Descripcion,
+            Proyecto = c.Proyecto,
+            Equipo = c.Equipo,
+            Asignado = c.Asignado,
+            Prioridad = c.Prioridad,
+            IdEstatusWorkItem = c.IdEstatusWorkItem,
+            Estatus = c.Estatus,
+            Sprint = c.Sprint,
+            MinutosPresupuesto = c.MinutosPresupuesto,
+            MinutosInvertidos = c.MinutosInvertidos,
+            FechaCreacion = c.FechaRegistro,
+            FechaInicio = c.FechaInicio,
+            FechaCompromiso = c.FechaCompromiso,
+            DiasAbierto = DiasNaturales(c.FechaRegistro, corte)!.Value,
+            EsVencida = c.EsVencida,
+            RevisionesPendientes = c.RevisionesPendientes,
+        }).ToList();
+
+        var totales = new WorkItemsPendientesTotalesResponse
+        {
+            Items = items.Count,
+            Vencidos = items.Count(i => i.EsVencida),
+            SinAsignar = items.Count(i => i.Asignado == null),
+            Suspendidos = items.Count(i => i.IdEstatusWorkItem == EstatusWorkItem.Suspendido),
+            MinutosInvertidos = items.Sum(i => i.MinutosInvertidos),
+        };
+
+        var (tickets, totalesTickets, avisosTickets) = await ObtenerTicketsPendientesAsync(
+            contexto, corte, idEquipo, idAsignado, idProyecto, folioFiltro, cancellationToken);
+
+        var (incidentes, totalesIncidentes, avisosIncidentes) = await ObtenerIncidentesPendientesAsync(
+            contexto, corte, idEquipo, idAsignado, idProyecto, folioFiltro, cancellationToken);
+
+        return new TrabajoPendienteReporteResponse
+        {
+            FechaCorte = corte, Items = items, Totales = totales, Truncado = truncado,
+            Tickets = tickets, TotalesTickets = totalesTickets, AvisosTickets = avisosTickets,
+            Incidentes = incidentes, TotalesIncidentes = totalesIncidentes, AvisosIncidentes = avisosIncidentes,
+        };
+    }
+
+    /// <summary>R17, seccion Tickets: todo lo que no esta Resuelto ni Cerrado.</summary>
+    private static async Task<(IReadOnlyList<TicketPendienteResponse>, TicketsPendientesTotalesResponse, IReadOnlyList<string>)>
+        ObtenerTicketsPendientesAsync(
+            DbContextGTE contexto, DateTime corte,
+            int? idEquipo, int? idAsignado, int? idProyecto, string? folio,
+            CancellationToken cancellationToken)
+    {
+        var avisos = new List<string>();
+        if (idEquipo != null) avisos.Add("Los tickets no se asignan a un equipo, por eso esta seccion queda vacia al filtrar por equipo.");
+        if (idProyecto != null) avisos.Add("Los tickets no pertenecen a un proyecto, por eso esta seccion queda vacia al filtrar por proyecto.");
+
+        if (avisos.Count > 0)
+        {
+            return ([], new TicketsPendientesTotalesResponse(), avisos);
+        }
+
+        var reloj = RelojEstatus(contexto, "Ticket", EstatusTicket.EnAtencion);
+
+        var crudos = await (
+            from t in contexto.TblTicket.AsNoTracking()
+            join r in reloj on t.IdTicket equals r.IdRegistro into relojes
+            from r in relojes.DefaultIfEmpty()
+            where t.Activo
+                && t.IdEstatusTicket != EstatusTicket.Resuelto && t.IdEstatusTicket != EstatusTicket.Cerrado
+                && (idAsignado == null || t.IdAsignado == idAsignado)
+                && (folio == null || (t.Folio != null && t.Folio.Contains(folio)))
+            orderby t.FechaLimiteResolucion == null, t.FechaLimiteResolucion, t.IdPrioridad, t.IdTicket
+            select new
+            {
+                t.IdTicket, t.Folio, t.Titulo, t.Descripcion,
+                Categoria = t.IdCategoriaTicketNavigation != null ? t.IdCategoriaTicketNavigation.Nombre : null,
+                Prioridad = t.IdPrioridadNavigation.Nombre,
+                Estatus = t.IdEstatusTicketNavigation.Descripcion,
+                Solicitante = t.IdSolicitanteNavigation.Nombre,
+                Asignado = t.IdAsignadoNavigation != null ? t.IdAsignadoNavigation.Nombre : null,
+                MinutosEnAtencion = r.Minutos ?? 0,
+                t.FechaRegistro, t.FechaPrimeraRespuesta, t.FechaLimiteResolucion,
+            })
+            .Take(TopeRenglonesDetalle)
+            .ToListAsync(cancellationToken);
+
+        var items = crudos.Select(c => new TicketPendienteResponse
+        {
+            IdTicket = c.IdTicket,
+            Folio = c.Folio,
+            Categoria = c.Categoria,
+            Titulo = c.Titulo,
+            Descripcion = c.Descripcion,
+            Prioridad = c.Prioridad,
+            Estatus = c.Estatus,
+            Solicitante = c.Solicitante,
+            Asignado = c.Asignado,
+            MinutosEnAtencion = c.MinutosEnAtencion,
+            FechaCreacion = c.FechaRegistro,
+            FechaPrimeraRespuesta = c.FechaPrimeraRespuesta,
+            FechaLimiteResolucion = c.FechaLimiteResolucion,
+            DiasAbierto = DiasNaturales(c.FechaRegistro, corte)!.Value,
+            SlaVencido = c.FechaLimiteResolucion == null ? null : c.FechaLimiteResolucion < corte,
+        }).ToList();
+
+        var totales = new TicketsPendientesTotalesResponse
+        {
+            Items = items.Count,
+            SinAsignar = items.Count(i => i.Asignado == null),
+            SlaVencido = items.Count(i => i.SlaVencido == true),
+        };
+
+        return (items, totales, avisos);
+    }
+
+    /// <summary>R17, seccion Incidentes: todo lo que no esta Resuelto ni Cerrado.</summary>
+    private static async Task<(IReadOnlyList<IncidentePendienteResponse>, IncidentesPendientesTotalesResponse, IReadOnlyList<string>)>
+        ObtenerIncidentesPendientesAsync(
+            DbContextGTE contexto, DateTime corte,
+            int? idEquipo, int? idAsignado, int? idProyecto, string? folio,
+            CancellationToken cancellationToken)
+    {
+        var avisos = new List<string>();
+        if (idEquipo != null) avisos.Add("Los incidentes no se asignan a un equipo, por eso esta seccion queda vacia al filtrar por equipo.");
+        if (idAsignado != null) avisos.Add("Los incidentes no tienen persona asignada, por eso esta seccion queda vacia al filtrar por asignado.");
+
+        if (avisos.Count > 0)
+        {
+            return ([], new IncidentesPendientesTotalesResponse(), avisos);
+        }
+
+        var reloj = RelojEstatus(contexto, "Incidente", EstatusIncidente.EnAtencion);
+
+        var crudos = await (
+            from i in contexto.TblIncidente.AsNoTracking()
+            join r in reloj on i.IdIncidente equals r.IdRegistro into relojes
+            from r in relojes.DefaultIfEmpty()
+            where i.Activo
+                && i.IdEstatusIncidente != EstatusIncidente.Resuelto && i.IdEstatusIncidente != EstatusIncidente.Cerrado
+                && (idProyecto == null || i.IdProyecto == idProyecto)
+                && (folio == null || (i.Folio != null && i.Folio.Contains(folio)))
+            orderby i.IdSeveridad, i.FechaOcurrencia, i.IdIncidente
+            select new
+            {
+                i.IdIncidente, i.Folio, i.Titulo, i.Descripcion,
+                Severidad = i.IdSeveridadNavigation.Nombre,
+                Proyecto = i.IdProyectoNavigation.Nombre,
+                Estatus = i.IdEstatusIncidenteNavigation.Descripcion,
+                MinutosEnAtencion = r.Minutos ?? 0,
+                i.MinutosIndisponibilidad,
+                i.FechaOcurrencia, i.FechaDeteccion,
+            })
+            .Take(TopeRenglonesDetalle)
+            .ToListAsync(cancellationToken);
+
+        var items = crudos.Select(c => new IncidentePendienteResponse
+        {
+            IdIncidente = c.IdIncidente,
+            Folio = c.Folio,
+            Severidad = c.Severidad,
+            Titulo = c.Titulo,
+            Descripcion = c.Descripcion,
+            Proyecto = c.Proyecto,
+            Estatus = c.Estatus,
+            MinutosEnAtencion = c.MinutosEnAtencion,
+            MinutosIndisponibilidad = c.MinutosIndisponibilidad,
+            FechaOcurrencia = c.FechaOcurrencia,
+            FechaDeteccion = c.FechaDeteccion,
+            DiasAbierto = DiasNaturales(c.FechaOcurrencia, corte)!.Value,
+        }).ToList();
+
+        var totales = new IncidentesPendientesTotalesResponse
+        {
+            Items = items.Count,
+            MinutosIndisponibilidad = items.Sum(i => i.MinutosIndisponibilidad ?? 0),
+        };
+
+        return (items, totales, avisos);
+    }
+
     /// <summary>Tope de renglones del detalle: evita que un rango abierto tumbe la pagina y el Excel.</summary>
     private const int TopeRenglonesDetalle = 5000;
 

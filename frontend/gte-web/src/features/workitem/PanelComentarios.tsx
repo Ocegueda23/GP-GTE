@@ -16,6 +16,8 @@ import { EditorComentario } from "./EditorComentario";
 /** Exactamente uno de los dos: WorkItem o Ticket son las unicas entidades con comentarios hoy. */
 type Props = {
   alError: (mensaje: string) => void;
+  /** WorkItem congelado por un release Aprobado/Liberado: el hilo solo se lee. */
+  soloLectura?: boolean;
 } & ({ idWorkItem: number; idTicket?: undefined } | { idWorkItem?: undefined; idTicket: number });
 
 function formatearFecha(iso: string): string {
@@ -25,7 +27,7 @@ function formatearFecha(iso: string): string {
 }
 
 /** Franja fija bajo el detalle (no una pestana mas), como lo dibuja el mockup del Documento Maestro. */
-export function PanelComentarios({ idWorkItem, idTicket, alError }: Props) {
+export function PanelComentarios({ idWorkItem, idTicket, alError, soloLectura = false }: Props) {
   const [respondiendoA, setRespondiendoA] = useState<number | null>(null);
   const dominioActual = useSesion((estado) => estado.sesion?.dominio);
   const clienteQuery = useQueryClient();
@@ -101,12 +103,12 @@ export function PanelComentarios({ idWorkItem, idTicket, alError }: Props) {
             </Box>
           </Box>
           <Stack direction="row" spacing={0.5} sx={{ flexShrink: 0 }}>
-            {!esRespuesta && (
+            {!esRespuesta && !soloLectura && (
               <IconButton size="small" onClick={() => setRespondiendoA(comentario.idComentario)}>
                 <ReplyIcon fontSize="small" />
               </IconButton>
             )}
-            {esAutor && (
+            {esAutor && !soloLectura && (
               <IconButton size="small" onClick={() => void borrar(comentario.idComentario)}>
                 <DeleteOutlineOutlinedIcon fontSize="small" />
               </IconButton>
@@ -150,15 +152,17 @@ export function PanelComentarios({ idWorkItem, idTicket, alError }: Props) {
         </Box>
       ))}
 
-      <Box sx={{ mt: 2 }}>
-        <EditorComentario
-          idWorkItemParaAdjuntos={idWorkItem}
-          usuarios={usuarios}
-          enviando={false}
-          onEnviar={(html) => void publicar(html)}
-          onError={(mensaje) => alError(mensaje)}
-        />
-      </Box>
+      {!soloLectura && (
+        <Box sx={{ mt: 2 }}>
+          <EditorComentario
+            idWorkItemParaAdjuntos={idWorkItem}
+            usuarios={usuarios}
+            enviando={false}
+            onEnviar={(html) => void publicar(html)}
+            onError={(mensaje) => alError(mensaje)}
+          />
+        </Box>
+      )}
     </Box>
   );
 }

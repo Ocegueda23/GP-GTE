@@ -8,7 +8,7 @@ import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
 import {
-  cambiarEstatus, formatearMinutos, obtenerMiDia, type MiDiaItem,
+  cambiarEstatus, colorEstatus, formatearMinutos, invalidarVistasDeTrabajo, obtenerMiDia, type MiDiaItem,
 } from "../../shared/api/workitems";
 import { colorEstatusTicket, type Ticket } from "../../shared/api/tickets";
 import { colorEstatusIncidente, colorSeveridad, type Incidente } from "../../shared/api/incidentes";
@@ -179,10 +179,7 @@ export function MiDiaPage() {
 
   const miDia = useQuery({ queryKey: ["mi-dia"], queryFn: obtenerMiDia });
 
-  const refrescar = () => Promise.all([
-    clienteQuery.invalidateQueries({ queryKey: ["mi-dia"] }),
-    clienteQuery.invalidateQueries({ queryKey: ["bandeja"] }),
-  ]);
+  const refrescar = () => invalidarVistasDeTrabajo(clienteQuery);
 
   // La accion viene del motor (INICIAR o REANUDAR segun el estatus): el front no la deduce.
   const iniciar = async (item: MiDiaItem) => {
@@ -265,7 +262,42 @@ export function MiDiaPage() {
             No tienes ningun elemento en proceso. Inicia uno de la lista para empezar a medir tiempo.
           </Typography>
         )}
+        {datos.enCurso.length > 0 && (
+          <List dense disablePadding sx={{ mt: 1.5, pt: 1, borderTop: 1, borderColor: "divider" }}>
+            {datos.enCurso.map((item) => (
+              <ListItem key={item.idWorkItem} disableGutters sx={{ gap: 1 }}>
+                <ListItemText
+                  sx={{ flex: 1, minWidth: 0 }}
+                  primary={
+                    <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                      <Link component={RouterLink} to={`/wi/${item.folio}`} underline="hover"
+                        sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>
+                        {item.folio}
+                      </Link>
+                      <Chip size="small" label={item.estatus} color={colorEstatus(item.idEstatus)} sx={{ height: 18 }} />
+                      {item.esVencida && <Chip size="small" color="error" label="Vencida" sx={{ height: 18 }} />}
+                      <Typography variant="body2" noWrap>{item.titulo}</Typography>
+                    </Stack>
+                  }
+                  secondary={`${item.claveProyecto} - vence ${formatearFecha(item.fechaCompromiso)} - ${item.prioridad}`}
+                />
+                {item.accionInicio && (
+                  <Button size="small" startIcon={<PlayArrowIcon />}
+                    sx={{ flexShrink: 0 }} onClick={() => iniciar(item)}>
+                    {item.etiquetaAccionInicio ?? "Iniciar"}
+                  </Button>
+                )}
+              </ListItem>
+            ))}
+          </List>
+        )}
       </Paper>
+
+      {datos.ticketsAsignados.length > 0 && (
+        <Stack direction={{ xs: "column", lg: "row" }} spacing={2} sx={{ mb: 2 }}>
+          <TarjetaTickets items={datos.ticketsAsignados} />
+        </Stack>
+      )}
 
       {(datos.incidentesRelevantes.length > 0 || datos.solicitudesPendientes.length > 0
         || datos.releasesRelevantes.length > 0) && (
@@ -292,12 +324,6 @@ export function MiDiaPage() {
             ? "Hay 1 solicitud esperando revision de triage."
             : `Hay ${datos.triagePendientes} solicitudes esperando revision de triage.`}
         </Alert>
-      )}
-
-      {datos.ticketsAsignados.length > 0 && (
-        <Stack direction={{ xs: "column", lg: "row" }} spacing={2} sx={{ mt: 2 }}>
-          <TarjetaTickets items={datos.ticketsAsignados} />
-        </Stack>
       )}
 
       {modalTiempo && (

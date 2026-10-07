@@ -102,4 +102,10 @@ public class DespliegueRegistrarRequest
     public bool EsRollback { get; set; }
     public string? Bitacora { get; set; }
     public bool Exitoso { get; set; } = true;
+
+    /// <summary>
+    /// Cuando se ejecuto el despliegue: suele registrarse despues de hacerlo. Nulo toma la
+    /// hora actual del servidor.
+    /// </summary>
+    public DateTime? FechaDespliegue { get; set; }
 }

@@ -14,6 +14,8 @@ import { useSesion } from "../../shared/api/sesion";
 
 interface Props {
   idWorkItem: number;
+  /** Elemento congelado por un release Aprobado/Liberado: solo se descarga. */
+  soloLectura?: boolean;
   alExito: (mensaje: string) => void;
   alError: (mensaje: string) => void;
 }
@@ -22,7 +24,7 @@ function formatearFecha(iso: string): string {
   return new Date(iso).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-export function PanelAdjuntos({ idWorkItem, alExito, alError }: Props) {
+export function PanelAdjuntos({ idWorkItem, soloLectura = false, alExito, alError }: Props) {
   const [subiendo, setSubiendo] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dominioActual = useSesion((estado) => estado.sesion?.dominio);
@@ -78,9 +80,11 @@ export function PanelAdjuntos({ idWorkItem, alExito, alError }: Props) {
     <Box>
       <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", mb: 1 }}>
         <Typography variant="subtitle2">Adjuntos</Typography>
-        <Button size="small" variant="contained" disabled={subiendo} onClick={() => inputRef.current?.click()}>
-          Adjuntar archivo
-        </Button>
+        {!soloLectura && (
+          <Button size="small" variant="contained" disabled={subiendo} onClick={() => inputRef.current?.click()}>
+            Adjuntar archivo
+          </Button>
+        )}
         <input
           ref={inputRef} type="file" hidden
           onChange={(evento) => {
@@ -120,7 +124,7 @@ export function PanelAdjuntos({ idWorkItem, alExito, alError }: Props) {
               <IconButton size="small" onClick={() => void descargar(archivo.guidArchivo, archivo.nombreArchivo)}>
                 <DownloadIcon fontSize="small" />
               </IconButton>
-              {esAutor && (
+              {esAutor && !soloLectura && (
                 <IconButton size="small" onClick={() => void eliminar(archivo.idArchivoVinculo)}>
                   <DeleteOutlineOutlinedIcon fontSize="small" />
                 </IconButton>
