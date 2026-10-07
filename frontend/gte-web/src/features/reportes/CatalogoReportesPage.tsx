@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from "react";
 import {
-  Alert, Box, Button, Chip, LinearProgress, List, ListItemButton, ListItemText,
-  Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  Alert, Box, Button, Chip, FormControlLabel, LinearProgress, List, ListItemButton, ListItemText,
+  Paper, Stack, Switch, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   TextField, Tooltip, Typography,
 } from "@mui/material";
 import DownloadIcon from "@mui/icons-material/Download";
@@ -26,7 +26,9 @@ import {
   obtenerReporteAuditoria, obtenerReporteActividadesTerminadas,
   type TicketTerminado, type TicketsTerminadosTotales,
   type IncidenteTerminado, type IncidentesTerminadosTotales,
-  obtenerReporteGanttActividades,
+  obtenerReporteGanttActividades, obtenerReporteTrabajoPendiente,
+  type TicketPendiente, type TicketsPendientesTotales,
+  type IncidentePendiente, type IncidentesPendientesTotales,
   type AgrupacionGantt, type FiltroGanttActividades,
 } from "../../shared/api/reportes";
 import { DiagramaGantt, LeyendaGantt } from "./DiagramaGantt";
@@ -34,7 +36,7 @@ import { DiagramaGantt, LeyendaGantt } from "./DiagramaGantt";
 type ClaveReporte =
   | "productividad" | "horas" | "retrabajo" | "bugs" | "releases" | "riesgos"
   | "solicitantes" | "costos" | "rentabilidad" | "sla" | "kpis" | "carga" | "flujo" | "auditoria"
-  | "actividadesTerminadas" | "gantt";
+  | "actividadesTerminadas" | "gantt" | "trabajoPendiente";
 
 /** Permiso 1:1 con el ExigirPermisoAsync de cada handler en GTE.Application.Reportes.Queries. */
 const REPORTES: { clave: ClaveReporte; titulo: string; permiso: string }[] = [
@@ -54,6 +56,7 @@ const REPORTES: { clave: ClaveReporte; titulo: string; permiso: string }[] = [
   { clave: "auditoria", titulo: "R14 - Auditoria", permiso: "RPT.Auditoria" },
   { clave: "actividadesTerminadas", titulo: "R15 - Actividades terminadas", permiso: "RPT.Ver" },
   { clave: "gantt", titulo: "R16 - Gantt de actividades", permiso: "RPT.Ver" },
+  { clave: "trabajoPendiente", titulo: "R17 - Trabajo pendiente", permiso: "RPT.Ver" },
 ];
 
 function primerDiaMes(): string {
@@ -1082,6 +1085,293 @@ function SeccionIncidentes({ incidentes, totales, avisos }: {
   );
 }
 
+/**
+ * R17: foto del trabajo abierto al momento de abrirlo -- work items sin terminar ni cancelar,
+ * y tickets/incidentes sin resolver ni cerrar. No lleva fechas: lo pendiente es pendiente sin
+ * importar cuando se creo.
+ */
+function ReporteTrabajoPendiente() {
+  const [idEquipo, setIdEquipo] = useState<number | "">("");
+  const [idAsignado, setIdAsignado] = useState<number | "">("");
+  const [idProyecto, setIdProyecto] = useState<number | "">("");
+  const [idTipo, setIdTipo] = useState<number | "">("");
+  const [folio, setFolio] = useState("");
+  const [incluirSuspendidos, setIncluirSuspendidos] = useState(true);
+  const [pagina, setPagina] = useState(0);
+  const [expandido, setExpandido] = useState<number | null>(null);
+
+  const { opcionesProyecto, opcionesEquipo } = useProyectosEquipos();
+  const catalogos = useQuery({ queryKey: ["catalogos-bandeja"], queryFn: obtenerCatalogosBandeja, staleTime: 5 * 60_000 });
+  const opcionesUsuario = useMemo(
+    () => [{ valor: "", etiqueta: "Todos" }, ...(catalogos.data?.usuarios ?? []).map((u) => ({ valor: u.id, etiqueta: u.nombre }))],
+    [catalogos.data],
+  );
+  const opcionesTipo = useMemo(
+    () => [{ valor: "", etiqueta: "Todos" }, ...(catalogos.data?.tipos ?? []).map((t) => ({ valor: t.id, etiqueta: t.nombre }))],
+    [catalogos.data],
+  );
+
+  const filtro = {
+    idEquipo: idEquipo === "" ? null : idEquipo,
+    idAsignado: idAsignado === "" ? null : idAsignado,
+    idProyecto: idProyecto === "" ? null : idProyecto,
+    idTipoWorkItem: idTipo === "" ? null : idTipo,
+    folio: folio.trim() === "" ? null : folio.trim(),
+    incluirSuspendidos: incluirSuspendidos ? "true" as const : "false" as const,
+  };
+
+  const consulta = useQuery({
+    queryKey: ["reporte-trabajo-pendiente", filtro],
+    queryFn: () => obtenerReporteTrabajoPendiente(filtro),
+  });
+
+  const items = consulta.data?.items ?? [];
+  const totales = consulta.data?.totales;
+  const visibles = items.slice(pagina * FILAS_POR_PAGINA, (pagina + 1) * FILAS_POR_PAGINA);
+
+  return (
+    <Stack spacing={2}>
+      <Stack direction="row" spacing={1.5} sx={{ flexWrap: "wrap", alignItems: "center", gap: 1 }}>
+        <ComboBuscable label="Equipo" value={idEquipo} onChange={(v) => { setIdEquipo(v as number | ""); setPagina(0); }}
+          sx={{ minWidth: 180 }} opciones={opcionesEquipo} />
+        <ComboBuscable label="Asignado" value={idAsignado} onChange={(v) => { setIdAsignado(v as number | ""); setPagina(0); }}
+          sx={{ minWidth: 200 }} opciones={opcionesUsuario} />
+        <ComboBuscable label="Proyecto" value={idProyecto} onChange={(v) => { setIdProyecto(v as number | ""); setPagina(0); }}
+          sx={{ minWidth: 200 }} opciones={opcionesProyecto} />
+        <ComboBuscable label="Tipo" value={idTipo} onChange={(v) => { setIdTipo(v as number | ""); setPagina(0); }}
+          sx={{ minWidth: 160 }} opciones={opcionesTipo} />
+        <TextField size="small" label="Folio" value={folio} sx={{ width: 150 }}
+          onChange={(e) => { setFolio(e.target.value); setPagina(0); }} />
+        <FormControlLabel label="Incluir suspendidos"
+          control={<Switch size="small" checked={incluirSuspendidos}
+            onChange={(e) => { setIncluirSuspendidos(e.target.checked); setPagina(0); }} />} />
+        <BotonExportar ruta="trabajo-pendiente" filtro={filtro} nombreArchivo="TrabajoPendiente.xlsx" />
+      </Stack>
+
+      {consulta.isLoading && <LinearProgress />}
+      {consulta.isError && <Alert severity="error">No se pudo cargar el reporte.</Alert>}
+      {consulta.data?.truncado && (
+        <Alert severity="warning">
+          Hay mas de {TOPE_RENGLONES.toLocaleString()} actividades pendientes y la lista viene recortada.
+          Filtra por equipo, proyecto o asignado para ver el detalle completo.
+        </Alert>
+      )}
+
+      {totales && consulta.data && (
+        <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
+          <Chip size="small" label={`Corte: ${new Date(consulta.data.fechaCorte).toLocaleString()}`} />
+          <Chip size="small" label={`Actividades: ${totales.items}`} />
+          <Chip size="small" color={totales.vencidos > 0 ? "error" : "default"} label={`Vencidas: ${totales.vencidos}`} />
+          <Chip size="small" color={totales.sinAsignar > 0 ? "warning" : "default"} label={`Sin asignar: ${totales.sinAsignar}`} />
+          {incluirSuspendidos && <Chip size="small" label={`Suspendidas: ${totales.suspendidos}`} />}
+          <Chip size="small" label={`En proceso: ${formatearMinutos(totales.minutosInvertidos)}`} />
+        </Stack>
+      )}
+
+      {consulta.data && (
+        <TableContainer component={Paper} variant="outlined">
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Folio</TableCell>
+                <TableCell>Tipo</TableCell>
+                <TableCell>Titulo</TableCell>
+                <TableCell>Estatus</TableCell>
+                <TableCell>Prioridad</TableCell>
+                <TableCell>Asignado</TableCell>
+                <TableCell>Proyecto</TableCell>
+                <TableCell>Sprint</TableCell>
+                <Tooltip title="Tiempo habil que la tarea lleva en estatus En Proceso">
+                  <TableCell align="right">En proceso</TableCell>
+                </Tooltip>
+                <TableCell>Compromiso</TableCell>
+                <TableCell align="right">Dias abierto</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {visibles.map((a) => (
+                <Fragment key={a.idWorkItem}>
+                  <TableRow hover sx={{ cursor: "pointer" }}
+                    onClick={() => setExpandido(expandido === a.idWorkItem ? null : a.idWorkItem)}>
+                    <TableCell>{a.folio}</TableCell>
+                    <TableCell>{a.tipo}</TableCell>
+                    <TableCell sx={{ maxWidth: 320 }}>{a.titulo}</TableCell>
+                    <TableCell>{a.estatus}</TableCell>
+                    <TableCell>{a.prioridad}</TableCell>
+                    <TableCell sx={{ color: a.asignado ? undefined : "warning.main" }}>{a.asignado ?? "Sin asignar"}</TableCell>
+                    <TableCell>{a.proyecto}</TableCell>
+                    <TableCell>{a.sprint ?? "-"}</TableCell>
+                    <TableCell align="right">{formatearMinutos(a.minutosInvertidos)}</TableCell>
+                    <TableCell sx={{ color: a.esVencida ? "error.main" : undefined, fontWeight: a.esVencida ? 700 : undefined }}>
+                      {a.fechaCompromiso ? new Date(a.fechaCompromiso).toLocaleDateString() : "-"}
+                    </TableCell>
+                    <TableCell align="right">{a.diasAbierto}</TableCell>
+                  </TableRow>
+                  {expandido === a.idWorkItem && (
+                    <TableRow>
+                      <TableCell colSpan={11} sx={{ bgcolor: "action.hover" }}>
+                        <Stack spacing={0.5}>
+                          <Typography variant="body2">
+                            <b>Equipo:</b> {a.equipo ?? "-"} &nbsp;·&nbsp; <b>Presupuesto:</b> {formatearMinutos(a.minutosPresupuesto)}
+                            &nbsp;·&nbsp; <b>Revisiones pendientes:</b> {a.revisionesPendientes}
+                          </Typography>
+                          <Typography variant="body2">
+                            <b>Creada:</b> {new Date(a.fechaCreacion).toLocaleString()} &nbsp;·&nbsp; <b>Inicio:</b>{" "}
+                            {a.fechaInicio ? new Date(a.fechaInicio).toLocaleString() : "Sin iniciar"}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "pre-wrap" }}>
+                            {a.descripcion ? htmlATextoPlano(a.descripcion) : "Sin descripcion."}
+                          </Typography>
+                        </Stack>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </Fragment>
+              ))}
+              {items.length === 0 && (
+                <TableRow><TableCell colSpan={11}>
+                  <Typography color="text.secondary">Sin actividades pendientes con esos filtros.</Typography>
+                </TableCell></TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+
+      {items.length > FILAS_POR_PAGINA && (
+        <Stack direction="row" spacing={1}>
+          <Button size="small" disabled={pagina === 0} onClick={() => setPagina((p) => p - 1)}>Anterior</Button>
+          <Typography variant="body2" sx={{ alignSelf: "center" }}>
+            Pagina {pagina + 1} de {Math.ceil(items.length / FILAS_POR_PAGINA)}
+          </Typography>
+          <Button size="small" disabled={(pagina + 1) * FILAS_POR_PAGINA >= items.length}
+            onClick={() => setPagina((p) => p + 1)}>Siguiente</Button>
+        </Stack>
+      )}
+
+      {consulta.data && (
+        <SeccionTicketsPendientes tickets={consulta.data.tickets} totales={consulta.data.totalesTickets}
+          avisos={consulta.data.avisosTickets} />
+      )}
+      {consulta.data && (
+        <SeccionIncidentesPendientes incidentes={consulta.data.incidentes} totales={consulta.data.totalesIncidentes}
+          avisos={consulta.data.avisosIncidentes} />
+      )}
+    </Stack>
+  );
+}
+
+function SeccionTicketsPendientes({ tickets, totales, avisos }: {
+  tickets: TicketPendiente[]; totales: TicketsPendientesTotales; avisos: string[];
+}) {
+  return (
+    <>
+      <TituloSeccion texto="Tickets abiertos" avisos={avisos}
+        chips={[
+          `Tickets: ${totales.items}`,
+          `Sin asignar: ${totales.sinAsignar}`,
+          `SLA vencido: ${totales.slaVencido}`,
+        ]} />
+      {avisos.length === 0 && (
+        <TableContainer component={Paper} variant="outlined">
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Folio</TableCell>
+                <TableCell>Categoria</TableCell>
+                <TableCell>Titulo</TableCell>
+                <TableCell>Estatus</TableCell>
+                <TableCell>Prioridad</TableCell>
+                <TableCell>Solicitante</TableCell>
+                <TableCell>Asignado</TableCell>
+                <TableCell align="right">En atencion</TableCell>
+                <TableCell>Limite SLA</TableCell>
+                <TableCell align="right">Dias abierto</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {tickets.map((t) => (
+                <TableRow key={t.idTicket} hover>
+                  <TableCell>{t.folio ?? "-"}</TableCell>
+                  <TableCell>{t.categoria ?? "-"}</TableCell>
+                  <TableCell sx={{ maxWidth: 320 }}>{t.titulo}</TableCell>
+                  <TableCell>{t.estatus}</TableCell>
+                  <TableCell>{t.prioridad}</TableCell>
+                  <TableCell>{t.solicitante}</TableCell>
+                  <TableCell sx={{ color: t.asignado ? undefined : "warning.main" }}>{t.asignado ?? "Sin asignar"}</TableCell>
+                  <TableCell align="right">{formatearMinutos(t.minutosEnAtencion)}</TableCell>
+                  <TableCell sx={{ color: t.slaVencido ? "error.main" : undefined, fontWeight: t.slaVencido ? 700 : undefined }}>
+                    {t.fechaLimiteResolucion ? new Date(t.fechaLimiteResolucion).toLocaleString() : "-"}
+                  </TableCell>
+                  <TableCell align="right">{t.diasAbierto}</TableCell>
+                </TableRow>
+              ))}
+              {tickets.length === 0 && (
+                <TableRow><TableCell colSpan={10}>
+                  <Typography color="text.secondary">Sin tickets abiertos con esos filtros.</Typography>
+                </TableCell></TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+    </>
+  );
+}
+
+function SeccionIncidentesPendientes({ incidentes, totales, avisos }: {
+  incidentes: IncidentePendiente[]; totales: IncidentesPendientesTotales; avisos: string[];
+}) {
+  return (
+    <>
+      <TituloSeccion texto="Incidentes abiertos" avisos={avisos}
+        chips={[
+          `Incidentes: ${totales.items}`,
+          `Indisponibilidad: ${formatearMinutos(totales.minutosIndisponibilidad)}`,
+        ]} />
+      {avisos.length === 0 && (
+        <TableContainer component={Paper} variant="outlined">
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Folio</TableCell>
+                <TableCell>Severidad</TableCell>
+                <TableCell>Titulo</TableCell>
+                <TableCell>Proyecto</TableCell>
+                <TableCell>Estatus</TableCell>
+                <TableCell align="right">En atencion</TableCell>
+                <TableCell align="right">Indisponible</TableCell>
+                <TableCell>Ocurrencia</TableCell>
+                <TableCell align="right">Dias abierto</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {incidentes.map((i) => (
+                <TableRow key={i.idIncidente} hover>
+                  <TableCell>{i.folio ?? "-"}</TableCell>
+                  <TableCell>{i.severidad}</TableCell>
+                  <TableCell sx={{ maxWidth: 320 }}>{i.titulo}</TableCell>
+                  <TableCell>{i.proyecto}</TableCell>
+                  <TableCell>{i.estatus}</TableCell>
+                  <TableCell align="right">{formatearMinutos(i.minutosEnAtencion)}</TableCell>
+                  <TableCell align="right">{formatearMinutos(i.minutosIndisponibilidad)}</TableCell>
+                  <TableCell>{new Date(i.fechaOcurrencia).toLocaleDateString()}</TableCell>
+                  <TableCell align="right">{i.diasAbierto}</TableCell>
+                </TableRow>
+              ))}
+              {incidentes.length === 0 && (
+                <TableRow><TableCell colSpan={9}>
+                  <Typography color="text.secondary">Sin incidentes abiertos con esos filtros.</Typography>
+                </TableCell></TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+    </>
+  );
+}
+
 const FILAS_POR_PAGINA = 50;
 
 /** Espejo de ReportesQueryService.TopeRenglonesDetalle: solo para el texto de la alerta. */
@@ -1320,6 +1610,7 @@ export function CatalogoReportesPage() {
         {reporteActivo === "auditoria" && <ReporteAuditoria />}
         {reporteActivo === "actividadesTerminadas" && <ReporteActividadesTerminadas />}
         {reporteActivo === "gantt" && <ReporteGantt />}
+        {reporteActivo === "trabajoPendiente" && <ReporteTrabajoPendiente />}
       </Box>
     </Box>
   );

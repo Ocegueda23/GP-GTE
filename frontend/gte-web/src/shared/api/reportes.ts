@@ -486,6 +486,113 @@ export async function obtenerReporteActividadesTerminadas(filtro: FiltroActivida
     "/api/v1/reportes/actividades-terminadas", armarParams({ ...filtro }));
 }
 
+// ---------- R17 Trabajo pendiente ----------
+export interface WorkItemPendiente {
+  idWorkItem: number;
+  folio: string;
+  tipo: string;
+  titulo: string;
+  descripcion: string | null;
+  proyecto: string;
+  equipo: string | null;
+  asignado: string | null;
+  prioridad: string;
+  idEstatusWorkItem: number;
+  estatus: string;
+  sprint: string | null;
+  minutosPresupuesto: number | null;
+  minutosInvertidos: number;
+  fechaCreacion: string;
+  fechaInicio: string | null;
+  fechaCompromiso: string | null;
+  diasAbierto: number;
+  esVencida: boolean;
+  revisionesPendientes: number;
+}
+
+export interface WorkItemsPendientesTotales {
+  items: number;
+  vencidos: number;
+  sinAsignar: number;
+  suspendidos: number;
+  minutosInvertidos: number;
+}
+
+export interface TicketPendiente {
+  idTicket: number;
+  folio: string | null;
+  categoria: string | null;
+  titulo: string;
+  descripcion: string | null;
+  prioridad: string;
+  estatus: string;
+  solicitante: string;
+  asignado: string | null;
+  minutosEnAtencion: number;
+  fechaCreacion: string;
+  fechaPrimeraRespuesta: string | null;
+  fechaLimiteResolucion: string | null;
+  diasAbierto: number;
+  /** null si el ticket no trae SLA. */
+  slaVencido: boolean | null;
+}
+
+export interface TicketsPendientesTotales {
+  items: number;
+  sinAsignar: number;
+  slaVencido: number;
+}
+
+export interface IncidentePendiente {
+  idIncidente: number;
+  folio: string | null;
+  severidad: string;
+  titulo: string;
+  descripcion: string | null;
+  proyecto: string;
+  estatus: string;
+  minutosEnAtencion: number;
+  minutosIndisponibilidad: number | null;
+  fechaOcurrencia: string;
+  fechaDeteccion: string | null;
+  diasAbierto: number;
+}
+
+export interface IncidentesPendientesTotales {
+  items: number;
+  minutosIndisponibilidad: number;
+}
+
+export interface TrabajoPendienteReporte {
+  /** Momento de la foto: el reporte no tiene periodo. */
+  fechaCorte: string;
+  items: WorkItemPendiente[];
+  totales: WorkItemsPendientesTotales;
+  truncado: boolean;
+  tickets: TicketPendiente[];
+  totalesTickets: TicketsPendientesTotales;
+  incidentes: IncidentePendiente[];
+  totalesIncidentes: IncidentesPendientesTotales;
+  /** Filtros que esa sección no puede honrar (mismo criterio que R15). */
+  avisosTickets: string[];
+  avisosIncidentes: string[];
+}
+
+export interface FiltroTrabajoPendiente {
+  idEquipo: number | null;
+  idAsignado: number | null;
+  idProyecto: number | null;
+  idTipoWorkItem: number | null;
+  folio: string | null;
+  /** Va como texto porque armarParams solo serializa string/number. */
+  incluirSuspendidos: "true" | "false";
+}
+
+export async function obtenerReporteTrabajoPendiente(filtro: FiltroTrabajoPendiente) {
+  return obtener<TrabajoPendienteReporte>(
+    "/api/v1/reportes/trabajo-pendiente", armarParams({ ...filtro }));
+}
+
 // ---------- R16 Gantt de actividades ----------
 /** Espejo de GTE.Domain.Reportes.AgrupacionGantt (el back lo enlaza por nombre). */
 export type AgrupacionGantt = "Ninguno" | "Proyecto" | "Usuario";
