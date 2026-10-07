@@ -54,6 +54,12 @@ public record EstadoWorkItem(
     int IdCategoriaProyecto,
     int? IdSprint);
 
+/// <summary>
+/// Release Aprobado o Liberado que contiene al elemento: mientras exista, el elemento
+/// queda congelado (ver CandadoRelease). Release es el folio o, sin folio, la version.
+/// </summary>
+public record ReleaseCongelado(int IdRelease, string Release, bool Liberado);
+
 /// <summary>Resumen de proyecto para reglas y folios.</summary>
 public record ProyectoResumen(
     int IdProyecto, string Clave, bool EsMantenimiento, bool Activo, int IdEstatusProyecto,

@@ -7,7 +7,7 @@ import { ErrorApi } from "../../shared/api/http";
 import { ComboBuscable } from "../../shared/components/ComboBuscable";
 import { EditorEnriquecido } from "../../shared/editor/EditorEnriquecido";
 import { useSesion } from "../../shared/api/sesion";
-import { crearWorkItem, filtrarComplejidades, type CatalogosBandeja } from "../../shared/api/workitems";
+import { crearWorkItem, filtrarComplejidades, type CatalogosBandeja, invalidarVistasDeTrabajo } from "../../shared/api/workitems";
 import { obtenerSprints } from "../../shared/api/planeacion";
 import { useEsMovil } from "../../shared/hooks/useEsMovil";
 import { PresupuestoComplejidad } from "../workitem/PresupuestoComplejidad";
@@ -128,7 +128,7 @@ export function NuevoItemModal({ abierto, catalogos, alCerrar, alExito, alError,
       alExito(`${mensaje} (${dato.folio})`);
       limpiar();
       alCerrar();
-      await clienteQuery.invalidateQueries({ queryKey: ["bandeja"] });
+      await invalidarVistasDeTrabajo(clienteQuery);
       if (padre) {
         await clienteQuery.invalidateQueries({ queryKey: ["hijos", padre.idWorkItem] });
       }

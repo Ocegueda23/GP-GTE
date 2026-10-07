@@ -1,6 +1,7 @@
 using GTE.Application.Common;
 using GTE.Application.DTOs.Responses.WorkItems;
 using GTE.Application.Interfaces;
+using GTE.Domain.Entregas;
 using GTE.Domain.WorkItems;
 using GTE.Infrastructure.Modelos.bdsGTE;
 using GTE.Infrastructure.Persistence;
@@ -277,8 +278,15 @@ public class WorkItemQueryService(FabricaContexto fabrica) : IWorkItemQueryServi
                join p in contexto.TblWorkItem.AsNoTracking() on w.IdPadre equals p.IdWorkItem into padres
                from p in padres.DefaultIfEmpty()
                join proy in contexto.TblProyecto.AsNoTracking() on w.IdProyecto equals proy.IdProyecto
+               join rel in contexto.TblRelease.AsNoTracking() on w.IdRelease equals rel.IdRelease into releases
+               from rel in releases.DefaultIfEmpty()
                select new WorkItemResponse
                {
+                   IdRelease = w.IdRelease,
+                   Release = rel != null ? (rel.Folio ?? rel.Version) : null,
+                   CongeladoPorRelease = rel != null
+                       && (rel.IdEstatusRelease == EstatusRelease.Aprobado
+                           || rel.IdEstatusRelease == EstatusRelease.Liberado),
                    IdPadre = w.IdPadre,
                    FolioPadre = p != null ? p.Folio : null,
                    TituloPadre = p != null ? p.Titulo : null,

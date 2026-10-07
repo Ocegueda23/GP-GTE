@@ -3,6 +3,7 @@ using FluentValidation;
 using GTE.Application.DTOs.Request.Comentarios;
 using GTE.Application.DTOs.Responses.Comentarios;
 using GTE.Application.Interfaces;
+using GTE.Application.WorkItems;
 using GTE.Domain.Comentarios;
 using GTE.Domain.Exceptions;
 using GTE.Domain.Interfaces;
@@ -43,6 +44,8 @@ public class CrearComentarioHandler(
         {
             throw new BusinessException("No se puede comentar un elemento eliminado.");
         }
+
+        await CandadoRelease.ExigirNoCongeladoAsync(workItems, command.IdWorkItem, cancellationToken);
 
         if (command.Datos.IdComentarioPadre.HasValue)
         {

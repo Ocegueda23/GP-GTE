@@ -198,18 +198,21 @@ public class EntregaQueryService(FabricaContexto fabrica) : IEntregaQueryService
     }
 
     public async Task<IReadOnlyList<CandidatoContenidoResponse>> ObtenerCandidatosContenidoAsync(
-        int idRelease, CancellationToken cancellationToken = default)
+        int idRelease, int? idProyecto = null, CancellationToken cancellationToken = default)
     {
         await using var contexto = fabrica.ConectarContexto<DbContextGTE>();
 
-        var idProyecto = await contexto.TblRelease.AsNoTracking()
+        var idProyectoRelease = await contexto.TblRelease.AsNoTracking()
             .Where(r => r.IdRelease == idRelease)
             .Select(r => r.IdProyecto)
             .FirstOrDefaultAsync(cancellationToken);
-        if (idProyecto == 0)
+        if (idProyectoRelease == 0)
         {
             throw new NotFoundException("Release", idRelease);
         }
+
+        // Sin proyecto indicado se ofrece el del release; con uno, el de otro proyecto
+        var idProyectoBuscar = idProyecto ?? idProyectoRelease;
 
         // IdRelease == null deja fuera lo que ya esta en otro release (y lo que ya esta en
         // este): un WorkItem pertenece a un solo release a la vez. El orden es por folio,
@@ -219,7 +222,7 @@ public class EntregaQueryService(FabricaContexto fabrica) : IEntregaQueryService
             join t in contexto.TblTipoWorkItem.AsNoTracking() on w.IdTipoWorkItem equals t.Id
             join s in contexto.TblSprint.AsNoTracking() on w.IdSprint equals s.IdSprint into sprints
             from s in sprints.DefaultIfEmpty()
-            where w.IdProyecto == idProyecto && w.Activo
+            where w.IdProyecto == idProyectoBuscar && w.Activo
                   && w.IdEstatusWorkItem == EstatusWorkItem.Terminado
                   && w.IdRelease == null
             orderby w.Folio

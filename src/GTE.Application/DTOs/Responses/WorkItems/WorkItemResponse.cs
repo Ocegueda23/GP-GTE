@@ -38,6 +38,14 @@ public class WorkItemResponse
     public int RevisionesPendientes { get; set; }
 
     /// <summary>
+    /// Release al que pertenece (folio o, sin folio, version) y si ese release ya esta
+    /// Aprobado o Liberado: en ese caso el elemento es de solo lectura (CandadoRelease).
+    /// </summary>
+    public int? IdRelease { get; set; }
+    public string? Release { get; set; }
+    public bool CongeladoPorRelease { get; set; }
+
+    /// <summary>
     /// Tarea padre cuando este elemento es una subtarea; nulo si es de primer nivel.
     /// El folio y el titulo vienen resueltos para que la pantalla pinte el enlace sin
     /// tener que pedir el detalle del padre aparte.

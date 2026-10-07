@@ -18,7 +18,7 @@ import {
   asignarLiderSprint, asignarSprint, cambiarEstatusSprint, editarSprint, obtenerBacklog,
   obtenerCapacidad, obtenerItemsSprint, obtenerSprint, reordenarBacklog,
 } from "../../shared/api/planeacion";
-import { obtenerCatalogosBandeja, type BandejaItem } from "../../shared/api/workitems";
+import { obtenerCatalogosBandeja, type BandejaItem, invalidarVistasDeTrabajo } from "../../shared/api/workitems";
 import { obtenerCoberturaReleaseSprint, enviarSprintARelease } from "../../shared/api/entregas";
 import { formatearFecha } from "../entregas/formato";
 import { FilaItemBacklog } from "./FilaItemBacklog";
@@ -99,7 +99,7 @@ export function DetalleSprintPage() {
     clienteQuery.invalidateQueries({ queryKey: ["backlog-global"] }),
     clienteQuery.invalidateQueries({ queryKey: ["items-sprint"] }),
     clienteQuery.invalidateQueries({ queryKey: ["capacidad"] }),
-    clienteQuery.invalidateQueries({ queryKey: ["bandeja"] }),
+    invalidarVistasDeTrabajo(clienteQuery),
     clienteQuery.invalidateQueries({ queryKey: ["tablero"] }),
     clienteQuery.invalidateQueries({ queryKey: ["cobertura-release"] }),
     clienteQuery.invalidateQueries({ queryKey: ["releases"] }),

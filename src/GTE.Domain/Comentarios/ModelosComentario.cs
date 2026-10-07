@@ -4,4 +4,5 @@ namespace GTE.Domain.Comentarios;
 public record ComentarioNuevo(string Entidad, int IdEntidad, string Contenido, int? IdComentarioPadre);
 
 /// <summary>Estado minimo para validar autoria antes de una baja.</summary>
-public record EstadoComentario(int IdComentario, string UsuarioRegistro, bool Activo);
+public record EstadoComentario(
+    int IdComentario, string UsuarioRegistro, bool Activo, string Entidad, int IdEntidad);

@@ -260,6 +260,8 @@ export async function registrarDespliegue(idRelease: number, datos: {
   idAmbiente: number;
   esRollback: boolean;
   bitacora: string | null;
+  /** Fecha y hora local "YYYY-MM-DDTHH:mm" en que se ejecuto; nula toma la del servidor. */
+  fechaDespliegue: string | null;
 }) {
   return enviar<ReleaseDetalle>("post", `/api/v1/releases/${idRelease}/despliegues`, {
     ...datos,
@@ -321,8 +323,11 @@ export interface CandidatoContenido {
 /**
  * Lo que puede entrar al release, ya ordenado por folio y sin lo que pertenece a otro
  * release. Reemplaza el uso de la bandeja general, que no sabia nada de releases y por eso
- * ofrecia elementos ya entregados en otra version.
+ * ofrecia elementos ya entregados en otra version. Sin idProyecto trae los del proyecto del
+ * release; con uno, los de ese otro proyecto.
  */
-export async function obtenerCandidatosContenido(idRelease: number) {
-  return obtener<CandidatoContenido[]>(`/api/v1/releases/${idRelease}/candidatos`);
+export async function obtenerCandidatosContenido(idRelease: number, idProyecto?: number) {
+  const params = new URLSearchParams();
+  if (idProyecto !== undefined) params.set("idProyecto", String(idProyecto));
+  return obtener<CandidatoContenido[]>(`/api/v1/releases/${idRelease}/candidatos`, params);
 }

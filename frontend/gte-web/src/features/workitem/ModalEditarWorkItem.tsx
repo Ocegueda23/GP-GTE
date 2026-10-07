@@ -7,7 +7,7 @@ import { ErrorApi } from "../../shared/api/http";
 import { ComboBuscable } from "../../shared/components/ComboBuscable";
 import { EditorEnriquecido } from "../../shared/editor/EditorEnriquecido";
 import {
-  actualizarWorkItem, filtrarComplejidades, type CatalogosBandeja, type WorkItemDetalle,
+  actualizarWorkItem, filtrarComplejidades, invalidarVistasDeTrabajo, type CatalogosBandeja, type WorkItemDetalle,
 } from "../../shared/api/workitems";
 import { obtenerSprints } from "../../shared/api/planeacion";
 import { useEsMovil } from "../../shared/hooks/useEsMovil";
@@ -89,7 +89,7 @@ export function ModalEditarWorkItem({ abierto, item, catalogos, alCerrar, alExit
       await Promise.all([
         clienteQuery.invalidateQueries({ queryKey: ["workitem", item.folio] }),
         clienteQuery.invalidateQueries({ queryKey: ["acciones", item.idWorkItem] }),
-        clienteQuery.invalidateQueries({ queryKey: ["bandeja"] }),
+        invalidarVistasDeTrabajo(clienteQuery),
       ]);
     } catch (error) {
       alError(error instanceof ErrorApi ? error.message : "No se pudo guardar el elemento.");

@@ -28,7 +28,7 @@ public interface IEntregaRepository
     Task AplicarEfectosTransicionAsync(int idRelease, string accion, CancellationToken cancellationToken = default);
 
     /// <summary>Marca la fecha de liberacion al desplegar a produccion.</summary>
-    Task MarcarLiberadoAsync(int idRelease, CancellationToken cancellationToken = default);
+    Task MarcarLiberadoAsync(int idRelease, DateTime fechaLiberacion, CancellationToken cancellationToken = default);
 
     /* Contenido */
 

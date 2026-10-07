@@ -23,6 +23,12 @@ public class ObtenerAccionesWorkItemHandler(
         var estado = await repositorio.ObtenerEstadoAsync(query.IdWorkItem, cancellationToken)
             ?? throw new NotFoundException("WorkItem", query.IdWorkItem);
 
+        // Congelado por un release Aprobado/Liberado: ninguna transicion pasaria (CandadoRelease)
+        if (await repositorio.ObtenerReleaseCongeladoAsync(query.IdWorkItem, cancellationToken) is not null)
+        {
+            return [];
+        }
+
         var acciones = await motor.ObtenerAccionesAsync("WorkItem", query.IdWorkItem, cancellationToken);
 
         var resultado = new List<AccionDisponibleResponse>();

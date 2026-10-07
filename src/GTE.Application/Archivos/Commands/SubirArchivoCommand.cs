@@ -1,6 +1,7 @@
 using FluentValidation;
 using GTE.Application.DTOs.Responses.Archivos;
 using GTE.Application.Interfaces;
+using GTE.Application.WorkItems;
 using GTE.Domain.Archivos;
 using GTE.Domain.Exceptions;
 using GTE.Domain.Interfaces;
@@ -43,6 +44,8 @@ public class SubirArchivoHandler(
         {
             throw new BusinessException("No se pueden adjuntar archivos a un elemento eliminado.");
         }
+
+        await CandadoRelease.ExigirNoCongeladoAsync(workItems, command.IdWorkItem, cancellationToken);
 
         var guardado = await almacen.GuardarAsync(command.Contenido, command.NombreArchivo, cancellationToken);
 

@@ -36,7 +36,8 @@ public class ComentarioRepository(FabricaContexto fabrica, AuditContext auditori
         await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
         return await contexto.TblComentario.AsNoTracking()
             .Where(c => c.IdComentario == idComentario)
-            .Select(c => new EstadoComentario(c.IdComentario, c.UsuarioRegistro, c.Activo))
+            .Select(c => new EstadoComentario(
+                c.IdComentario, c.UsuarioRegistro, c.Activo, c.Entidad, c.IdEntidad))
             .FirstOrDefaultAsync(cancellationToken);
     }
 

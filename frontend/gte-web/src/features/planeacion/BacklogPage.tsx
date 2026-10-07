@@ -10,7 +10,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
 import { ComboBuscable } from "../../shared/components/ComboBuscable";
 import { obtenerBacklog, obtenerBacklogGlobal, reordenarBacklog } from "../../shared/api/planeacion";
-import { obtenerCatalogosBandeja } from "../../shared/api/workitems";
+import { obtenerCatalogosBandeja, invalidarVistasDeTrabajo } from "../../shared/api/workitems";
 import { FilaItemBacklog } from "./FilaItemBacklog";
 
 /**
@@ -50,7 +50,7 @@ export function BacklogPage() {
   const refrescar = () => Promise.all([
     clienteQuery.invalidateQueries({ queryKey: ["backlog"] }),
     clienteQuery.invalidateQueries({ queryKey: ["backlog-global"] }),
-    clienteQuery.invalidateQueries({ queryKey: ["bandeja"] }),
+    invalidarVistasDeTrabajo(clienteQuery),
   ]);
 
   const manejar = async (accion: () => Promise<{ mensaje: string }>, respaldo: string) => {

@@ -37,7 +37,7 @@ public class ObtenerReleaseHandler(IEntregaQueryService consultas)
 }
 
 /// <summary>Elementos que pueden entrar al release, para el selector de "Agregar contenido".</summary>
-public record ObtenerCandidatosContenidoQuery(int IdRelease)
+public record ObtenerCandidatosContenidoQuery(int IdRelease, int? IdProyecto = null)
     : IRequest<IReadOnlyList<CandidatoContenidoResponse>>;
 
 public class ObtenerCandidatosContenidoHandler(IEntregaQueryService consultas)
@@ -46,7 +46,8 @@ public class ObtenerCandidatosContenidoHandler(IEntregaQueryService consultas)
     public async Task<IReadOnlyList<CandidatoContenidoResponse>> Handle(
         ObtenerCandidatosContenidoQuery query, CancellationToken cancellationToken)
     {
-        return await consultas.ObtenerCandidatosContenidoAsync(query.IdRelease, cancellationToken);
+        return await consultas.ObtenerCandidatosContenidoAsync(
+            query.IdRelease, query.IdProyecto, cancellationToken);
     }
 }
 

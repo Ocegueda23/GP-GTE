@@ -23,9 +23,11 @@ public interface IEntregaQueryService
     /// release asignado todavia, ordenados por folio. Deja fuera lo que ya esta en otro
     /// release (o en este) porque un WorkItem pertenece a un solo release a la vez, y trae
     /// el conteo de hallazgos para avisar en la interfaz de lo que RN-GTE-031 va a rechazar.
+    /// Con idProyecto se buscan en otro proyecto, para releases que entregan trabajo de
+    /// varios proyectos a la vez.
     /// </summary>
     Task<IReadOnlyList<CandidatoContenidoResponse>> ObtenerCandidatosContenidoAsync(
-        int idRelease, CancellationToken cancellationToken = default);
+        int idRelease, int? idProyecto = null, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<MatrizAmbienteResponse>> ObtenerMatrizAmbientesAsync(
         CancellationToken cancellationToken = default);

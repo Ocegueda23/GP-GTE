@@ -9,7 +9,7 @@ import { ErrorApi } from "../../shared/api/http";
 import { useEsMovil } from "../../shared/hooks/useEsMovil";
 import { useSesion } from "../../shared/api/sesion";
 import {
-  cambiarEstatus, obtenerAcciones, obtenerWorkItem,
+  cambiarEstatus, invalidarVistasDeTrabajo, obtenerAcciones, obtenerWorkItem,
   type AccionDisponible, type BandejaItem, type CatalogosBandeja,
 } from "../../shared/api/workitems";
 import { ModalTiempo } from "./ModalTiempo";
@@ -100,7 +100,7 @@ export function MenuAcciones({ item, catalogos, alExito, alError }: Props) {
       alExito(mensaje);
       setAccionConMotivo(null);
       setMotivo("");
-      await clienteQuery.invalidateQueries({ queryKey: ["bandeja"] });
+      await invalidarVistasDeTrabajo(clienteQuery);
     } catch (error) {
       if (error instanceof ErrorApi) {
         const detalle = error.detalle as { revisionesPendientes?: unknown[] } | undefined;

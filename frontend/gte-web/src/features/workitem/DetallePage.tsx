@@ -97,7 +97,10 @@ export function DetallePage() {
   const esTerminado = item.idEstatus === ESTATUS_TERMINADO && !puede("WI.ModificarTerminado");
   const esAjeno = item.idAsignado !== null && item.idAsignado !== sesion?.idUsuario
     && !puede("WI.ModificarAjeno");
-  const puedeEditar = !esTerminado && !esAjeno;
+  // Un release Aprobado/Liberado congela el elemento por completo (el backend lo rechaza
+  // aunque se tenga WI.ModificarTerminado), asi que tampoco se ofrecen las acciones.
+  const soloLectura = item.congeladoPorRelease;
+  const puedeEditar = !esTerminado && !esAjeno && !soloLectura;
 
   return (
     <Box sx={{ p: { xs: 1.5, sm: 2 } }}>
@@ -132,14 +135,24 @@ export function DetallePage() {
                 Editar
               </Button>
             )}
-            <BotonesAcciones
-              idWorkItem={item.idWorkItem}
-              folio={item.folio}
-              alExito={(mensaje) => setAviso({ tipo: "success", mensaje })}
-              alError={(mensaje) => setAviso({ tipo: "error", mensaje })}
-            />
+            {!soloLectura && (
+              <BotonesAcciones
+                idWorkItem={item.idWorkItem}
+                folio={item.folio}
+                alExito={(mensaje) => setAviso({ tipo: "success", mensaje })}
+                alError={(mensaje) => setAviso({ tipo: "error", mensaje })}
+              />
+            )}
           </Stack>
         </Stack>
+        {soloLectura && item.idRelease !== null && (
+          <Alert severity="info" sx={{ mt: 1.5 }}>
+            Este elemento pertenece al release{" "}
+            <Link component={RouterLink} to={`/releases/${item.idRelease}`}>{item.release}</Link>,
+            que ya esta aprobado o liberado: es de solo lectura. Cualquier cambio se registra
+            como un elemento nuevo.
+          </Alert>
+        )}
       </Paper>
 
       <Box sx={{ display: "flex", gap: 2, flexDirection: { xs: "column", md: "row" } }}>
@@ -178,9 +191,11 @@ export function DetallePage() {
             <Box>
               <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", mb: 1 }}>
                 <Typography variant="subtitle2">Registros de tiempo</Typography>
-                <Button size="small" variant="contained" onClick={() => setModalTiempo(true)}>
-                  Registrar tiempo
-                </Button>
+                {!soloLectura && (
+                  <Button size="small" variant="contained" onClick={() => setModalTiempo(true)}>
+                    Registrar tiempo
+                  </Button>
+                )}
               </Stack>
               {/* Cinco columnas no caben en un celular: la tabla scrollea dentro de su
                   caja en vez de estirar la pantalla completa. */}
@@ -237,6 +252,7 @@ export function DetallePage() {
             <PanelRevisiones
               idWorkItem={item.idWorkItem}
               folio={item.folio}
+              soloLectura={soloLectura}
               alExito={(mensaje) => setAviso({ tipo: "success", mensaje })}
               alError={(mensaje) => setAviso({ tipo: "error", mensaje })}
             />
@@ -246,6 +262,7 @@ export function DetallePage() {
             <PanelPruebas
               idWorkItem={item.idWorkItem}
               idProyecto={item.idProyecto}
+              soloLectura={soloLectura}
               alExito={(mensaje) => setAviso({ tipo: "success", mensaje })}
               alError={(mensaje) => setAviso({ tipo: "error", mensaje })}
             />
@@ -254,6 +271,7 @@ export function DetallePage() {
           {pestana === 4 && (
             <PanelAdjuntos
               idWorkItem={item.idWorkItem}
+              soloLectura={soloLectura}
               alExito={(mensaje) => setAviso({ tipo: "success", mensaje })}
               alError={(mensaje) => setAviso({ tipo: "error", mensaje })}
             />
@@ -272,6 +290,7 @@ export function DetallePage() {
 
           <PanelComentarios
             idWorkItem={item.idWorkItem}
+            soloLectura={soloLectura}
             alError={(mensaje) => setAviso({ tipo: "error", mensaje })}
           />
         </Paper>

@@ -1,5 +1,6 @@
 using FluentValidation;
 using GTE.Application.Common;
+using GTE.Application.WorkItems;
 using GTE.Domain.Exceptions;
 using GTE.Domain.Interfaces;
 using MediatR;
@@ -19,6 +20,7 @@ public class EliminarComentarioValidator : AbstractValidator<EliminarComentarioC
 /// <summary>Baja logica. Solo quien escribio el comentario puede eliminarlo (sin admin-override en esta entrega).</summary>
 public class EliminarComentarioHandler(
     IComentarioRepository repositorio,
+    IWorkItemRepository workItems,
     AuditContext auditoria) : IRequestHandler<EliminarComentarioCommand, Unit>
 {
     public async Task<Unit> Handle(EliminarComentarioCommand command, CancellationToken cancellationToken)
@@ -31,6 +33,11 @@ public class EliminarComentarioHandler(
             if (!string.Equals(estado.UsuarioRegistro, auditoria.Usuario, StringComparison.OrdinalIgnoreCase))
             {
                 throw new ForbiddenException("Solo quien escribio el comentario puede eliminarlo.");
+            }
+
+            if (estado.Entidad == "WorkItem")
+            {
+                await CandadoRelease.ExigirNoCongeladoAsync(workItems, estado.IdEntidad, cancellationToken);
             }
 
             await repositorio.EliminarAsync(command.IdComentario, cancellationToken);

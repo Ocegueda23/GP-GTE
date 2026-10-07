@@ -8,7 +8,7 @@ import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorApi } from "../../shared/api/http";
 import {
-  cambiarEstatus, colorEstatus, formatearMinutos, obtenerMiDia, type MiDiaItem,
+  cambiarEstatus, colorEstatus, formatearMinutos, invalidarVistasDeTrabajo, obtenerMiDia, type MiDiaItem,
 } from "../../shared/api/workitems";
 import { colorEstatusTicket, type Ticket } from "../../shared/api/tickets";
 import { colorEstatusIncidente, colorSeveridad, type Incidente } from "../../shared/api/incidentes";
@@ -179,10 +179,7 @@ export function MiDiaPage() {
 
   const miDia = useQuery({ queryKey: ["mi-dia"], queryFn: obtenerMiDia });
 
-  const refrescar = () => Promise.all([
-    clienteQuery.invalidateQueries({ queryKey: ["mi-dia"] }),
-    clienteQuery.invalidateQueries({ queryKey: ["bandeja"] }),
-  ]);
+  const refrescar = () => invalidarVistasDeTrabajo(clienteQuery);
 
   // La accion viene del motor (INICIAR o REANUDAR segun el estatus): el front no la deduce.
   const iniciar = async (item: MiDiaItem) => {

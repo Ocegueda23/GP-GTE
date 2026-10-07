@@ -11,6 +11,9 @@ public interface IWorkItemRepository
 
     Task<EstadoWorkItem?> ObtenerEstadoAsync(int idWorkItem, CancellationToken cancellationToken = default);
 
+    /// <summary>Release Aprobado o Liberado que contiene al elemento (null si no esta congelado).</summary>
+    Task<ReleaseCongelado?> ObtenerReleaseCongeladoAsync(int idWorkItem, CancellationToken cancellationToken = default);
+
     Task<ProyectoResumen?> ObtenerProyectoAsync(int idProyecto, CancellationToken cancellationToken = default);
 
     Task<UsuarioResumen?> ObtenerUsuarioAsync(int idUsuario, CancellationToken cancellationToken = default);

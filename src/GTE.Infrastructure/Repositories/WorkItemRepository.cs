@@ -1,5 +1,6 @@
 using GTE.Application.Common;
 using GTE.Domain.Calidad;
+using GTE.Domain.Entregas;
 using GTE.Domain.Interfaces;
 using GTE.Domain.WorkItems;
 using GTE.Infrastructure.Modelos.bdsGTE;
@@ -99,6 +100,22 @@ public class WorkItemRepository(FabricaContexto fabrica, AuditContext auditoria)
                 contexto.TblUsuario.Where(u => u.IdUsuario == w.IdAsignado)
                     .Select(u => u.IdHorario).FirstOrDefault(),
                 w.IdComplejidad, w.FechaCompromiso, w.Activo, p.Administrado, p.IdCategoriaProyecto, w.IdSprint)
+            ).FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<ReleaseCongelado?> ObtenerReleaseCongeladoAsync(
+        int idWorkItem, CancellationToken cancellationToken = default)
+    {
+        await using var contexto = Fabrica.ConectarContexto<DbContextGTE>();
+
+        return await (
+            from w in contexto.TblWorkItem.AsNoTracking()
+            join r in contexto.TblRelease.AsNoTracking() on w.IdRelease equals r.IdRelease
+            where w.IdWorkItem == idWorkItem
+                  && (r.IdEstatusRelease == EstatusRelease.Aprobado
+                      || r.IdEstatusRelease == EstatusRelease.Liberado)
+            select new ReleaseCongelado(
+                r.IdRelease, r.Folio ?? r.Version, r.IdEstatusRelease == EstatusRelease.Liberado)
             ).FirstOrDefaultAsync(cancellationToken);
     }
 

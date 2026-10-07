@@ -198,6 +198,10 @@ public class RegistrarDespliegueValidator : AbstractValidator<RegistrarDespliegu
     {
         RuleFor(c => c.IdRelease).GreaterThan(0);
         RuleFor(c => c.Datos.IdAmbiente).GreaterThan(0).WithMessage("El ambiente es obligatorio.");
+        // Margen de unos minutos por la diferencia de reloj entre el equipo y el servidor
+        RuleFor(c => c.Datos.FechaDespliegue)
+            .Must(f => f is null || f.Value <= DateTime.Now.AddMinutes(5))
+            .WithMessage("La fecha del despliegue no puede ser futura.");
     }
 }
 
@@ -242,9 +246,11 @@ public class RegistrarDespliegueHandler(
             }
         }
 
+        var fechaDespliegue = command.Datos.FechaDespliegue ?? DateTime.Now;
+
         await repositorio.RegistrarDespliegueAsync(new DespliegueNuevo(
             command.IdRelease, command.Datos.IdAmbiente, usuario.IdUsuario,
-            command.Datos.EsRollback, command.Datos.Bitacora), cancellationToken);
+            command.Datos.EsRollback, command.Datos.Bitacora, fechaDespliegue), cancellationToken);
 
         // El estatus del release solo cambia en produccion
         if (esProduccion && command.Datos.Exitoso)
@@ -259,7 +265,7 @@ public class RegistrarDespliegueHandler(
 
             if (!command.Datos.EsRollback)
             {
-                await repositorio.MarcarLiberadoAsync(command.IdRelease, cancellationToken);
+                await repositorio.MarcarLiberadoAsync(command.IdRelease, fechaDespliegue, cancellationToken);
             }
         }
 

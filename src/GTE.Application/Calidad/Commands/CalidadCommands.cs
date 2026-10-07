@@ -4,6 +4,7 @@ using GTE.Application.DTOs.Request.Revisiones;
 using GTE.Application.DTOs.Responses.Calidad;
 using GTE.Application.Interfaces;
 using GTE.Application.Revisiones.Commands;
+using GTE.Application.WorkItems;
 using GTE.Domain.Calidad;
 using GTE.Domain.Exceptions;
 using GTE.Domain.Interfaces;
@@ -47,6 +48,7 @@ public class CrearCasoYAsignarHandler(
             ?? throw new NotFoundException("WorkItem", command.IdWorkItem);
 
         await permisos.ExigirPermisoAsync(PermisosCalidad.Ejecutar, estadoItem.IdProyecto, cancellationToken);
+        await CandadoRelease.ExigirNoCongeladoAsync(workItems, command.IdWorkItem, cancellationToken);
 
         var folio = await folios.GenerarAsync("CP", cancellationToken: cancellationToken);
 
@@ -89,6 +91,7 @@ public class AsignarCasoExistenteHandler(
             ?? throw new NotFoundException("WorkItem", command.IdWorkItem);
 
         await permisos.ExigirPermisoAsync(PermisosCalidad.Ejecutar, estadoItem.IdProyecto, cancellationToken);
+        await CandadoRelease.ExigirNoCongeladoAsync(workItems, command.IdWorkItem, cancellationToken);
 
         var caso = await repositorio.ObtenerEstadoCasoAsync(command.Datos.IdCasoPrueba, cancellationToken)
             ?? throw new NotFoundException("CasoPrueba", command.Datos.IdCasoPrueba);
@@ -134,6 +137,7 @@ public class RetirarAsignacionHandler(
             ?? throw new NotFoundException("WorkItem", idWorkItem);
 
         await permisos.ExigirPermisoAsync(PermisosCalidad.Ejecutar, estadoItem.IdProyecto, cancellationToken);
+        await CandadoRelease.ExigirNoCongeladoAsync(workItems, idWorkItem, cancellationToken);
 
         await repositorio.RetirarAsignacionAsync(command.IdWorkItemCasoPrueba, cancellationToken);
         return Unit.Value;
@@ -257,6 +261,7 @@ public class RegistrarEjecucionHandler(
             ?? throw new NotFoundException("WorkItem", command.IdWorkItem);
 
         await permisos.ExigirPermisoAsync(PermisosCalidad.Ejecutar, estadoItem.IdProyecto, cancellationToken);
+        await CandadoRelease.ExigirNoCongeladoAsync(workItems, command.IdWorkItem, cancellationToken);
 
         if (!await repositorio.ExisteAsignacionActivaAsync(command.IdWorkItem, command.Datos.IdCasoPrueba, cancellationToken))
         {

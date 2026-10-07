@@ -24,7 +24,7 @@ import {
   quitarArtefacto, quitarContenido, quitarRespaldo, registrarDespliegue, resolverAprobacion,
 } from "../../shared/api/entregas";
 import type { Artefacto, Respaldo } from "../../shared/api/entregas";
-import { obtenerCatalogosBandeja } from "../../shared/api/workitems";
+import { obtenerCatalogosBandeja, invalidarVistasDeTrabajo } from "../../shared/api/workitems";
 import { useSesion } from "../../shared/api/sesion";
 import { formatearFecha } from "./formato";
 
@@ -59,6 +59,12 @@ const FORM_RESPALDO_VACIO: FormRespaldo = {
   idReleaseRespaldo: null, idTipoRespaldo: "", descripcion: "",
 };
 
+/** Fecha y hora local actual en el formato de un input datetime-local (YYYY-MM-DDTHH:mm). */
+function ahoraLocal() {
+  const ahora = new Date();
+  return new Date(ahora.getTime() - ahora.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
+
 /**
  * P13 y P14 - Detalle de un release: encabezado con acciones, lider asignado, instructivo,
  * contenido, artefactos y respaldos; a la derecha la cadena de firmas, los despliegues y la
@@ -82,6 +88,8 @@ export function DetalleReleasePage() {
   const [motivoAutorizar, setMotivoAutorizar] = useState("");
   const [seleccionados, setSeleccionados] = useState<number[]>([]);
   const [idSprintFiltro, setIdSprintFiltro] = useState<number | "">("");
+  /** Proyecto del que se ofrecen candidatos; vacio es el del propio release. */
+  const [idProyectoCandidatos, setIdProyectoCandidatos] = useState<number | "">("");
   const [textoCandidatos, setTextoCandidatos] = useState("");
   const [tipoCandidatos, setTipoCandidatos] = useState("");
   const [ocultarBloqueados, setOcultarBloqueados] = useState(false);
@@ -90,6 +98,7 @@ export function DetalleReleasePage() {
   const [idAmbiente, setIdAmbiente] = useState<number | "">("");
   const [esRollback, setEsRollback] = useState(false);
   const [bitacora, setBitacora] = useState("");
+  const [fechaDespliegue, setFechaDespliegue] = useState("");
   const [comentario, setComentario] = useState("");
   const [enviando, setEnviando] = useState(false);
   const clienteQuery = useQueryClient();
@@ -109,8 +118,9 @@ export function DetalleReleasePage() {
   const matriz = useQuery({ queryKey: ["matriz-ambientes"], queryFn: obtenerMatrizAmbientes });
 
   const candidatos = useQuery({
-    queryKey: ["candidatos-release", idRelease],
-    queryFn: () => obtenerCandidatosContenido(idRelease),
+    queryKey: ["candidatos-release", idRelease, idProyectoCandidatos],
+    queryFn: () => obtenerCandidatosContenido(
+      idRelease, idProyectoCandidatos === "" ? undefined : idProyectoCandidatos),
     enabled: modalContenido,
   });
 
@@ -142,7 +152,7 @@ export function DetalleReleasePage() {
     clienteQuery.invalidateQueries({ queryKey: ["release", idRelease] }),
     clienteQuery.invalidateQueries({ queryKey: ["candidatos-release", idRelease] }),
     clienteQuery.invalidateQueries({ queryKey: ["matriz-ambientes"] }),
-    clienteQuery.invalidateQueries({ queryKey: ["bandeja"] }),
+    invalidarVistasDeTrabajo(clienteQuery),
   ]);
 
   const manejar = async (accion: () => Promise<{ mensaje: string }>, respaldo: string) => {
@@ -305,6 +315,7 @@ export function DetalleReleasePage() {
             {editable && (
               <>
                 <Button size="small" variant="outlined" onClick={() => {
+                  setIdProyectoCandidatos("");
                   setIdSprintFiltro("");
                   setTextoCandidatos("");
                   setTipoCandidatos("");
@@ -337,7 +348,7 @@ export function DetalleReleasePage() {
               </Button>
             )}
             {(r.idEstatus === 3 || r.idEstatus === 4) && (
-              <Button size="small" variant="contained" onClick={() => setModalDespliegue(true)}>
+              <Button size="small" variant="contained" onClick={() => { setFechaDespliegue(ahoraLocal()); setModalDespliegue(true); }}>
                 Registrar despliegue
               </Button>
             )}
@@ -684,8 +695,29 @@ export function DetalleReleasePage() {
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
           <Typography variant="body2" color="text.secondary">
             Solo aparecen los elementos terminados del proyecto que todavia no estan en ningun
-            release, ordenados por folio.
+            release, ordenados por folio. Para incluir trabajo de otro proyecto, cambialo abajo.
           </Typography>
+
+          {/* Al cambiar de proyecto se reinician los filtros: los sprints y tipos de la
+              lista anterior no existen en la nueva. La seleccion tambien se limpia porque
+              el combo solo muestra las opciones del proyecto actual. */}
+          <ComboBuscable
+            label="Proyecto"
+            value={idProyectoCandidatos === "" ? r.idProyecto : idProyectoCandidatos}
+            onChange={(v) => {
+              const valor = v === "" || Number(v) === r.idProyecto ? "" : Number(v);
+              setIdProyectoCandidatos(valor);
+              setIdSprintFiltro("");
+              setTipoCandidatos("");
+              setSeleccionados([]);
+            }}
+            opciones={(catalogos.data?.proyectos ?? []).map((p) => ({
+              valor: p.id,
+              etiqueta: p.id === r.idProyecto
+                ? `${p.clave} - ${p.nombre} (proyecto del release)`
+                : `${p.clave} - ${p.nombre}`,
+            }))}
+          />
 
           {/* Los filtros se arman con los propios candidatos: acotan la lista Y el boton de
               seleccionar todo, que es lo que permite meter un sprint completo de un clic. */}
@@ -899,17 +931,21 @@ export function DetalleReleasePage() {
               <MenuItem value={1}>Rollback</MenuItem>
             </Select>
           </FormControl>
+          <TextField size="small" type="datetime-local" label="Fecha del despliegue" required
+            slotProps={{ inputLabel: { shrink: true }, htmlInput: { max: ahoraLocal() } }}
+            value={fechaDespliegue} onChange={(e) => setFechaDespliegue(e.target.value)} />
           <TextField size="small" multiline minRows={2} label="Bitacora"
             value={bitacora} onChange={(e) => setBitacora(e.target.value)} />
         </DialogContent>
         <DialogActions>
           <Button color="error" onClick={() => setModalDespliegue(false)}>Cancelar</Button>
-          <Button variant="contained" disabled={enviando || idAmbiente === ""}
+          <Button variant="contained" disabled={enviando || idAmbiente === "" || !fechaDespliegue}
             onClick={() => { setModalDespliegue(false); void manejar(
               () => registrarDespliegue(r.idRelease, {
                 idAmbiente: idAmbiente as number,
                 esRollback,
                 bitacora: bitacora.trim() || null,
+                fechaDespliegue,
               }).then((res) => { setBitacora(""); return res; }),
               "No se pudo registrar el despliegue."); }}>
             Registrar
