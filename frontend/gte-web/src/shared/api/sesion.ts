@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { enviar, obtener } from "./http";
+import { enviar, intentarRefrescar, obtener } from "./http";
 
 export interface Sesion {
   idUsuario: number;
@@ -87,6 +87,66 @@ export function cerrarSesion() {
 
 export function hayToken(): boolean {
   return sessionStorage.getItem(CLAVE_TOKEN) !== null;
+}
+
+// ---------- Sesion compartida entre pestanas ----------
+// El token vive en sessionStorage, que es de UNA pestana: un Ctrl+Click abria la pestana
+// nueva sin token y caia en el login. La pestana nueva le pide la sesion a las que ya
+// estan abiertas por BroadcastChannel (mismo origen, funciona tambien sobre HTTP plano).
+// Solo si ninguna contesta usa la cookie de refresh; no se refresca de entrada porque
+// abrir varias pestanas a la vez dispararia refreshes simultaneos con la misma cookie.
+
+const CLAVES_COMPARTIDAS = [CLAVE_TOKEN, CLAVE_TOKEN_REAL, CLAVE_NOMBRE_REAL];
+const ESPERA_RESPUESTA_MS = 400;
+
+type MensajeSesion =
+  | { tipo: "pedir" }
+  | { tipo: "sesion"; valores: Record<string, string> };
+
+const canalSesion = typeof BroadcastChannel === "undefined" ? null : new BroadcastChannel("gte.sesion");
+
+// Toda pestana con sesion contesta. Se copian tambien las claves de suplantacion para que
+// la pestana nueva siga siendo la misma identidad que la que le dio la sesion.
+canalSesion?.addEventListener("message", (evento: MessageEvent<MensajeSesion>) => {
+  if (evento.data.tipo !== "pedir" || !hayToken()) return;
+  const valores: Record<string, string> = {};
+  for (const clave of CLAVES_COMPARTIDAS) {
+    const valor = sessionStorage.getItem(clave);
+    if (valor !== null) valores[clave] = valor;
+  }
+  canalSesion.postMessage({ tipo: "sesion", valores } satisfies MensajeSesion);
+});
+
+function pedirSesionAOtraPestana(): Promise<boolean> {
+  if (!canalSesion) return Promise.resolve(false);
+  return new Promise((resolver) => {
+    const alRecibir = (evento: MessageEvent<MensajeSesion>) => {
+      if (evento.data.tipo !== "sesion") return;
+      terminar(true, evento.data.valores);
+    };
+    const limite = window.setTimeout(() => terminar(false), ESPERA_RESPUESTA_MS);
+    function terminar(recibida: boolean, valores?: Record<string, string>) {
+      window.clearTimeout(limite);
+      canalSesion!.removeEventListener("message", alRecibir);
+      // Contesta la primera pestana; las respuestas que lleguen despues se ignoran.
+      if (recibida && valores && !hayToken()) {
+        for (const [clave, valor] of Object.entries(valores)) sessionStorage.setItem(clave, valor);
+      }
+      resolver(recibida);
+    }
+    canalSesion.addEventListener("message", alRecibir);
+    canalSesion.postMessage({ tipo: "pedir" } satisfies MensajeSesion);
+  });
+}
+
+/**
+ * Pestana sin token: intenta recuperar la sesion sin pedir contraseña. Devuelve true si
+ * quedo un token en esta pestana.
+ */
+export async function recuperarSesionDeOtraPestana(): Promise<boolean> {
+  if (hayToken()) return true;
+  if (await pedirSesionAOtraPestana()) return hayToken();
+  return (await intentarRefrescar()) !== null;
 }
 
 /**
