@@ -296,6 +296,8 @@ export interface MiDia {
   usuario: string;
   fecha: string;
   enProceso: MiDiaItem | null;
+  /** En Pruebas, Correccion o Suspendido; no se repiten en vencidas/paraHoy/proximas. */
+  enCurso: MiDiaItem[];
   vencidas: MiDiaItem[];
   paraHoy: MiDiaItem[];
   proximas: MiDiaItem[];
